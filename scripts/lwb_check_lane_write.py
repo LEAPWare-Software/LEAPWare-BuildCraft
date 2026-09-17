@@ -26,6 +26,11 @@ direction for a same-session nudge that is not itself the enforcement of
 record (see module docstring); the `lwb-lanes` CI check still catches an
 out-of-lane commit regardless of what this hook did or didn't catch.
 
+Scope: only paths INSIDE this repo are lane-checked. Owner directive 5
+divides this repo into lanes and says nothing about the rest of the
+filesystem, so a write to a session's own memory directory, a global
+`~/.claude/CLAUDE.md`, or a scratch file is allowed — see `_relativize`.
+
 Usage:
     python scripts/lwb_check_lane_write.py --agent claude
     python scripts/lwb_check_lane_write.py --agent codex
@@ -40,6 +45,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -81,14 +87,26 @@ def _extract_paths(agent: str, raw: dict) -> list[str]:
     return []
 
 
-def _relativize(path_str: str) -> str:
-    """Best-effort: turn an absolute path under REPO_ROOT into a repo-relative one."""
+def _relativize(path_str: str) -> Optional[str]:
+    """Repo-relative form of `path_str`, or None if it is not inside this repo.
+
+    Returning None matters. Owner directive 5 divides THIS repo into lanes;
+    it says nothing about the rest of the filesystem. An absolute path that
+    is not under REPO_ROOT used to fall through to `classify_path` unchanged,
+    which called it "other" and denied the write -- so this hook blocked a
+    session from writing its own memory directory, its global
+    `~/.claude/CLAUDE.md`, or any scratch file, none of which is a lane
+    violation. A path outside the repo is simply not this hook's business.
+    """
     try:
         p = Path(path_str)
         if p.is_absolute():
-            return str(p.resolve().relative_to(REPO_ROOT.resolve())).replace("\\", "/")
-    except (OSError, ValueError):
-        pass
+            try:
+                return str(p.resolve().relative_to(REPO_ROOT.resolve())).replace("\\", "/")
+            except ValueError:
+                return None  # absolute, but outside this repo
+    except OSError:
+        return None
     return path_str.replace("\\", "/")
 
 
@@ -97,6 +115,8 @@ def evaluate(agent: str, raw: dict) -> dict:
     offenders = []
     for path_str in paths:
         rel = _relativize(path_str)
+        if rel is None:
+            continue  # outside this repo: not a lane question
         cls = classify_path(rel)
         if cls not in (agent, "shared"):
             offenders.append(rel)
