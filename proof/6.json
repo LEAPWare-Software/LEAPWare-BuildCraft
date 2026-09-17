@@ -1,9 +1,9 @@
 {
-  "deliverable": "6",
+  "deliverable": "lwb-gates-enforceable",
   "pr": 6,
   "author": "claude-code-opus5-session-f8da3f9e-2026-09-17",
   "checked_by": "lw-verifier-sonnet-ac5ffd6d6cde8a968-2026-09-17",
-  "commit": "5ed50893ad1c400840fcec0a72a59860085c74ce",
+  "commit": "bbb07b950d0f0c37a9edc896d2073aa359cf475f",
   "commands": [
     {
       "argv": [
@@ -16,12 +16,12 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "........................................................................ [ 49%]",
-        "........................................................................ [ 98%]",
-        "..                                                                       [100%]",
-        "146 passed in 8.14s"
+        "........................................................................ [ 48%]",
+        "........................................................................ [ 97%]",
+        "....                                                                     [100%]",
+        "148 passed in 10.63s"
       ],
-      "sha256": "7ba6823ae0b728a27d77947762e70bd8a00aa52c7059b9ef40eaca93df08ba7b"
+      "sha256": "4711772437e70543e7f4f4d237c42844448b5cb64b93d241319c94ace4c1bdc4"
     },
     {
       "argv": [
@@ -56,9 +56,9 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "OK: C:\\Users\\manny.ramos\\leapware-hq\\leapware-software\\leapware-buildcraft\\HANDOFF.md passes all checks (2784 bytes)"
+        "OK: <repo>\\HANDOFF.md passes all checks (2742 bytes)"
       ],
-      "sha256": "e5eb1e81860cf79325c02b064d1789cd67fcc58aff0450a9d4e90a291c240282"
+      "sha256": "98e21ea3c86896ddb10dcd68fd0e9705b0b97091e7c2a5a73b12f2c1eb8bfa53"
     },
     {
       "argv": [
@@ -93,18 +93,40 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "OK: C:\\Users\\manny.ramos\\leapware-hq\\leapware-software\\leapware-buildcraft\\plugins\\claude\\lwb\\vendor matches source",
-        "OK: C:\\Users\\manny.ramos\\leapware-hq\\leapware-software\\leapware-buildcraft\\plugins\\codex\\lwb\\vendor matches source"
+        "OK: <repo>\\plugins\\claude\\lwb\\vendor matches source",
+        "OK: <repo>\\plugins\\codex\\lwb\\vendor matches source"
       ],
-      "sha256": "e47050836b1da7620b0132a3aed8d8c467e3f2a976ba9d52b8502b5ea02d8fb1"
+      "sha256": "291de8aba32c4d695de2c308ed6de8de9fa42093249cfea7fdc79a2b78c477fb"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD",
+        "--pr-number",
+        "6"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-lanes check passed"
+      ],
+      "sha256": "5a4cc910732720cea242f7078dfef2ee3c130f9e3d9203b386cb9facb5fc275d"
     }
   ],
   "mutations": [
     ".github/workflows/ci.yml",
     "CLAUDE.md",
     "HANDOFF.md",
+    "docs/requirements/decisions.md",
+    "proof/6.json",
     "proof/README.md",
     "proof/exempt.json",
+    "proof/schema.json",
+    "reviews/6/independent-verifier.json",
     "reviews/README.md",
     "scripts/lwb_check_proof.py",
     "scripts/lwb_handoff.py",
@@ -113,11 +135,13 @@
     "tests/test_lwb_lanes.py"
   ],
   "unproven": [
-    "The squash-merge commit this PR produces on main does not exist yet, so 'commit' names this branch's head instead. Post-merge coverage matches on the 'pr' field for exactly this reason.",
-    "reviewer/author identity strings in reviews/ and the 'author'/'checked_by' fields here are self-attested: nothing cross-checks them against git authorship or a session registry. Flagged by the independent review; binding them to something externally verifiable is an open owner decision.",
-    "GitHub Apps lwb-claude and lwb-codex are still not created (no App-creation API, manifest flow needs a browser session). Step 2 of HANDOFF is only half done.",
+    "Command tails and their sha256 are SANITIZED, not verbatim: absolute paths are replaced with <repo>/<home>/<path> before hashing. Directive 7 wants captured output and directive 8 forbids leaking the machine; raw output collided with both (lwb_handoff.py prints absolute paths) and the leak gate caught it. Reproduce a digest by applying the same substitutions.",
+    "'commit' names this branch's head at capture time, not the squash-merge commit, which GitHub does not create until merge. Both directive-7 gates key on the 'pr' field for exactly this reason. The record and review files added after capture are not themselves covered by the captured runs.",
+    "'python scripts/lwb_check_proof.py --pr 6' is deliberately NOT in commands[]: a record cannot contain proof of its own existence. It was verified separately after this record was written.",
+    "author/checked_by and the reviews/ identity strings are self-attested; nothing cross-checks them against git authorship or a session registry. Flagged by the independent review, ruled on by the owner, and logged as open decision D5 in docs/requirements/decisions.md. This is an audit trail, not cryptographic proof that two sessions existed.",
+    "GitHub Apps lwb-claude and lwb-codex remain uncreated (no App-creation API; the manifest flow needs a browser session). HANDOFF step 2 is half done -- see decision D6.",
     "Plugin version drift (plugins/claude 0.1.0 vs plugins/codex 0.2.0+codex) is untouched: plugins/codex is outside the claude lane.",
-    "The ruleset was applied to the live repo out-of-band by gh api, not by anything in this diff; this record does not prove its contents match .github/rulesets/main.json.",
-    "No runtime/behavioural test of the lwb plugin itself was added or run; this deliverable changes governance checks only."
+    "The live ruleset was applied by gh api out-of-band; this record does not prove the applied ruleset matches .github/rulesets/main.json.",
+    "No runtime or behavioural test of the lwb plugin itself was added or run. This deliverable changes governance checks only; the product still ships exactly one no-op rule (lwb_version)."
   ]
 }

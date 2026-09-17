@@ -77,6 +77,31 @@ See `schema.json` for the enforced shape. In prose:
   record does NOT prove. An empty list is a claim of total proof; use it
   honestly.
 
+## Captured output must be sanitized
+
+Directive 7 wants really-captured command output. Directive 8 (**SACRED**)
+forbids this repo carrying anything about the machine it was built on.
+Raw output collides with both, and not hypothetically: `lwb_handoff.py`
+prints absolute paths, so the first real proof record written here carried
+`C:\Users\<name>\...` into a public repo and the `lwb-env-leak` gate
+rejected it.
+
+So before a record is written:
+
+- Replace the repo root with `<repo>`, the home directory with `<home>`,
+  and any remaining local absolute path with `<path>`, in every `tail`
+  line.
+- Take `sha256` over the **sanitized** text, so anyone applying the same
+  substitutions reproduces the same digest. A hash of unpublishable bytes
+  is not verifiable by anyone.
+- Say so in `unproven[]`, because a sanitized tail is not verbatim output.
+
+Two things cannot go in `commands[]` at all:
+
+- `lwb_check_proof.py --pr <N>` for the record's own PR — a record cannot
+  contain proof of its own existence. Verify it after writing the record.
+- Anything printing a private-name needle, for the obvious reason.
+
 ## Validating
 
 ```
