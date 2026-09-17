@@ -84,6 +84,8 @@ def _check_one(plugin_dir: Path, root_var: str, fixture: Path, errors: list[str]
             input=fixture.read_text(encoding="utf-8"),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env=env,
             timeout=30,
         )

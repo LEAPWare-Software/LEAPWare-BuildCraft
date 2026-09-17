@@ -123,6 +123,8 @@ def _tracked_files() -> list[Path]:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
     return [REPO_ROOT / line for line in result.stdout.splitlines() if line]
@@ -221,6 +223,8 @@ def check_range(rev_range: str, needles: Optional[list[str]] = None) -> list[str
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
 

@@ -1,0 +1,31 @@
+{
+  "$comment": "Squash-merge commits that landed on main WITHOUT a proof record, listed here rather than back-filled with invented evidence. Owner directive 7 requires a real record: commands actually run, exit codes actually observed, an independent checked_by. Writing one after the fact, from memory, for work whose output was never captured, would be a fabricated receipt -- the precise dishonesty the record exists to prevent. So the gap is named instead. scripts/lwb_check_proof.py --coverage skips exactly these shas and nothing else; adding an entry is a visible, reviewable act in a shared path, which is the point. DO NOT add a new entry to avoid writing a record.",
+  "$why_the_gap_existed": "lwb_check_proof.py validated the records that existed and never asked whether one SHOULD exist, so an empty proof/ reported 'skipped (no records yet)' and exited 0. The gate could not fail. These five deliverables merged green through it. The --coverage mode added in PR #6 closes that; these five predate it.",
+  "merges": {
+    "31a75abfbc23770b157b804322088130ac62aa28": {
+      "pr": 1,
+      "subject": "Bootstrap LEAPWare BuildCraft (lwb) scaffold",
+      "reason": "Scaffolding session that created the proof mechanism itself; proof/README.md states in terms that it wrote no records. No captured command output survives from it."
+    },
+    "ad4a3fa7f937dd30fa5410126b44b7307ead476b": {
+      "pr": 2,
+      "subject": "chore(deps): bump actions/checkout from 5 to 7",
+      "reason": "Dependabot. No agent authored it, so there is no author/checked_by pair to record; CI green on the PR head is the whole of the available evidence."
+    },
+    "4784c6bd4b8d196fa5731122b905fad1f9b158ed": {
+      "pr": 3,
+      "subject": "chore(deps): bump actions/setup-python from 6 to 7",
+      "reason": "Dependabot, as PR 2."
+    },
+    "68ac412247c03d109273de33948391581fdbec56": {
+      "pr": 4,
+      "subject": "chore(deps): bump softprops/action-gh-release from 2 to 3",
+      "reason": "Dependabot, as PR 2."
+    },
+    "4a62f6eb810d81d649acb6c5dbd099cb60e9ab52": {
+      "pr": 5,
+      "subject": "Arm directive 8's private-name gate; make tests/ a shared lane",
+      "reason": "Landed before --coverage existed and before any independent checker identity was available, so checked_by could only have been self-certified. Its verification IS recorded -- in full, with commands and counts, in the three commit messages 818c906, 8336cff, 7f213ce -- which docs/handoff-protocol.md accepts as a proof record; it is the proof/*.json artifact that is missing, not the evidence."
+    }
+  }
+}

@@ -12,42 +12,42 @@ In order. Do not start step *n+1* before step *n* is done and proven.
    (`lwb`). PR #1 squash-merged, 16/16 green. The repo is **PUBLIC** under
    Apache-2.0: everything committed is world-readable permanently, history
    included.
-2. **Apply the repository ruleset; create the two GitHub Apps**
-   (`lwb-claude`, `lwb-codex`) from `.github/apps/`, in a browser session.
-   Install on this repo only; each private key goes to the owner's secrets
-   manager, never the repo. Record App ids in
-   `docs/maintainers/github-apps.md` via PR.
-3. **The requirements package**, per `docs/requirements/approach.md`,
-   replacing the TODO placeholder in
-   `docs/requirements/owner-directives.md`. Owner decisions recorded: all
-   three rule families (stage, role, proof) ship in 1.0 **warn-only**, deny
-   modes from 1.1 on ledger evidence; stages are `design → qa → review →
-   security → delivery → release → operations`; role separation is
-   reviewer-independence only (a `qa`/`review`/`security` author may not
-   have authored an earlier stage of the same deliverable), and policy may
-   tighten it, never loosen it; stage state derives from `proof/*.json`
-   plus one added `stage` field — no new state store, no network in a hook.
-   Then the lift from the private legacy repo (acceptance checker and its
-   tests, provenance/vendor pattern), each piece origin- and
-   licence-checked before it lands.
+2. **Ruleset DONE; GitHub Apps DEFERRED.** Ruleset `main` (id 23627212) is
+   active on the default branch: no deletion, no force-push, PR required,
+   9 required checks, squash-only, merge queue. The two Apps
+   (`lwb-claude`, `lwb-codex`, manifests in `.github/apps/`) are **not
+   created** — GitHub has no API for App creation, the manifest flow needs
+   an authenticated browser session, and no Chrome extension is reachable
+   from a CLI session. They block nothing: `gh auth` already commits and
+   merges. Do them when a second CLI or a revocable per-CLI identity is
+   actually needed. Do NOT generate a private key until there is a decided
+   place to put it — GitHub shows it once and it carries repo write.
+3. **The requirements package** ← NEXT, per
+   `docs/requirements/approach.md`, replacing the TODO placeholder in
+   `docs/requirements/owner-directives.md`. Eight owner decisions are
+   already recorded in **`docs/requirements/decisions.md`** (D1–D8: rule
+   families and phasing, stages, role separation, derived stage state,
+   identity-based review, Apps deferred, needles as config, history
+   accepted) — read that file, do not re-decide them. D5 carries a NAMED
+   OPEN DECISION the package must answer: what binds a reviewer identity to
+   something externally verifiable. Then the lift from the private legacy
+   repo (acceptance checker and its tests, provenance/vendor pattern), each
+   piece origin- and licence-checked before it lands.
 4. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-17 21:35 UTC
-main SHA: 31a75abfbc23770b157b804322088130ac62aa28
+Generated: 2026-09-17 22:32 UTC
+main SHA: 68ac412247c03d109273de33948391581fdbec56
 CLI: claude
-Session: requirements-2026-09-17
+Session: gates-2026-09-17
 
 Open PRs:
-#5 Arm directive 8's private-name gate; make tests/ a shared lane (lwb-leak-gate-handoff)
-#4 chore(deps): bump softprops/action-gh-release from 2 to 3 (dependabot/github_actions/softprops/action-gh-release-3)
-#3 chore(deps): bump actions/setup-python from 6 to 7 (dependabot/github_actions/actions/setup-python-7)
-#2 chore(deps): bump actions/checkout from 5 to 7 (dependabot/github_actions/actions/checkout-7)
+#6 Make directive 7 enforceable; decouple directive 5 from CLI vendor (lwb-gates-enforceable)
 
 Deliverable proof state (from proof/):
-(none yet)
+- lwb-gates-enforceable: PROVEN (commit bbb07b950d0f0c37a9edc896d2073aa359cf475f)
 
 <!-- lwb-handoff:end -->
 

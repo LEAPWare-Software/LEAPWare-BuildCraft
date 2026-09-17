@@ -131,6 +131,8 @@ def _run_gh(argv: list[str], input_json: str | None = None) -> subprocess.Comple
         input=input_json,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
 

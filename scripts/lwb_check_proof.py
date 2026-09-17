@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -113,7 +114,9 @@ def validate_all() -> tuple[list[str], int]:
     count = 0
     if PROOF_DIR.is_dir():
         for path in sorted(PROOF_DIR.glob("*.json")):
-            if path.name == "schema.json":
+            # schema.json is the shape; exempt.json is the named-gap list
+            # (see check_coverage). Neither is a proof record.
+            if path.name in ("schema.json", "exempt.json"):
                 continue
             count += 1
             try:
@@ -125,8 +128,182 @@ def validate_all() -> tuple[list[str], int]:
     return errors, count
 
 
+SQUASH_SUBJECT_RE = re.compile(r"\(#(\d+)\)\s*$")
+EXEMPT_PATH = PROOF_DIR / "exempt.json"
+
+
+def _landed_deliverables(rev_range: str) -> list[tuple[str, str]]:
+    """(sha, subject) for each squash-merge commit in `rev_range`.
+
+    A squash merge is a single-parent commit, so `--merges` finds nothing;
+    the convention GitHub writes is a trailing `(#N)` in the subject.
+    """
+    result = subprocess.run(
+        ["git", "log", "--format=%H%x00%s", rev_range],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
+    landed = []
+    for line in result.stdout.splitlines():
+        if "\x00" not in line:
+            continue
+        sha, subject = line.split("\x00", 1)
+        if SQUASH_SUBJECT_RE.search(subject):
+            landed.append((sha, subject))
+    return landed
+
+
+def _exempt_shas() -> dict:
+    if not EXEMPT_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(EXEMPT_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return data.get("merges", {}) if isinstance(data, dict) else {}
+
+
+def check_coverage(rev_range: str) -> list[str]:
+    """Every landed deliverable must HAVE a proof record, not merely be well-formed.
+
+    This is the half directive 7 was missing. `validate_all` checks the
+    records that exist; it never asks whether one should exist, so an empty
+    `proof/` read as "nothing to prove yet" and the gate could not fail --
+    PRs #1 through #5 all merged green with zero records. Historical merges
+    are listed in proof/exempt.json with a reason rather than back-filled
+    with invented evidence; anything not on that list needs a real record.
+    """
+    errors: list[str] = []
+    proved_commits = set()
+    proved_prs = set()
+    if PROOF_DIR.is_dir():
+        for path in sorted(PROOF_DIR.glob("*.json")):
+            if path.name in ("schema.json", "exempt.json"):
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(data, dict):
+                continue
+            if isinstance(data.get("commit"), str):
+                proved_commits.add(data["commit"])
+            # A record is written INSIDE the PR it proves, so it cannot name
+            # the squash-merge sha -- that sha does not exist until GitHub
+            # creates it at merge time. The PR number is the only identifier
+            # available at both moments, so both halves of this check key on
+            # it. Without this, every record would be unmatchable post-merge
+            # and coverage would fail on work that was properly proven.
+            # Typed `pr` only, for the reason spelled out in
+            # check_pr_has_record: a digit-string `deliverable` is ordinary
+            # usage and collided with unrelated PR numbers.
+            if isinstance(data.get("pr"), int):
+                proved_prs.add(data["pr"])
+
+    exempt = _exempt_shas()
+    for sha, subject in _landed_deliverables(rev_range):
+        if sha in exempt or sha[:12] in exempt:
+            continue
+        match = SQUASH_SUBJECT_RE.search(subject)
+        if match and int(match.group(1)) in proved_prs:
+            continue
+        # `commit` is schema-constrained to 7-40 hex chars, so a prefix test
+        # in this direction is enough; the reverse test that used to be here
+        # (`c.startswith(sha[:7])`) was dead weight -- it could only match by
+        # predicting a future sha -- and it made an empty string match
+        # everything if the schema check were ever relaxed.
+        if any(len(c) >= 7 and sha.startswith(c) for c in proved_commits):
+            continue
+        errors.append(
+            f"{sha[:12]} ({subject!r}) landed with no proof/*.json record naming its "
+            "PR number or commit — owner directive 7: done means committed AND pushed "
+            "WITH a proof record. Add one, or list the sha in proof/exempt.json with a "
+            "reason."
+        )
+    return errors
+
+
+def check_pr_has_record(pr_number: int) -> list[str]:
+    """Pre-merge half of directive 7: this PR must carry its own proof record.
+
+    `check_coverage` keys on the `(#N)` squash-merge subject, and GitHub
+    fabricates that commit AT MERGE TIME. It does not exist while the PR's
+    own CI is running, so running coverage over `base..head` at PR time can
+    never find a landed deliverable -- it is a guaranteed no-op. That is how
+    this check first shipped, and an independent review of PR #6 caught it:
+    the gate meant to stop deliverables merging without proof would itself
+    have merged without ever being able to fire.
+
+    So there are two halves, keyed on the two things that actually exist at
+    the two moments: the PR NUMBER before the merge (blocking), and the
+    COMMIT after it (detective, on push to main).
+    """
+    errors: list[str] = []
+    if not PROOF_DIR.is_dir():
+        records = []
+    else:
+        records = [
+            p for p in sorted(PROOF_DIR.glob("*.json"))
+            if p.name not in ("schema.json", "exempt.json")
+        ]
+
+    for path in records:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        # ONLY the typed `pr` integer counts. There used to be a fallback
+        # accepting a `deliverable` that happened to be the digits of the PR
+        # number, and it was unsound: schema.json documents `deliverable` as
+        # "an issue/step number or a short slug", so a small integer is
+        # normal, expected usage. A record proving step 6 of some unrelated
+        # plan would have silently satisfied PR #6's gate forever, pre- and
+        # post-merge, with no relation to its content -- a gate reporting
+        # green without checking anything real, the same defect this PR
+        # exists to fix. Found by independent review; the first version's own
+        # test asserted the broken behaviour as intended.
+        if data.get("pr") == pr_number:
+            return []
+
+    errors.append(
+        f"PR #{pr_number} carries no proof/*.json record for itself. Add one with "
+        f"\"pr\": {pr_number} — the typed field, not a deliverable that merely reads "
+        f"as \"{pr_number}\". Owner directive 7: done means committed AND pushed WITH "
+        "a proof record."
+    )
+    return errors
+
+
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--coverage",
+        dest="rev_range",
+        default=None,
+        help="post-merge: require a proof record for every squash-merge in base..head",
+    )
+    parser.add_argument(
+        "--pr",
+        dest="pr_number",
+        type=int,
+        default=None,
+        help="pre-merge: require a proof record naming this PR number",
+    )
+    args = parser.parse_args()
+
     errors, count = validate_all()
+    if args.rev_range:
+        errors.extend(check_coverage(args.rev_range))
+    if args.pr_number:
+        errors.extend(check_pr_has_record(args.pr_number))
     if errors:
         for e in errors:
             print(f"FAIL: {e}")

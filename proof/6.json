@@ -1,0 +1,147 @@
+{
+  "deliverable": "lwb-gates-enforceable",
+  "pr": 6,
+  "author": "claude-code-opus5-session-f8da3f9e-2026-09-17",
+  "checked_by": "lw-verifier-sonnet-ac5ffd6d6cde8a968-2026-09-17",
+  "commit": "bbb07b950d0f0c37a9edc896d2073aa359cf475f",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 48%]",
+        "........................................................................ [ 97%]",
+        "....                                                                     [100%]",
+        "148 passed in 10.63s"
+      ],
+      "sha256": "4711772437e70543e7f4f4d237c42844448b5cb64b93d241319c94ace4c1bdc4"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed (6 needles)"
+      ],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-proof check skipped (no proof/*.json records yet)"
+      ],
+      "sha256": "c55a8fe033aedbd1361fc3d278daec5a0126b6cbfa58c8097980b3120676a42f"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>\\HANDOFF.md passes all checks (2742 bytes)"
+      ],
+      "sha256": "98e21ea3c86896ddb10dcd68fd0e9705b0b97091e7c2a5a73b12f2c1eb8bfa53"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>\\plugins\\claude\\lwb\\vendor matches source",
+        "OK: <repo>\\plugins\\codex\\lwb\\vendor matches source"
+      ],
+      "sha256": "291de8aba32c4d695de2c308ed6de8de9fa42093249cfea7fdc79a2b78c477fb"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD",
+        "--pr-number",
+        "6"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-lanes check passed"
+      ],
+      "sha256": "5a4cc910732720cea242f7078dfef2ee3c130f9e3d9203b386cb9facb5fc275d"
+    }
+  ],
+  "mutations": [
+    ".github/workflows/ci.yml",
+    "CLAUDE.md",
+    "HANDOFF.md",
+    "docs/requirements/decisions.md",
+    "proof/6.json",
+    "proof/README.md",
+    "proof/exempt.json",
+    "proof/schema.json",
+    "reviews/6/independent-verifier.json",
+    "reviews/README.md",
+    "scripts/lwb_check_proof.py",
+    "scripts/lwb_handoff.py",
+    "scripts/lwb_lanes.py",
+    "tests/test_lwb_check_proof.py",
+    "tests/test_lwb_lanes.py"
+  ],
+  "unproven": [
+    "Command tails and their sha256 are SANITIZED, not verbatim: absolute paths are replaced with <repo>/<home>/<path> before hashing. Directive 7 wants captured output and directive 8 forbids leaking the machine; raw output collided with both (lwb_handoff.py prints absolute paths) and the leak gate caught it. Reproduce a digest by applying the same substitutions.",
+    "'commit' names this branch's head at capture time, not the squash-merge commit, which GitHub does not create until merge. Both directive-7 gates key on the 'pr' field for exactly this reason. The record and review files added after capture are not themselves covered by the captured runs.",
+    "'python scripts/lwb_check_proof.py --pr 6' is deliberately NOT in commands[]: a record cannot contain proof of its own existence. It was verified separately after this record was written.",
+    "author/checked_by and the reviews/ identity strings are self-attested; nothing cross-checks them against git authorship or a session registry. Flagged by the independent review, ruled on by the owner, and logged as open decision D5 in docs/requirements/decisions.md. This is an audit trail, not cryptographic proof that two sessions existed.",
+    "GitHub Apps lwb-claude and lwb-codex remain uncreated (no App-creation API; the manifest flow needs a browser session). HANDOFF step 2 is half done -- see decision D6.",
+    "Plugin version drift (plugins/claude 0.1.0 vs plugins/codex 0.2.0+codex) is untouched: plugins/codex is outside the claude lane.",
+    "The live ruleset was applied by gh api out-of-band; this record does not prove the applied ruleset matches .github/rulesets/main.json.",
+    "No runtime or behavioural test of the lwb plugin itself was added or run. This deliverable changes governance checks only; the product still ships exactly one no-op rule (lwb_version)."
+  ]
+}
