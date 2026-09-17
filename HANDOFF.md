@@ -38,12 +38,13 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-17 22:32 UTC
+Generated: 2026-09-17 22:38 UTC
 main SHA: 68ac412247c03d109273de33948391581fdbec56
 CLI: claude
 Session: gates-2026-09-17
 
 Open PRs:
+#7 Make directives 5 and 7 actually enforceable (lwb-gates-clean)
 #6 Make directive 7 enforceable; decouple directive 5 from CLI vendor (lwb-gates-enforceable)
 
 Deliverable proof state (from proof/):

@@ -1,6 +1,6 @@
 {
   "deliverable": "lwb-gates-enforceable",
-  "pr": 6,
+  "pr": 7,
   "author": "claude-code-opus5-session-f8da3f9e-2026-09-17",
   "checked_by": "lw-verifier-sonnet-ac5ffd6d6cde8a968-2026-09-17",
   "commit": "bbb07b950d0f0c37a9edc896d2073aa359cf475f",
@@ -142,6 +142,7 @@
     "GitHub Apps lwb-claude and lwb-codex remain uncreated (no App-creation API; the manifest flow needs a browser session). HANDOFF step 2 is half done -- see decision D6.",
     "Plugin version drift (plugins/claude 0.1.0 vs plugins/codex 0.2.0+codex) is untouched: plugins/codex is outside the claude lane.",
     "The live ruleset was applied by gh api out-of-band; this record does not prove the applied ruleset matches .github/rulesets/main.json.",
-    "No runtime or behavioural test of the lwb plugin itself was added or run. This deliverable changes governance checks only; the product still ships exactly one no-op rule (lwb_version)."
+    "No runtime or behavioural test of the lwb plugin itself was added or run. This deliverable changes governance checks only; the product still ships exactly one no-op rule (lwb_version).",
+    "Landed as PR #7, not #6: #6's branch history carried an unsanitized proof record that the --range leak scan rejected, and rewriting it needed a force-push reserved to the owner. The independent review was performed against #6's tree, which is byte-identical to this one."
   ]
 }
