@@ -72,6 +72,30 @@ jobs:
       - name: lwb-proof (proof/*.json records validate against proof/schema.json)
         run: python scripts/lwb_check_proof.py
 
+      # Directive 7 has to be checked at TWO moments, because the two
+      # identifiers exist at different times. Pre-merge, the PR number
+      # exists and the squash commit does not. Post-merge, the reverse.
+      #
+      # The first version of this ran --coverage over base..head on
+      # pull_request, which could never fire: --coverage looks for GitHub's
+      # `(#N)` squash subject, and GitHub only fabricates that commit AT
+      # MERGE TIME. Independent review of PR #6 caught it -- a gate against
+      # merging without proof that would itself have merged unable to fire.
+      - name: lwb-proof-pr (this PR carries a proof record for itself)
+        if: github.event_name == 'pull_request'
+        run: python scripts/lwb_check_proof.py --pr ${{ github.event.pull_request.number }}
+
+      - name: lwb-proof-coverage (every landed deliverable HAS a record)
+        # Post-merge, on main: `before..sha` contains the squash commit that
+        # GitHub has now actually written, `(#N)` subject and all.
+        if: >-
+          github.event_name == 'push'
+          && github.ref == 'refs/heads/main'
+          && github.event.before != '0000000000000000000000000000000000000000'
+        run: >-
+          python scripts/lwb_check_proof.py
+          --coverage ${{ github.event.before }}..${{ github.sha }}
+
       - name: HANDOFF.md shape check
         run: python scripts/lwb_handoff.py --check
 

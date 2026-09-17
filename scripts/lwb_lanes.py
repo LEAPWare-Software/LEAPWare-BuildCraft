@@ -84,6 +84,14 @@ SHARED_FILES = ("HANDOFF.md", "AGENTS.md", "CLAUDE.md", "README.md")
 # eaten or quietly extended by a bot.
 BOOTSTRAP_EXEMPT_PRS = frozenset({1, 5})
 
+# How many DISTINCT independent reviewers a shared-path change needs. The
+# old rule was "one record per CLI vendor", which read as two but was really
+# one-each and could never be met with a single CLI in operation. One
+# genuinely independent reviewer is the substance of directive 5; raise this
+# when a second reviewer identity is routinely available. A project policy
+# may tighten it, never loosen it.
+REQUIRED_INDEPENDENT_REVIEWS = 1
+
 # Commit authors that cannot satisfy lane review by construction: a bot
 # does not run a CTO role, cannot write a reviews/ record, and does not
 # stamp an `LWB-Agent:` trailer. Without this, every Dependabot PR from #6
@@ -137,6 +145,8 @@ def commit_agent(sha: str) -> Optional[str]:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
     m = TRAILER_RE.search(result.stdout)
@@ -151,6 +161,8 @@ def commit_files(sha: str) -> list[str]:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
     return [line for line in result.stdout.splitlines() if line.strip()]
@@ -162,38 +174,74 @@ def commits_in_range(rev_range: str) -> list[str]:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
-def _review_ok(pr_number: int, agent: str, commit_sha: str, errors: list[str]) -> bool:
-    review_path = REPO_ROOT / "reviews" / str(pr_number) / f"{agent}-cto.json"
-    if not review_path.is_file():
-        errors.append(f"{commit_sha[:12]}: missing required review {review_path.relative_to(REPO_ROOT)}")
-        return False
+def _review_ok(review_path: Path, errors: list[str]) -> Optional[str]:
+    """Validate one review record. Returns its reviewer_id, or None if invalid.
+
+    Vendor-agnostic on purpose. This used to take an `agent` and look for
+    exactly `reviews/<pr>/<agent>-cto.json`, and `check_lanes` called it
+    twice -- once for "claude", once for "codex" -- so a shared-path change
+    needed one record per CLI VENDOR. That coupled independence to a vendor
+    when the property that actually matters is a distinct reviewer IDENTITY,
+    which `reviews/README.md` already spelled out ("two different sessions,
+    not the same one reviewing itself"). It was also unsatisfiable: one CLI
+    operates this repo, so from PR #6 every shared-path change would have
+    been unmergeable, and an unsatisfiable gate is worse than a strict one
+    because it gets routed around. Any filename is accepted now; what is
+    enforced is AGREE and reviewer_id != commit_author_id.
+    """
     import json
 
+    rel = review_path.relative_to(REPO_ROOT)
     try:
         data = json.loads(review_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        errors.append(f"{review_path}: invalid JSON: {exc}")
-        return False
+        errors.append(f"{rel}: invalid JSON: {exc}")
+        return None
+    if not isinstance(data, dict):
+        errors.append(f"{rel}: not a JSON object")
+        return None
     if data.get("verdict") != "AGREE":
-        errors.append(f"{review_path}: verdict is {data.get('verdict')!r}, want 'AGREE'")
-        return False
-    if data.get("reviewer_agent") != agent:
-        errors.append(f"{review_path}: reviewer_agent is {data.get('reviewer_agent')!r}, want {agent!r}")
-        return False
+        errors.append(f"{rel}: verdict is {data.get('verdict')!r}, want 'AGREE'")
+        return None
     reviewer_id = data.get("reviewer_id")
     author_id = data.get("commit_author_id")
     if not reviewer_id or not author_id:
-        errors.append(f"{review_path}: missing 'reviewer_id' or 'commit_author_id'")
-        return False
+        errors.append(f"{rel}: missing 'reviewer_id' or 'commit_author_id'")
+        return None
     if reviewer_id == author_id:
         errors.append(
-            f"{review_path}: reviewer_id equals commit_author_id ({reviewer_id!r}) — "
+            f"{rel}: reviewer_id equals commit_author_id ({reviewer_id!r}) — "
             "a reviewer may not be the commit's own author"
+        )
+        return None
+    return str(reviewer_id)
+
+
+def independent_reviews(pr_number: int, commit_sha: str, errors: list[str]) -> bool:
+    """True when this PR carries REQUIRED_INDEPENDENT_REVIEWS distinct reviewers."""
+    review_dir = REPO_ROOT / "reviews" / str(pr_number)
+    records = sorted(review_dir.glob("*.json")) if review_dir.is_dir() else []
+
+    reviewer_ids = set()
+    for record in records:
+        reviewer_id = _review_ok(record, errors)
+        if reviewer_id is not None:
+            reviewer_ids.add(reviewer_id)
+
+    if len(reviewer_ids) < REQUIRED_INDEPENDENT_REVIEWS:
+        errors.append(
+            f"{commit_sha[:12]}: touches a shared path and has "
+            f"{len(reviewer_ids)} independent review(s) in reviews/{pr_number}/, "
+            f"needs {REQUIRED_INDEPENDENT_REVIEWS} "
+            "(each a record with verdict AGREE and a reviewer_id differing from "
+            "commit_author_id)"
         )
         return False
     return True
@@ -206,6 +254,8 @@ def commit_author_email(sha: str) -> str:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
     return result.stdout.strip()
@@ -219,6 +269,13 @@ def is_bot_commit(sha: str) -> bool:
 
 def check_lanes(rev_range: str, pr_number: int) -> list[str]:
     """Check every commit in `rev_range`. Returns a list of failure strings."""
+    # 0 means "not running under a PR" (a push to main after merge). The
+    # --pr-number help text always said so and main() printed a skip message
+    # for it, but check_lanes itself enforced anyway -- so a direct call with
+    # 0 ran the full gate. Lane review is a pre-merge check; there is nothing
+    # to gate after the fact.
+    if pr_number == 0:
+        return []
     if pr_number in BOOTSTRAP_EXEMPT_PRS:
         return []
 
@@ -246,8 +303,7 @@ def check_lanes(rev_range: str, pr_number: int) -> list[str]:
                 )
 
         if touches_shared:
-            _review_ok(pr_number, "claude", sha, errors)
-            _review_ok(pr_number, "codex", sha, errors)
+            independent_reviews(pr_number, sha, errors)
 
     return errors
 

@@ -102,6 +102,8 @@ def _run_git(args: list[str]) -> str:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     return result.stdout.strip()
@@ -114,6 +116,8 @@ def _run_gh(args: list[str]) -> str:
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
             timeout=30,
         )
@@ -143,7 +147,12 @@ def _proof_state_lines() -> list[str]:
     if not PROOF_DIR.is_dir():
         return ["(none yet)"]
 
-    records = sorted(p for p in PROOF_DIR.glob("*.json") if p.name != "schema.json")
+    # schema.json is the shape and exempt.json is the named-gap list (see
+    # proof/README.md); neither is a proof record, and reporting exempt.json
+    # as INVALID for lacking a 'deliverable' field is noise, not a finding.
+    records = sorted(
+        p for p in PROOF_DIR.glob("*.json") if p.name not in ("schema.json", "exempt.json")
+    )
     if not records:
         return ["(none yet)"]
 

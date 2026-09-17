@@ -47,6 +47,8 @@ def _authors(rev_range: str) -> list[tuple[str, str]]:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
     seen: list[tuple[str, str]] = []
