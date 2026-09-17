@@ -72,6 +72,16 @@ jobs:
       - name: lwb-proof (proof/*.json records validate against proof/schema.json)
         run: python scripts/lwb_check_proof.py
 
+      - name: lwb-proof-coverage (every landed deliverable HAS a record)
+        if: github.event_name == 'pull_request'
+        # Validating the records that exist never asks whether one SHOULD
+        # exist: an empty proof/ reported "skipped" and exited 0, and five
+        # deliverables merged straight through directive 7. This half asks.
+        # Historical merges are named in proof/exempt.json with a reason.
+        run: >-
+          python scripts/lwb_check_proof.py
+          --coverage ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+
       - name: HANDOFF.md shape check
         run: python scripts/lwb_handoff.py --check
 

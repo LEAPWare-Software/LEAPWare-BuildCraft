@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -113,7 +114,9 @@ def validate_all() -> tuple[list[str], int]:
     count = 0
     if PROOF_DIR.is_dir():
         for path in sorted(PROOF_DIR.glob("*.json")):
-            if path.name == "schema.json":
+            # schema.json is the shape; exempt.json is the named-gap list
+            # (see check_coverage). Neither is a proof record.
+            if path.name in ("schema.json", "exempt.json"):
                 continue
             count += 1
             try:
@@ -125,8 +128,95 @@ def validate_all() -> tuple[list[str], int]:
     return errors, count
 
 
+SQUASH_SUBJECT_RE = re.compile(r"\(#(\d+)\)\s*$")
+EXEMPT_PATH = PROOF_DIR / "exempt.json"
+
+
+def _landed_deliverables(rev_range: str) -> list[tuple[str, str]]:
+    """(sha, subject) for each squash-merge commit in `rev_range`.
+
+    A squash merge is a single-parent commit, so `--merges` finds nothing;
+    the convention GitHub writes is a trailing `(#N)` in the subject.
+    """
+    result = subprocess.run(
+        ["git", "log", "--format=%H%x00%s", rev_range],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    landed = []
+    for line in result.stdout.splitlines():
+        if "\x00" not in line:
+            continue
+        sha, subject = line.split("\x00", 1)
+        if SQUASH_SUBJECT_RE.search(subject):
+            landed.append((sha, subject))
+    return landed
+
+
+def _exempt_shas() -> dict:
+    if not EXEMPT_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(EXEMPT_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return data.get("merges", {}) if isinstance(data, dict) else {}
+
+
+def check_coverage(rev_range: str) -> list[str]:
+    """Every landed deliverable must HAVE a proof record, not merely be well-formed.
+
+    This is the half directive 7 was missing. `validate_all` checks the
+    records that exist; it never asks whether one should exist, so an empty
+    `proof/` read as "nothing to prove yet" and the gate could not fail --
+    PRs #1 through #5 all merged green with zero records. Historical merges
+    are listed in proof/exempt.json with a reason rather than back-filled
+    with invented evidence; anything not on that list needs a real record.
+    """
+    errors: list[str] = []
+    proved = set()
+    if PROOF_DIR.is_dir():
+        for path in sorted(PROOF_DIR.glob("*.json")):
+            if path.name in ("schema.json", "exempt.json"):
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if isinstance(data, dict) and isinstance(data.get("commit"), str):
+                proved.add(data["commit"])
+
+    exempt = _exempt_shas()
+    for sha, subject in _landed_deliverables(rev_range):
+        if sha in exempt or sha[:12] in exempt:
+            continue
+        if any(sha.startswith(c) or c.startswith(sha[:7]) for c in proved):
+            continue
+        errors.append(
+            f"{sha[:12]} ({subject!r}) landed with no proof/*.json record naming its "
+            "commit — owner directive 7: done means committed AND pushed WITH a proof "
+            "record. Add one, or list the sha in proof/exempt.json with a reason."
+        )
+    return errors
+
+
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--coverage",
+        dest="rev_range",
+        default=None,
+        help="also require a proof record for every squash-merge in base..head",
+    )
+    args = parser.parse_args()
+
     errors, count = validate_all()
+    if args.rev_range:
+        errors.extend(check_coverage(args.rev_range))
     if errors:
         for e in errors:
             print(f"FAIL: {e}")

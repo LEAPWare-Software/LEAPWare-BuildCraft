@@ -193,30 +193,92 @@ def test_commit_agent_parses_trailer(tmp_path):
         lwb_lanes.REPO_ROOT = original_root
 
 
-def test_review_ok_requires_distinct_reviewer_and_author_identity(tmp_path):
+def _write_review(tmp_path, name: str, **overrides):
     reviews_dir = tmp_path / "reviews" / "9"
-    reviews_dir.mkdir(parents=True)
-    (reviews_dir / "claude-cto.json").write_text(
-        json.dumps(
-            {
-                "pr": 9,
-                "reviewer_agent": "claude",
-                "reviewer_id": "same-session",
-                "commit_author_agent": "codex",
-                "commit_author_id": "same-session",
-                "verdict": "AGREE",
-            }
-        ),
-        encoding="utf-8",
-    )
+    reviews_dir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "pr": 9,
+        "reviewer_agent": "claude",
+        "reviewer_id": "reviewer-session",
+        "commit_author_agent": "claude",
+        "commit_author_id": "author-session",
+        "verdict": "AGREE",
+    }
+    record.update(overrides)
+    (reviews_dir / name).write_text(json.dumps(record), encoding="utf-8")
 
+
+def test_review_ok_requires_distinct_reviewer_and_author_identity(tmp_path):
+    _write_review(tmp_path, "claude-cto.json", reviewer_id="same", commit_author_id="same")
     original_root = lwb_lanes.REPO_ROOT
     try:
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
-        ok = lwb_lanes._review_ok(9, "claude", "deadbeef", errors)
+        got = lwb_lanes._review_ok(tmp_path / "reviews" / "9" / "claude-cto.json", errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("equals" in e for e in errors)
+
+
+def test_independent_reviews_accepts_any_filename_not_just_per_vendor(tmp_path):
+    """The gate counts distinct reviewer identities, not vendor filenames.
+    It used to demand BOTH claude-cto.json and codex-cto.json, which no
+    single-CLI repo could ever satisfy."""
+    _write_review(tmp_path, "verifier.json", reviewer_id="independent-verifier")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is True, errors
+    assert errors == []
+
+
+def test_independent_reviews_fails_with_no_records(tmp_path):
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", errors)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
     assert ok is False
-    assert any("equals" in e for e in errors)
+    assert any("independent review" in e for e in errors)
+
+
+def test_independent_reviews_counts_distinct_reviewers_not_files(tmp_path):
+    """Two records from the SAME reviewer are one independent review."""
+    _write_review(tmp_path, "a.json", reviewer_id="same-reviewer")
+    _write_review(tmp_path, "b.json", reviewer_id="same-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        lwb_lanes.REQUIRED_INDEPENDENT_REVIEWS = 2
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", errors)
+    finally:
+        lwb_lanes.REQUIRED_INDEPENDENT_REVIEWS = 1
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False
+    assert any("1 independent review" in e for e in errors)
+
+
+def test_independent_reviews_rejects_a_disagree_verdict(tmp_path):
+    _write_review(tmp_path, "claude-cto.json", verdict="DISAGREE")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False
+    assert any("DISAGREE" in e for e in errors)
