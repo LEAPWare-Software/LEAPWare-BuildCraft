@@ -176,7 +176,8 @@ def check_coverage(rev_range: str) -> list[str]:
     with invented evidence; anything not on that list needs a real record.
     """
     errors: list[str] = []
-    proved = set()
+    proved_commits = set()
+    proved_prs = set()
     if PROOF_DIR.is_dir():
         for path in sorted(PROOF_DIR.glob("*.json")):
             if path.name in ("schema.json", "exempt.json"):
@@ -185,20 +186,85 @@ def check_coverage(rev_range: str) -> list[str]:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 continue
-            if isinstance(data, dict) and isinstance(data.get("commit"), str):
-                proved.add(data["commit"])
+            if not isinstance(data, dict):
+                continue
+            if isinstance(data.get("commit"), str):
+                proved_commits.add(data["commit"])
+            # A record is written INSIDE the PR it proves, so it cannot name
+            # the squash-merge sha -- that sha does not exist until GitHub
+            # creates it at merge time. The PR number is the only identifier
+            # available at both moments, so both halves of this check key on
+            # it. Without this, every record would be unmatchable post-merge
+            # and coverage would fail on work that was properly proven.
+            for key in ("pr", "deliverable"):
+                value = data.get(key)
+                if isinstance(value, int):
+                    proved_prs.add(value)
+                elif isinstance(value, str) and value.isdigit():
+                    proved_prs.add(int(value))
 
     exempt = _exempt_shas()
     for sha, subject in _landed_deliverables(rev_range):
         if sha in exempt or sha[:12] in exempt:
             continue
-        if any(sha.startswith(c) or c.startswith(sha[:7]) for c in proved):
+        match = SQUASH_SUBJECT_RE.search(subject)
+        if match and int(match.group(1)) in proved_prs:
+            continue
+        # `commit` is schema-constrained to 7-40 hex chars, so a prefix test
+        # in this direction is enough; the reverse test that used to be here
+        # (`c.startswith(sha[:7])`) was dead weight -- it could only match by
+        # predicting a future sha -- and it made an empty string match
+        # everything if the schema check were ever relaxed.
+        if any(len(c) >= 7 and sha.startswith(c) for c in proved_commits):
             continue
         errors.append(
             f"{sha[:12]} ({subject!r}) landed with no proof/*.json record naming its "
-            "commit — owner directive 7: done means committed AND pushed WITH a proof "
-            "record. Add one, or list the sha in proof/exempt.json with a reason."
+            "PR number or commit — owner directive 7: done means committed AND pushed "
+            "WITH a proof record. Add one, or list the sha in proof/exempt.json with a "
+            "reason."
         )
+    return errors
+
+
+def check_pr_has_record(pr_number: int) -> list[str]:
+    """Pre-merge half of directive 7: this PR must carry its own proof record.
+
+    `check_coverage` keys on the `(#N)` squash-merge subject, and GitHub
+    fabricates that commit AT MERGE TIME. It does not exist while the PR's
+    own CI is running, so running coverage over `base..head` at PR time can
+    never find a landed deliverable -- it is a guaranteed no-op. That is how
+    this check first shipped, and an independent review of PR #6 caught it:
+    the gate meant to stop deliverables merging without proof would itself
+    have merged without ever being able to fire.
+
+    So there are two halves, keyed on the two things that actually exist at
+    the two moments: the PR NUMBER before the merge (blocking), and the
+    COMMIT after it (detective, on push to main).
+    """
+    errors: list[str] = []
+    if not PROOF_DIR.is_dir():
+        records = []
+    else:
+        records = [
+            p for p in sorted(PROOF_DIR.glob("*.json"))
+            if p.name not in ("schema.json", "exempt.json")
+        ]
+
+    for path in records:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        if data.get("pr") == pr_number or str(data.get("deliverable", "")) == str(pr_number):
+            return []
+
+    errors.append(
+        f"PR #{pr_number} touches this repo and carries no proof/*.json record for "
+        f"itself (a record with \"pr\": {pr_number}, or deliverable \"{pr_number}\"). "
+        "Owner directive 7: done means committed AND pushed WITH a proof record."
+    )
     return errors
 
 
@@ -210,13 +276,22 @@ def main() -> int:
         "--coverage",
         dest="rev_range",
         default=None,
-        help="also require a proof record for every squash-merge in base..head",
+        help="post-merge: require a proof record for every squash-merge in base..head",
+    )
+    parser.add_argument(
+        "--pr",
+        dest="pr_number",
+        type=int,
+        default=None,
+        help="pre-merge: require a proof record naming this PR number",
     )
     args = parser.parse_args()
 
     errors, count = validate_all()
     if args.rev_range:
         errors.extend(check_coverage(args.rev_range))
+    if args.pr_number:
+        errors.extend(check_pr_has_record(args.pr_number))
     if errors:
         for e in errors:
             print(f"FAIL: {e}")

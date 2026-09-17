@@ -261,6 +261,13 @@ def is_bot_commit(sha: str) -> bool:
 
 def check_lanes(rev_range: str, pr_number: int) -> list[str]:
     """Check every commit in `rev_range`. Returns a list of failure strings."""
+    # 0 means "not running under a PR" (a push to main after merge). The
+    # --pr-number help text always said so and main() printed a skip message
+    # for it, but check_lanes itself enforced anyway -- so a direct call with
+    # 0 ran the full gate. Lane review is a pre-merge check; there is nothing
+    # to gate after the fact.
+    if pr_number == 0:
+        return []
     if pr_number in BOOTSTRAP_EXEMPT_PRS:
         return []
 

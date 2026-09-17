@@ -11,6 +11,11 @@
       "minLength": 1,
       "description": "The deliverable's id, e.g. an issue/step number or a short slug."
     },
+    "pr": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The PR number this record proves, when there is one. Optional, but it is what the pre-merge lwb-proof-pr check keys on: the squash-merge commit does not exist yet while a PR's own CI runs, so 'commit' cannot be matched pre-merge. See scripts/lwb_check_proof.py::check_pr_has_record."
+    },
     "author": {
       "type": "string",
       "minLength": 1,

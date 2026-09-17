@@ -41,8 +41,20 @@ and carried into the requirements package as an owner decision.
 }
 ```
 
-- `reviewer_agent` must match the filename (`claude-cto.json` ->
-  `"claude"`, `codex-cto.json` -> `"codex"`).
+- The **filename does not matter** and `reviewer_agent` is informational.
+  This file used to say `reviewer_agent` must match the filename; that check
+  was removed in PR #6 along with the per-vendor requirement, and nothing
+  loads `schema.json` at all, so its `enum` on `reviewer_agent` is likewise
+  unenforced. Only `verdict` and the two identity fields are checked.
+- **KNOWN WEAKNESS, flagged by the independent review of PR #6:**
+  `reviewer_id` and `commit_author_id` are self-attested strings. Nothing
+  cross-checks them against git authorship, the `LWB-Agent:` trailer, or any
+  session registry — the only enforcement is literal string inequality. A
+  single operator can author a commit and then write a record bearing a
+  different invented `reviewer_id`. Binding review identity to something
+  externally verifiable is an open owner decision recorded in the
+  requirements package; until it is decided, treat these records as an
+  audit trail, not as proof.
 - `reviewer_id` and `commit_author_id` are free-form identity strings (a
   session id, a dispatch id — whatever the CLI in question uses to name a
   specific run) and **must differ from each other**: a reviewer may never
