@@ -39,15 +39,29 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-SIZE_CAP_BYTES = 6000
+# Owner ruling, 2026-09-17: HANDOFF.md carries the transition only and is
+# capped at 3000 bytes. Durable reference (session start, re-derive
+# commands, hard rules, traps) moved to docs/handoff-protocol.md. A cap
+# reached is a signal to move content into docs/, never to trim meaning.
+SIZE_CAP_BYTES = 3000
 
 BEGIN_MARKER = "<!-- lwb-handoff:begin -->"
 END_MARKER = "<!-- lwb-handoff:end -->"
 
+# Only the transition sections are required here now. "Start of session",
+# "Re-derive state", "Hard rules" and "Traps" are required of
+# docs/handoff-protocol.md instead (see PROTOCOL_REQUIRED_SECTIONS), so
+# moving them out of HANDOFF.md cannot silently lose them.
 REQUIRED_SECTIONS = [
     "# HANDOFF",
-    "## Start of session",
     "## In flight",
+    "## Where to look",
+]
+
+PROTOCOL_DOC = REPO_ROOT / "docs" / "handoff-protocol.md"
+
+PROTOCOL_REQUIRED_SECTIONS = [
+    "## Start of session",
     "## Re-derive state",
     "## Hard rules",
     "## Traps",
@@ -219,6 +233,19 @@ def _validate(text: str) -> list[str]:
     for needle in FORBIDDEN_SUBSTRINGS:
         if needle in lowered:
             errors.append(f"forbidden substring found: {needle!r}")
+
+    # The durable sections moved out of HANDOFF.md under the 3000-byte cap.
+    # Assert they landed in the protocol doc, so "trim HANDOFF.md" can never
+    # quietly become "delete the hard rules".
+    if not PROTOCOL_DOC.exists():
+        errors.append(f"missing {PROTOCOL_DOC.name}: the moved sections have nowhere to live")
+    else:
+        protocol = PROTOCOL_DOC.read_text(encoding="utf-8")
+        for section in PROTOCOL_REQUIRED_SECTIONS:
+            if section not in protocol:
+                errors.append(
+                    f"docs/handoff-protocol.md is missing required section heading: {section!r}"
+                )
 
     return errors
 

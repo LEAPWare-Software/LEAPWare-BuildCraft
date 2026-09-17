@@ -65,10 +65,106 @@ def test_lane_owned_paths_inside_tests_still_win_over_shared():
     assert lwb_lanes.classify_path("tests/adapters/test_codex_hook_io.py") == "codex"
 
 
-def test_bootstrap_exception_skips_pr_4():
-    # rev_range irrelevant since pr_number gate short-circuits before any git call
-    assert lwb_lanes.check_lanes("HEAD~1..HEAD", 4) == []
-    assert lwb_lanes.check_lanes("HEAD~1..HEAD", 1) == []
+def test_bootstrap_exemption_covers_only_the_named_prs():
+    # rev_range irrelevant since the pr_number gate short-circuits before any git call
+    for exempt in sorted(lwb_lanes.BOOTSTRAP_EXEMPT_PRS):
+        assert lwb_lanes.check_lanes("HEAD~1..HEAD", exempt) == []
+
+
+def test_bootstrap_exemption_is_an_explicit_set_not_a_range():
+    """A `<= N` threshold let Dependabot spend #2-#4 of a window meant for
+    the PRs that stood this system up. Naming them stops that."""
+    assert lwb_lanes.BOOTSTRAP_EXEMPT_PRS == frozenset({1, 5})
+    assert not hasattr(lwb_lanes, "BOOTSTRAP_LAST_EXEMPT_PR")
+    # The numbers Dependabot took must NOT be exempt.
+    for taken in (2, 3, 4):
+        assert taken not in lwb_lanes.BOOTSTRAP_EXEMPT_PRS
+
+
+def test_bot_author_emails_are_recognised():
+    for email in (
+        "dependabot[bot]@users.noreply.github.com",
+        "49699333+dependabot[bot]@users.noreply.github.com",
+        "dependabot@github.com",
+    ):
+        assert any(p.search(email) for p in lwb_lanes.BOT_AUTHOR_PATTERNS), email
+
+
+def test_human_and_agent_emails_are_not_treated_as_bots():
+    for email in ("leapware@outlook.com", "someone@example.com"):
+        assert not any(p.search(email) for p in lwb_lanes.BOT_AUTHOR_PATTERNS), email
+
+
+def test_bot_commit_skips_lane_enforcement(tmp_path):
+    """A Dependabot commit touches shared paths, carries no LWB-Agent
+    trailer, and must still pass a non-exempt PR."""
+    repo = tmp_path / "botrepo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "dependabot[bot]"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "49699333+dependabot[bot]@users.noreply.github.com"],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text("bumped\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "chore(deps): bump actions/checkout from 5 to 7"],
+        cwd=repo,
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        # PR 42 is well outside the bootstrap set, so only the bot skip can save it.
+        assert lwb_lanes.check_lanes(f"{base}..{head}", 42) == []
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+
+def test_non_bot_commit_without_trailer_still_fails(tmp_path):
+    """The bot skip must not become a general amnesty."""
+    repo = tmp_path / "humanrepo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Someone"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "someone@example.com"], cwd=repo, check=True)
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    (repo / "seed.txt").write_text("changed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "no trailer here"], cwd=repo, check=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        errors = lwb_lanes.check_lanes(f"{base}..{head}", 42)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert any("LWB-Agent" in e for e in errors)
 
 
 def test_commit_agent_parses_trailer(tmp_path):
