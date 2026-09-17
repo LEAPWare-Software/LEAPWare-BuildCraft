@@ -13,7 +13,14 @@ Lane membership (literal, per the D1b brief):
   - codex lane: `plugins/codex/`, `adapters/codex/`, any directory literally
     named `codex` under `tests/`.
   - shared: `core/`, `scripts/`, `.github/`, `docs/`, `proof/`, `reviews/`,
-    `HANDOFF.md`, `AGENTS.md`, `CLAUDE.md`, `README.md`.
+    `tests/`, `HANDOFF.md`, `AGENTS.md`, `CLAUDE.md`, `README.md`.
+
+`tests/` is shared, with the lane-owned subtrees and filename patterns
+below carved out of it. It has to be: a test covering a shared script
+(`tests/test_lwb_check_proof.py`, say) previously classified as "other" —
+in neither lane and not on the shared list — which meant NEITHER CLI was
+allowed to write it, so a shared script could not be given a test at all.
+Lane patterns are therefore matched before the shared prefixes.
 
 One extension beyond the literal glob, documented here rather than left
 implicit: a test module directly named `test_claude_*` or `*_claude_*`
@@ -51,6 +58,12 @@ SHARED_PREFIXES = (
     "docs/",
     "proof/",
     "reviews/",
+    # `tests/` is shared so that a test covering a shared script is writable
+    # by either CLI (under two-CTO review). Without it, a file such as
+    # `tests/test_lwb_check_proof.py` classified as "other" — in no lane and
+    # not shared — so NEITHER CLI could touch it. Lane-owned subtrees inside
+    # `tests/` still win: see classify_path's ordering.
+    "tests/",
 )
 SHARED_FILES = ("HANDOFF.md", "AGENTS.md", "CLAUDE.md", "README.md")
 
@@ -63,12 +76,11 @@ def classify_path(path: str) -> str:
     """Return "claude", "codex", "shared", or "other" for a repo-relative path."""
     posix = path.replace("\\", "/")
 
-    for prefix in SHARED_PREFIXES:
-        if posix.startswith(prefix):
-            return "shared"
-    if posix in SHARED_FILES:
-        return "shared"
-
+    # Lane-specific patterns are checked BEFORE the shared prefixes, because
+    # `tests/` is shared as a whole while `tests/**/claude/**` and
+    # `tests/**/*_claude_*` inside it still belong to the claude lane. No
+    # shared prefix other than `tests/` can match a lane pattern, so the
+    # order is a no-op for the rest.
     for agent in ("claude", "codex"):
         if posix.startswith(f"plugins/{agent}/") or posix.startswith(f"adapters/{agent}/"):
             return agent
@@ -80,6 +92,12 @@ def classify_path(path: str) -> str:
             filename.startswith(f"test_{agent}_") or f"_{agent}_" in filename
         ):
             return agent
+
+    for prefix in SHARED_PREFIXES:
+        if posix.startswith(prefix):
+            return "shared"
+    if posix in SHARED_FILES:
+        return "shared"
 
     return "other"
 

@@ -39,6 +39,73 @@ def test_findings_for_line_clean_line_has_no_findings():
     assert check_mod._findings_for_line("some/file.py", 1, "print('hello world')") == []
 
 
+def test_env_needles_empty_when_unset_or_blank():
+    assert check_mod.env_needles({}) == []
+    assert check_mod.env_needles({check_mod.NEEDLE_ENV_VAR: "   "}) == []
+
+
+def test_env_needles_splits_lowercases_and_keeps_internal_spaces():
+    env = {check_mod.NEEDLE_ENV_VAR: "Alpha-Proj, beta_org\nGAMMA:team,,Some Private Name"}
+    assert check_mod.env_needles(env) == [
+        "alpha-proj",
+        "beta_org",
+        "gamma:team",
+        "some private name",
+    ]
+
+
+def test_resolve_needles_unconfigured_is_synthetic_only():
+    assert check_mod.resolve_needles({}) == [check_mod.SYNTHETIC_NEEDLE]
+
+
+def test_resolve_needles_prepends_env_supplied():
+    needles = check_mod.resolve_needles({check_mod.NEEDLE_ENV_VAR: "secret-proj"})
+    assert needles[0] == "secret-proj"
+    assert check_mod.SYNTHETIC_NEEDLE in needles
+
+
+def test_findings_for_line_catches_an_env_supplied_needle():
+    needles = check_mod.resolve_needles({check_mod.NEEDLE_ENV_VAR: "secret-proj"})
+    findings = check_mod._findings_for_line(
+        "some/file.py", 7, "url = https://github.com/acme/Secret-Proj", needles
+    )
+    assert any("private-project name leak" in f and "secret-proj" in f for f in findings)
+
+
+def test_env_supplied_needle_is_not_matched_when_not_configured():
+    """The whole point of failing UNCONFIGURED: without the env var, a real
+    private name sails straight past the scan."""
+    findings = check_mod._findings_for_line(
+        "some/file.py", 7, "url = https://github.com/acme/Secret-Proj"
+    )
+    assert findings == []
+
+
+def test_public_needles_is_empty_so_deliberate_prose_is_not_flagged():
+    """A name this repo publishes on purpose is not a leak. `HANDOFF.md` and
+    `README.md` both name the legacy repo; needling it would flag the very
+    prose that published it and wedge the check permanently red."""
+    assert check_mod.PUBLIC_NEEDLES == ()
+    for doc in ("HANDOFF.md", "README.md"):
+        text = (REPO_ROOT / doc).read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            leaks = [
+                f
+                for f in check_mod._findings_for_line(doc, lineno, line)
+                if "private-project name leak" in f
+            ]
+            assert leaks == [], leaks
+
+
+def test_unconfigured_run_reports_failure(tmp_path, monkeypatch, capsys):
+    """The defect this replaced: an unarmed check printed 'passed' and exited 0."""
+    monkeypatch.delenv(check_mod.NEEDLE_ENV_VAR, raising=False)
+    monkeypatch.setattr(check_mod.sys, "argv", ["lwb_check_env_leak.py"])
+    rc = check_mod.main()
+    assert rc == 1
+    assert "UNCONFIGURED" in capsys.readouterr().out
+
+
 def test_range_scan_catches_leak_committed_then_reverted(tmp_path):
     repo = tmp_path / "fixture-repo"
     repo.mkdir()

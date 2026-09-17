@@ -45,6 +45,26 @@ def test_classify_other_for_unrelated_path():
     assert lwb_lanes.classify_path("examples/policies/example-routing.json") == "other"
 
 
+def test_classify_shared_test_module_is_shared_not_other():
+    """A test covering a shared script must be writable by either CLI under
+    two-CTO review. These used to classify as "other" — in no lane and not
+    shared — so NEITHER CLI could add a test for a shared script."""
+    for path in (
+        "tests/test_lwb_check_env_leak.py",
+        "tests/test_lwb_check_proof.py",
+        "tests/test_lwb_lanes.py",
+        "tests/conftest.py",
+        "tests/core/test_engine_mutation.py",
+    ):
+        assert lwb_lanes.classify_path(path) == "shared", path
+
+
+def test_lane_owned_paths_inside_tests_still_win_over_shared():
+    """`tests/` being shared must not swallow the lane-owned carve-outs."""
+    assert lwb_lanes.classify_path("tests/adapters/fixtures/claude/x.json") == "claude"
+    assert lwb_lanes.classify_path("tests/adapters/test_codex_hook_io.py") == "codex"
+
+
 def test_bootstrap_exception_skips_pr_4():
     # rev_range irrelevant since pr_number gate short-circuits before any git call
     assert lwb_lanes.check_lanes("HEAD~1..HEAD", 4) == []
