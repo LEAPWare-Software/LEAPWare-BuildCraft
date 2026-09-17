@@ -176,19 +176,62 @@ def test_pr_check_fails_when_no_record_names_the_pr(tmp_path):
     assert "PR #6" in errors[0]
 
 
-def test_pr_check_passes_on_pr_field_or_deliverable(tmp_path):
-    for key, value in (("pr", 6), ("deliverable", "6")):
-        proof_dir = tmp_path / f"proof_{key}"
-        proof_dir.mkdir()
-        (proof_dir / "r.json").write_text(json.dumps({key: value}), encoding="utf-8")
-        orig = (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR)
-        try:
-            lwb_check_proof.REPO_ROOT = tmp_path
-            lwb_check_proof.PROOF_DIR = proof_dir
-            errors = lwb_check_proof.check_pr_has_record(6)
-        finally:
-            (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR) = orig
-        assert errors == [], (key, errors)
+def test_pr_check_passes_only_on_the_typed_pr_field(tmp_path):
+    proof_dir = tmp_path / "proof_pr"
+    proof_dir.mkdir()
+    (proof_dir / "r.json").write_text(json.dumps({"pr": 6}), encoding="utf-8")
+    orig = (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR)
+    try:
+        lwb_check_proof.REPO_ROOT = tmp_path
+        lwb_check_proof.PROOF_DIR = proof_dir
+        errors = lwb_check_proof.check_pr_has_record(6)
+    finally:
+        (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR) = orig
+    assert errors == [], errors
+
+
+def test_a_digit_deliverable_does_not_satisfy_the_pr_gate(tmp_path):
+    """The collision an earlier version of this check asserted as CORRECT.
+
+    schema.json documents `deliverable` as "an issue/step number or a short
+    slug", so a small integer is ordinary usage. Accepting it as an alias
+    for the PR number meant a record proving step 6 of an unrelated plan
+    silently satisfied PR #6's directive-7 gate forever. Found by
+    independent review of PR #6; only the typed `pr` field counts now.
+    """
+    proof_dir = tmp_path / "proof_del"
+    proof_dir.mkdir()
+    (proof_dir / "r.json").write_text(
+        json.dumps({"deliverable": "6", "author": "unrelated work"}), encoding="utf-8"
+    )
+    orig = (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR)
+    try:
+        lwb_check_proof.REPO_ROOT = tmp_path
+        lwb_check_proof.PROOF_DIR = proof_dir
+        errors = lwb_check_proof.check_pr_has_record(6)
+    finally:
+        (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR) = orig
+    assert len(errors) == 1, errors
+
+
+def test_coverage_is_not_satisfied_by_a_digit_deliverable(tmp_path):
+    """Same collision on the post-merge half."""
+    repo, base, _ = _fixture_repo(tmp_path, ["feat: thing (#7)"])
+    (repo / "proof").mkdir()
+    (repo / "proof" / "unrelated.json").write_text(
+        json.dumps({"deliverable": "7", "author": "unrelated work"}), encoding="utf-8"
+    )
+
+    orig = (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR, lwb_check_proof.EXEMPT_PATH)
+    try:
+        lwb_check_proof.REPO_ROOT = repo
+        lwb_check_proof.PROOF_DIR = repo / "proof"
+        lwb_check_proof.EXEMPT_PATH = repo / "proof" / "exempt.json"
+        errors = lwb_check_proof.check_coverage(f"{base}..HEAD")
+    finally:
+        (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR, lwb_check_proof.EXEMPT_PATH) = orig
+
+    assert len(errors) == 1, errors
 
 
 def test_pr_check_is_not_satisfied_by_another_prs_record(tmp_path):

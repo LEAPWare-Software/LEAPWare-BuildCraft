@@ -14,7 +14,7 @@
     "pr": {
       "type": "integer",
       "minimum": 1,
-      "description": "The PR number this record proves, when there is one. Optional, but it is what the pre-merge lwb-proof-pr check keys on: the squash-merge commit does not exist yet while a PR's own CI runs, so 'commit' cannot be matched pre-merge. See scripts/lwb_check_proof.py::check_pr_has_record."
+      "description": "The PR number this record proves. Optional in the schema, but it is the ONLY thing the directive-7 gates key on, both pre-merge (lwb-proof-pr) and post-merge (lwb-proof-coverage) -- the squash-merge commit does not exist while a PR's own CI runs, so 'commit' cannot be matched pre-merge. Do NOT reintroduce a fallback onto 'deliverable': a deliverable is documented below as an issue/step number or a slug, so a small integer there is ordinary usage, and accepting it as a PR alias let a record for step 6 of an unrelated plan silently satisfy PR #6's gate. See scripts/lwb_check_proof.py::check_pr_has_record."
     },
     "author": {
       "type": "string",

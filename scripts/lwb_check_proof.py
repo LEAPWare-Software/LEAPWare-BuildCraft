@@ -196,12 +196,11 @@ def check_coverage(rev_range: str) -> list[str]:
             # available at both moments, so both halves of this check key on
             # it. Without this, every record would be unmatchable post-merge
             # and coverage would fail on work that was properly proven.
-            for key in ("pr", "deliverable"):
-                value = data.get(key)
-                if isinstance(value, int):
-                    proved_prs.add(value)
-                elif isinstance(value, str) and value.isdigit():
-                    proved_prs.add(int(value))
+            # Typed `pr` only, for the reason spelled out in
+            # check_pr_has_record: a digit-string `deliverable` is ordinary
+            # usage and collided with unrelated PR numbers.
+            if isinstance(data.get("pr"), int):
+                proved_prs.add(data["pr"])
 
     exempt = _exempt_shas()
     for sha, subject in _landed_deliverables(rev_range):
@@ -257,13 +256,24 @@ def check_pr_has_record(pr_number: int) -> list[str]:
             continue
         if not isinstance(data, dict):
             continue
-        if data.get("pr") == pr_number or str(data.get("deliverable", "")) == str(pr_number):
+        # ONLY the typed `pr` integer counts. There used to be a fallback
+        # accepting a `deliverable` that happened to be the digits of the PR
+        # number, and it was unsound: schema.json documents `deliverable` as
+        # "an issue/step number or a short slug", so a small integer is
+        # normal, expected usage. A record proving step 6 of some unrelated
+        # plan would have silently satisfied PR #6's gate forever, pre- and
+        # post-merge, with no relation to its content -- a gate reporting
+        # green without checking anything real, the same defect this PR
+        # exists to fix. Found by independent review; the first version's own
+        # test asserted the broken behaviour as intended.
+        if data.get("pr") == pr_number:
             return []
 
     errors.append(
-        f"PR #{pr_number} touches this repo and carries no proof/*.json record for "
-        f"itself (a record with \"pr\": {pr_number}, or deliverable \"{pr_number}\"). "
-        "Owner directive 7: done means committed AND pushed WITH a proof record."
+        f"PR #{pr_number} carries no proof/*.json record for itself. Add one with "
+        f"\"pr\": {pr_number} — the typed field, not a deliverable that merely reads "
+        f"as \"{pr_number}\". Owner directive 7: done means committed AND pushed WITH "
+        "a proof record."
     )
     return errors
 

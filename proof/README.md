@@ -24,10 +24,28 @@ never asked whether one *should* exist. An empty `proof/` printed
 five deliverables (PRs #1–#5) merged green straight through a rule this
 repo calls load-bearing.
 
-`python scripts/lwb_check_proof.py --coverage <base>..<head>` closes it:
-every squash-merge commit in the range (GitHub's trailing `(#N)` subject)
-must have a `proof/*.json` record naming its `commit`. The `lwb-proof-coverage`
-CI job runs it on every pull request.
+It is checked at **two** moments, because the two identifiers exist at
+different times:
+
+- **Pre-merge, blocking** — `--pr <N>` (`lwb-proof-pr`, on `pull_request`)
+  requires a record with `"pr": <N>`. The PR number exists; the
+  squash-merge commit does not.
+- **Post-merge, detective** — `--coverage <base>..<head>`
+  (`lwb-proof-coverage`, on push to `main`) requires every squash-merge in
+  the range, identified by GitHub's trailing `(#N)` subject, to have a
+  record.
+
+The first version ran `--coverage` over `base..head` on `pull_request` and
+was a guaranteed no-op: GitHub fabricates the `(#N)` commit **at merge
+time**, so a PR's own commits never carry that subject. It would have
+merged green and reported success forever. Independent review caught it.
+
+**Both gates key exclusively on the typed `pr` integer.** A record is
+written *inside* the PR it proves, so it can never name the squash sha —
+which is why `commit` alone is not enough. And a fallback onto a
+digit-string `deliverable` was removed as unsound: a `deliverable` is
+normally an issue or step number, so a record for step 6 of an unrelated
+plan silently satisfied PR #6's gate. Do not reintroduce it.
 
 `exempt.json` names the five historical merges, each with a reason, rather
 than back-filling invented evidence — a receipt written after the fact from
