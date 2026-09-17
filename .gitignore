@@ -1,0 +1,52 @@
+# Vendored copies are BUILD OUTPUT, not source — scripts/build.py writes
+# them from core/ and adapters/. They ARE committed (a marketplace/plugin
+# install pulls from git with no build step to run), so scripts/build.py
+# --check in CI compares the committed tree against a fresh build from
+# core/ and adapters/ to catch drift, rather than a missing tree.
+
+# Release artifacts (scripts/release.py).
+dist/
+
+# Runtime state a plugin install writes; never part of the shipped tree.
+*.jsonl
+state/
+plugins/*/lwb/state/
+
+# Worktrees live only under .worktrees/<branch>, never as a sibling folder.
+.worktrees/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+build/
+.mypy_cache/
+.ruff_cache/
+
+# credentials — same class of rule as every LEAPWare repo, prophylaxis not
+# remediation; nothing in this project's own source should ever hold one.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+id_rsa*
+id_ed25519*
+*.credentials.json
+.npmrc
+
+# local scratch
+*.tmp
+*.bak
+*.local.json
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.swp
