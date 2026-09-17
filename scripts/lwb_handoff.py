@@ -76,13 +76,20 @@ FORBIDDEN_PATTERNS = [
     re.compile(r"(?<!\w)/(?:Users|home)/\w+"),  # POSIX home directory
 ]
 
-FORBIDDEN_SUBSTRINGS = [
-    "manny",
-    "ramos",
-    "followoz",
-    "leapware-cpt",
-    "leapware-financial",
-]
+# Private-name needles come from the one source of truth,
+# scripts/lwb_check_env_leak.py's resolve_needles(), which reads them from
+# the LWB_PRIVATE_NEEDLES environment variable (a repository secret in CI).
+#
+# They used to be five literals HERE: the owner's own name and three private
+# project names, committed in plaintext to a PUBLIC repo. That is the exact
+# breach owner directive 8 calls SACRED, sitting inside the file meant to
+# prevent it. It survived because this file was on the env-leak scanner's
+# own exemption list (_PATTERN_DATA_EXEMPT), so the scanner could not see
+# its own needles -- an exemption added to stop false positives ended up
+# concealing a real one. Both exemptions are now gone with the literals.
+#
+# A needle list is configuration, not source. Never re-add a real name here.
+from lwb_check_env_leak import resolve_needles  # noqa: E402
 
 
 class ValidationError(Exception):
@@ -230,7 +237,7 @@ def _validate(text: str) -> list[str]:
             errors.append(f"forbidden pattern found (absolute path): {pattern.pattern!r}")
 
     lowered = text.lower()
-    for needle in FORBIDDEN_SUBSTRINGS:
+    for needle in resolve_needles():
         if needle in lowered:
             errors.append(f"forbidden substring found: {needle!r}")
 

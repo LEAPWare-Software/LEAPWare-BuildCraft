@@ -130,10 +130,15 @@ def _tracked_files() -> list[Path]:
 
 # Files that necessarily carry this scanner's own pattern data (or, for a
 # test file, synthetic needles that exercise it) rather than a real leak.
+# scripts/lwb_handoff.py and tests/core/test_lwb_handoff.py were REMOVED from
+# this set. They were exempt because they carried the needle literals, and the
+# exemption meant this scanner could not see five real private names committed
+# in plaintext to a public repo. The needles moved to LWB_PRIVATE_NEEDLES, so
+# neither file carries pattern data any more and neither may be exempt again.
+# An exemption is a blind spot: only this scanner's own source and the test
+# holding synthetic needles qualify.
 _PATTERN_DATA_EXEMPT = {
     "scripts/lwb_check_env_leak.py",
-    "scripts/lwb_handoff.py",
-    "tests/core/test_lwb_handoff.py",
     "tests/test_lwb_check_env_leak.py",
 }
 
