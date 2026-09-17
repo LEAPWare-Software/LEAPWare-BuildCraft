@@ -39,15 +39,29 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-SIZE_CAP_BYTES = 6000
+# Owner ruling, 2026-09-17: HANDOFF.md carries the transition only and is
+# capped at 3000 bytes. Durable reference (session start, re-derive
+# commands, hard rules, traps) moved to docs/handoff-protocol.md. A cap
+# reached is a signal to move content into docs/, never to trim meaning.
+SIZE_CAP_BYTES = 3000
 
 BEGIN_MARKER = "<!-- lwb-handoff:begin -->"
 END_MARKER = "<!-- lwb-handoff:end -->"
 
+# Only the transition sections are required here now. "Start of session",
+# "Re-derive state", "Hard rules" and "Traps" are required of
+# docs/handoff-protocol.md instead (see PROTOCOL_REQUIRED_SECTIONS), so
+# moving them out of HANDOFF.md cannot silently lose them.
 REQUIRED_SECTIONS = [
     "# HANDOFF",
-    "## Start of session",
     "## In flight",
+    "## Where to look",
+]
+
+PROTOCOL_DOC = REPO_ROOT / "docs" / "handoff-protocol.md"
+
+PROTOCOL_REQUIRED_SECTIONS = [
+    "## Start of session",
     "## Re-derive state",
     "## Hard rules",
     "## Traps",
@@ -62,13 +76,20 @@ FORBIDDEN_PATTERNS = [
     re.compile(r"(?<!\w)/(?:Users|home)/\w+"),  # POSIX home directory
 ]
 
-FORBIDDEN_SUBSTRINGS = [
-    "manny",
-    "ramos",
-    "followoz",
-    "leapware-cpt",
-    "leapware-financial",
-]
+# Private-name needles come from the one source of truth,
+# scripts/lwb_check_env_leak.py's resolve_needles(), which reads them from
+# the LWB_PRIVATE_NEEDLES environment variable (a repository secret in CI).
+#
+# They used to be five literals HERE: the owner's own name and three private
+# project names, committed in plaintext to a PUBLIC repo. That is the exact
+# breach owner directive 8 calls SACRED, sitting inside the file meant to
+# prevent it. It survived because this file was on the env-leak scanner's
+# own exemption list (_PATTERN_DATA_EXEMPT), so the scanner could not see
+# its own needles -- an exemption added to stop false positives ended up
+# concealing a real one. Both exemptions are now gone with the literals.
+#
+# A needle list is configuration, not source. Never re-add a real name here.
+from lwb_check_env_leak import resolve_needles  # noqa: E402
 
 
 class ValidationError(Exception):
@@ -216,9 +237,22 @@ def _validate(text: str) -> list[str]:
             errors.append(f"forbidden pattern found (absolute path): {pattern.pattern!r}")
 
     lowered = text.lower()
-    for needle in FORBIDDEN_SUBSTRINGS:
+    for needle in resolve_needles():
         if needle in lowered:
             errors.append(f"forbidden substring found: {needle!r}")
+
+    # The durable sections moved out of HANDOFF.md under the 3000-byte cap.
+    # Assert they landed in the protocol doc, so "trim HANDOFF.md" can never
+    # quietly become "delete the hard rules".
+    if not PROTOCOL_DOC.exists():
+        errors.append(f"missing {PROTOCOL_DOC.name}: the moved sections have nowhere to live")
+    else:
+        protocol = PROTOCOL_DOC.read_text(encoding="utf-8")
+        for section in PROTOCOL_REQUIRED_SECTIONS:
+            if section not in protocol:
+                errors.append(
+                    f"docs/handoff-protocol.md is missing required section heading: {section!r}"
+                )
 
     return errors
 

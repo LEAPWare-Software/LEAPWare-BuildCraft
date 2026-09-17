@@ -13,7 +13,14 @@ Lane membership (literal, per the D1b brief):
   - codex lane: `plugins/codex/`, `adapters/codex/`, any directory literally
     named `codex` under `tests/`.
   - shared: `core/`, `scripts/`, `.github/`, `docs/`, `proof/`, `reviews/`,
-    `HANDOFF.md`, `AGENTS.md`, `CLAUDE.md`, `README.md`.
+    `tests/`, `HANDOFF.md`, `AGENTS.md`, `CLAUDE.md`, `README.md`.
+
+`tests/` is shared, with the lane-owned subtrees and filename patterns
+below carved out of it. It has to be: a test covering a shared script
+(`tests/test_lwb_check_proof.py`, say) previously classified as "other" —
+in neither lane and not on the shared list — which meant NEITHER CLI was
+allowed to write it, so a shared script could not be given a test at all.
+Lane patterns are therefore matched before the shared prefixes.
 
 One extension beyond the literal glob, documented here rather than left
 implicit: a test module directly named `test_claude_*` or `*_claude_*`
@@ -25,11 +32,19 @@ not under a `claude/`/`codex/` subdirectory, and the literal glob alone
 would strand them in neither lane nor the shared list.
 
 Bootstrap exception: lane enforcement (this module's `check_lanes`, wired
-into the `lwb-lanes` CI job) is a no-op for PR numbers 1-5 — the PR that
-introduced this system could not have satisfied it before it existed. PR 6
-onward is enforced. `--pr-number` with no value, or 0, means "not running
-under a PR" (e.g. a push to main after merge) and is also skipped, since
-lane enforcement is a pre-merge PR gate, not a post-merge one.
+into the `lwb-lanes` CI job) is a no-op for the PRs named in
+`BOOTSTRAP_EXEMPT_PRS` — the PR that introduced this system could not have
+satisfied it before it existed. That used to be the range 1-5, which was a
+mistake: PR numbers are a consumable resource, and Dependabot spent #2, #3
+and #4 unattended. It is now an explicit set, so no bot can eat the window
+and nobody can widen it by editing one digit. `--pr-number` with no value,
+or 0, means "not running under a PR" (e.g. a push to main after merge) and
+is also skipped, since lane enforcement is a pre-merge gate.
+
+Bot commits are skipped too (`BOT_AUTHOR_PATTERNS`): a bot stamps no
+`LWB-Agent:` trailer and cannot write a `reviews/` record, so without this
+every Dependabot PR would fail the lane check and teach us to merge past a
+red gate. Bots remain bound by every other check.
 """
 
 from __future__ import annotations
@@ -51,10 +66,36 @@ SHARED_PREFIXES = (
     "docs/",
     "proof/",
     "reviews/",
+    # `tests/` is shared so that a test covering a shared script is writable
+    # by either CLI (under two-CTO review). Without it, a file such as
+    # `tests/test_lwb_check_proof.py` classified as "other" — in no lane and
+    # not shared — so NEITHER CLI could touch it. Lane-owned subtrees inside
+    # `tests/` still win: see classify_path's ordering.
+    "tests/",
 )
 SHARED_FILES = ("HANDOFF.md", "AGENTS.md", "CLAUDE.md", "README.md")
 
-BOOTSTRAP_LAST_EXEMPT_PR = 5
+# The bootstrap window, as an explicit set rather than a `<= N` threshold.
+# A threshold is wrong here because PR numbers are a shared, consumable
+# resource: Dependabot opened #2, #3 and #4 unattended, silently spending
+# three quarters of a window that was meant for the PRs that stood this
+# system up. Only #1 (the scaffold) and #5 (the PR that fixed this rule)
+# ever needed the exemption, so they are named, and the window cannot be
+# eaten or quietly extended by a bot.
+BOOTSTRAP_EXEMPT_PRS = frozenset({1, 5})
+
+# Commit authors that cannot satisfy lane review by construction: a bot
+# does not run a CTO role, cannot write a reviews/ record, and does not
+# stamp an `LWB-Agent:` trailer. Without this, every Dependabot PR from #6
+# onward fails `lwb-lanes` on a missing trailer -- which would train us to
+# merge past a red lane check, the exact habit this gate exists to prevent.
+# A bot commit is still bound by every other check (commit identity, env
+# leak, tests); it is only exempt from the two-CTO lane review.
+BOT_AUTHOR_PATTERNS = (
+    re.compile(r"^dependabot(?:\[bot\])?@", re.IGNORECASE),
+    re.compile(r"^\d+\+dependabot\[bot\]@users\.noreply\.github\.com$", re.IGNORECASE),
+    re.compile(r"\[bot\]@users\.noreply\.github\.com$", re.IGNORECASE),
+)
 
 TRAILER_RE = re.compile(r"^LWB-Agent:\s*(claude|codex|human)\s*$", re.MULTILINE)
 
@@ -63,12 +104,11 @@ def classify_path(path: str) -> str:
     """Return "claude", "codex", "shared", or "other" for a repo-relative path."""
     posix = path.replace("\\", "/")
 
-    for prefix in SHARED_PREFIXES:
-        if posix.startswith(prefix):
-            return "shared"
-    if posix in SHARED_FILES:
-        return "shared"
-
+    # Lane-specific patterns are checked BEFORE the shared prefixes, because
+    # `tests/` is shared as a whole while `tests/**/claude/**` and
+    # `tests/**/*_claude_*` inside it still belong to the claude lane. No
+    # shared prefix other than `tests/` can match a lane pattern, so the
+    # order is a no-op for the rest.
     for agent in ("claude", "codex"):
         if posix.startswith(f"plugins/{agent}/") or posix.startswith(f"adapters/{agent}/"):
             return agent
@@ -80,6 +120,12 @@ def classify_path(path: str) -> str:
             filename.startswith(f"test_{agent}_") or f"_{agent}_" in filename
         ):
             return agent
+
+    for prefix in SHARED_PREFIXES:
+        if posix.startswith(prefix):
+            return "shared"
+    if posix in SHARED_FILES:
+        return "shared"
 
     return "other"
 
@@ -153,13 +199,33 @@ def _review_ok(pr_number: int, agent: str, commit_sha: str, errors: list[str]) -
     return True
 
 
+def commit_author_email(sha: str) -> str:
+    """The author email of `sha`, for the bot check."""
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%ae", sha],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def is_bot_commit(sha: str) -> bool:
+    """True when `sha`'s author is a bot that cannot satisfy lane review."""
+    email = commit_author_email(sha)
+    return any(pattern.search(email) for pattern in BOT_AUTHOR_PATTERNS)
+
+
 def check_lanes(rev_range: str, pr_number: int) -> list[str]:
     """Check every commit in `rev_range`. Returns a list of failure strings."""
-    if pr_number <= BOOTSTRAP_LAST_EXEMPT_PR:
+    if pr_number in BOOTSTRAP_EXEMPT_PRS:
         return []
 
     errors: list[str] = []
     for sha in commits_in_range(rev_range):
+        if is_bot_commit(sha):
+            continue  # see BOT_AUTHOR_PATTERNS
         agent = commit_agent(sha)
         if agent is None:
             errors.append(f"{sha[:12]}: missing or invalid 'LWB-Agent:' trailer")
@@ -204,7 +270,7 @@ def main() -> int:
         return 1
     if args.pr_number == 0:
         print("lwb-lanes check skipped (not running under a PR)")
-    elif args.pr_number <= BOOTSTRAP_LAST_EXEMPT_PR:
+    elif args.pr_number in BOOTSTRAP_EXEMPT_PRS:
         print(f"lwb-lanes check skipped (bootstrap exception, PR #{args.pr_number})")
     else:
         print("lwb-lanes check passed")

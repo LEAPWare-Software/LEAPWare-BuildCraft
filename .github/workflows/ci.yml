@@ -45,6 +45,12 @@ jobs:
         run: python scripts/lwb_check_prefix.py
 
       - name: lwb-env-leak (no local-environment or private-project leak)
+        # The real private-name needles never live in this public repo; they
+        # arrive here from a repository secret. An empty/unset value makes the
+        # check fail as UNCONFIGURED rather than pass while scanning for
+        # nothing -- see scripts/lwb_check_env_leak.py's "Needle sources".
+        env:
+          LWB_PRIVATE_NEEDLES: ${{ secrets.LWB_PRIVATE_NEEDLES }}
         run: python scripts/lwb_check_env_leak.py
 
       - name: lwb-env-leak-history (no leak in any commit added by this PR, even one later reverted)
@@ -54,6 +60,8 @@ jobs:
         # removed again within the same PR -- it is still in the branch's
         # history, which a clone or marketplace pull carries in full. No
         # allow-listed commits: every PR's added lines must be clean.
+        env:
+          LWB_PRIVATE_NEEDLES: ${{ secrets.LWB_PRIVATE_NEEDLES }}
         run: >-
           python scripts/lwb_check_env_leak.py
           --range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}

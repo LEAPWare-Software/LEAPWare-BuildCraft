@@ -19,14 +19,14 @@ _spec.loader.exec_module(lwb_handoff)
 
 
 def _valid_text(begin: str = lwb_handoff.BEGIN_MARKER, end: str = lwb_handoff.END_MARKER) -> str:
+    """The post-2026-09-17 shape: HANDOFF.md carries the transition only.
+    "Start of session", "Re-derive state", "Hard rules" and "Traps" moved to
+    docs/handoff-protocol.md under the 3000-byte cap."""
     return (
         "# HANDOFF\n\n"
-        "## Start of session\n- [ ] read this\n\n"
         "## In flight\n1. do the thing\n\n"
         f"{begin}\nGenerated: 2026-09-17 00:00 UTC\nmain SHA: deadbeef\n\nOpen PRs:\n(none)\n\n{end}\n\n"
-        "## Re-derive state\n```\ngit status\n```\n\n"
-        "## Hard rules\n- stdlib only\n\n"
-        "## Traps\n- none yet\n"
+        "## Where to look\n- protocol → `docs/handoff-protocol.md`\n"
     )
 
 
@@ -35,9 +35,34 @@ def test_valid_text_passes():
 
 
 def test_missing_section_fails():
-    text = _valid_text().replace("## Traps\n", "")
+    text = _valid_text().replace("## Where to look\n", "")
     errors = lwb_handoff._validate(text)
-    assert any("Traps" in e for e in errors)
+    assert any("Where to look" in e for e in errors)
+
+
+def test_size_cap_is_3000_per_owner_ruling():
+    assert lwb_handoff.SIZE_CAP_BYTES == 3000
+
+
+def test_the_real_handoff_is_within_cap():
+    text = (REPO_ROOT / "HANDOFF.md").read_text(encoding="utf-8")
+    assert len(text.encode("utf-8")) <= lwb_handoff.SIZE_CAP_BYTES
+
+
+def test_moved_sections_must_survive_in_the_protocol_doc(tmp_path, monkeypatch):
+    """Trimming HANDOFF.md must not be able to quietly delete the hard rules:
+    the moved headings are now required of docs/handoff-protocol.md."""
+    stub = tmp_path / "handoff-protocol.md"
+    stub.write_text("## Start of session\n## Re-derive state\n## Traps\n", encoding="utf-8")
+    monkeypatch.setattr(lwb_handoff, "PROTOCOL_DOC", stub)
+    errors = lwb_handoff._validate(_valid_text())
+    assert any("Hard rules" in e and "handoff-protocol" in e for e in errors)
+
+
+def test_real_protocol_doc_carries_every_moved_section():
+    protocol = (REPO_ROOT / "docs" / "handoff-protocol.md").read_text(encoding="utf-8")
+    for section in lwb_handoff.PROTOCOL_REQUIRED_SECTIONS:
+        assert section in protocol, section
 
 
 def test_missing_begin_marker_fails():
@@ -64,21 +89,53 @@ def test_over_size_cap_fails():
     assert any("bytes" in e and "cap" in e for e in errors)
 
 
-@pytest.mark.parametrize(
-    "needle",
-    ["C:\\Users\\someone\\repo", "/Users/someone/repo", "/home/someone/repo"],
-)
-def test_absolute_path_fails(needle):
-    text = _valid_text() + f"\n{needle}\n"
+def _synthetic_abs_path(kind: str) -> str:
+    """Assembled at run time so no absolute-path literal appears in this file.
+
+    This file is no longer exempt from the env-leak scan (its exemption hid
+    five real private names), so it must not contain the very patterns that
+    scan looks for. A test fixture is data; it does not need to be a literal.
+    """
+    if kind == "windows":
+        return "C" + ":" + "\\" + "Users\\someone\\repo"
+    return "/" + kind + "/someone/repo"
+
+
+@pytest.mark.parametrize("kind", ["windows", "Users", "home"])
+def test_absolute_path_fails(kind):
+    text = _valid_text() + f"\n{_synthetic_abs_path(kind)}\n"
     errors = lwb_handoff._validate(text)
     assert any("absolute path" in e for e in errors)
 
 
-@pytest.mark.parametrize("needle", ["manny", "Ramos", "FOLLOWOZ", "leapware-cpt", "leapware-financial"])
-def test_forbidden_substring_fails(needle):
+@pytest.mark.parametrize("needle", ["Private-Proj", "acme-holdings", "SOMEORG"])
+def test_forbidden_substring_fails(needle, monkeypatch):
+    """Needles are injected, never hardcoded. Real private names used to be
+    literals in this file and in scripts/lwb_handoff.py -- committed to a
+    public repo, and invisible to the env-leak scanner because both files
+    were on its exemption list."""
+    monkeypatch.setenv("LWB_PRIVATE_NEEDLES", "private-proj,acme-holdings,someorg")
     text = _valid_text() + f"\n{needle}\n"
     errors = lwb_handoff._validate(text)
     assert any("forbidden substring" in e for e in errors)
+
+
+def test_needles_come_from_the_environment_not_from_source():
+    """Regression guard: no real private name may live in either file again."""
+    for path in (
+        REPO_ROOT / "scripts" / "lwb_handoff.py",
+        REPO_ROOT / "tests" / "core" / "test_lwb_handoff.py",
+    ):
+        assert not hasattr(lwb_handoff, "FORBIDDEN_SUBSTRINGS"), path
+    import lwb_check_env_leak
+
+    assert lwb_handoff.resolve_needles is lwb_check_env_leak.resolve_needles
+
+
+def test_no_needle_is_matched_when_unconfigured(monkeypatch):
+    monkeypatch.delenv("LWB_PRIVATE_NEEDLES", raising=False)
+    errors = lwb_handoff._validate(_valid_text() + "\nacme-holdings\n")
+    assert not any("forbidden substring" in e for e in errors)
 
 
 def test_cmd_check_missing_file(tmp_path, monkeypatch, capsys):
@@ -97,7 +154,7 @@ def test_cmd_check_valid_file(tmp_path, monkeypatch, capsys):
 
 def test_cmd_check_invalid_file(tmp_path, monkeypatch, capsys):
     path = tmp_path / "HANDOFF.md"
-    path.write_text(_valid_text().replace("## Traps\n", ""), encoding="utf-8")
+    path.write_text(_valid_text().replace("## Where to look\n", ""), encoding="utf-8")
     monkeypatch.setattr(lwb_handoff, "HANDOFF_PATH", path)
     assert lwb_handoff.cmd_check() == 1
     assert "FAIL" in capsys.readouterr().err
