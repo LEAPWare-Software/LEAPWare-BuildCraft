@@ -12,11 +12,16 @@ In order. Do not start step *n+1* before step *n* is done and proven.
    (`lwb`). PR #1 squash-merged, 16/16 green. The repo is **PUBLIC** under
    Apache-2.0: everything committed is world-readable permanently, history
    included.
-2. **Apply the repository ruleset; create the two GitHub Apps**
-   (`lwb-claude`, `lwb-codex`) from `.github/apps/`, in a browser session.
-   Install on this repo only; each private key goes to the owner's secrets
-   manager, never the repo. Record App ids in
-   `docs/maintainers/github-apps.md` via PR.
+2. **Ruleset DONE; GitHub Apps DEFERRED.** Ruleset `main` (id 23627212) is
+   active on the default branch: no deletion, no force-push, PR required,
+   9 required checks, squash-only, merge queue. The two Apps
+   (`lwb-claude`, `lwb-codex`, manifests in `.github/apps/`) are **not
+   created** — GitHub has no API for App creation, the manifest flow needs
+   an authenticated browser session, and no Chrome extension is reachable
+   from a CLI session. They block nothing: `gh auth` already commits and
+   merges. Do them when a second CLI or a revocable per-CLI identity is
+   actually needed. Do NOT generate a private key until there is a decided
+   place to put it — GitHub shows it once and it carries repo write.
 3. **The requirements package**, per `docs/requirements/approach.md`,
    replacing the TODO placeholder in
    `docs/requirements/owner-directives.md`. Owner decisions recorded: all
@@ -35,16 +40,13 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-17 21:35 UTC
-main SHA: 31a75abfbc23770b157b804322088130ac62aa28
+Generated: 2026-09-17 22:14 UTC
+main SHA: 68ac412247c03d109273de33948391581fdbec56
 CLI: claude
-Session: requirements-2026-09-17
+Session: gates-2026-09-17
 
 Open PRs:
-#5 Arm directive 8's private-name gate; make tests/ a shared lane (lwb-leak-gate-handoff)
-#4 chore(deps): bump softprops/action-gh-release from 2 to 3 (dependabot/github_actions/softprops/action-gh-release-3)
-#3 chore(deps): bump actions/setup-python from 6 to 7 (dependabot/github_actions/actions/setup-python-7)
-#2 chore(deps): bump actions/checkout from 5 to 7 (dependabot/github_actions/actions/checkout-7)
+(unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
 (none yet)

@@ -16,6 +16,26 @@ This scaffolding session wrote NO proof records — `schema.json`, this
 README, and the validator are the mechanism. Every deliverable from here
 on writes its own.
 
+## Coverage: the half that was missing until PR #6
+
+`lwb_check_proof.py` originally validated the records that *existed* and
+never asked whether one *should* exist. An empty `proof/` printed
+"skipped (no records yet)" and exited 0, so the gate could not fail — and
+five deliverables (PRs #1–#5) merged green straight through a rule this
+repo calls load-bearing.
+
+`python scripts/lwb_check_proof.py --coverage <base>..<head>` closes it:
+every squash-merge commit in the range (GitHub's trailing `(#N)` subject)
+must have a `proof/*.json` record naming its `commit`. The `lwb-proof-coverage`
+CI job runs it on every pull request.
+
+`exempt.json` names the five historical merges, each with a reason, rather
+than back-filling invented evidence — a receipt written after the fact from
+memory, for work whose output was never captured, is exactly the dishonesty
+a proof record exists to prevent. A test asserts every exempt sha is a real
+commit in this repo's history, so the list cannot be used to excuse a
+future merge. **Adding an entry is not a substitute for writing a record.**
+
 ## Record shape
 
 See `schema.json` for the enforced shape. In prose:
