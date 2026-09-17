@@ -1,0 +1,19 @@
+{
+  "name": "lwb",
+  "version": "0.2.0+codex",
+  "description": "Companion to the LEAPWare BuildCraft Claude Code plugin, now with the same enforcement: an engine identical to it, an enforcing PreToolUse hook (hooks/hooks.json), and lwb-config/lwb-report skills.",
+  "author": {
+    "name": "LEAPWare-Software"
+  },
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "LEAPWare BuildCraft",
+    "shortDescription": "SDLC gate policy for this session.",
+    "longDescription": "lwb makes the generic SDLC's stage, role and gate policy mechanical. Both the Claude Code and Codex plugins enforce via a PreToolUse hook backed by the same lwb_core policy engine, with lwb-config and lwb-report skills for inspecting and previewing policy.",
+    "developerName": "LEAPWare-Software",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "lwb: show the current gate policy and report on the last action."
+  }
+}

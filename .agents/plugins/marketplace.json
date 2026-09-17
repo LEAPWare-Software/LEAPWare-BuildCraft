@@ -1,0 +1,20 @@
+{
+  "name": "LEAPWare-BuildCraft",
+  "interface": {
+    "displayName": "LEAPWare BuildCraft"
+  },
+  "plugins": [
+    {
+      "name": "lwb",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/lwb"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

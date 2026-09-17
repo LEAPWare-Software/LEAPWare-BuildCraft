@@ -1,0 +1,8 @@
+{
+  "deliverable": "example-deliverable",
+  "author": "claude-worker-session-1",
+  "checked_by": "sonnet-verifier-session-2",
+  "commit": "abc1234",
+  "commands": [],
+  "mutations": ["example.py"]
+}

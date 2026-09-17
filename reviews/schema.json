@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lwb shared-path review record",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "pr",
+    "reviewer_agent",
+    "reviewer_id",
+    "commit_author_agent",
+    "commit_author_id",
+    "verdict"
+  ],
+  "properties": {
+    "pr": { "type": "integer", "minimum": 1 },
+    "reviewer_agent": { "type": "string", "enum": ["claude", "codex"] },
+    "reviewer_id": { "type": "string", "minLength": 1 },
+    "commit_author_agent": { "type": "string", "enum": ["claude", "codex", "human"] },
+    "commit_author_id": { "type": "string", "minLength": 1 },
+    "verdict": { "type": "string", "enum": ["AGREE", "DISAGREE"] },
+    "notes": { "type": "string" }
+  }
+}

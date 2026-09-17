@@ -1,0 +1,18 @@
+{
+  "name": "lwb-claude",
+  "url": "https://github.com/LEAPWare-Software/LEAPWare-BuildCraft",
+  "hook_attributes": {
+    "url": "https://example.invalid/not-configured",
+    "active": false
+  },
+  "redirect_url": "https://github.com/LEAPWare-Software/LEAPWare-BuildCraft",
+  "description": "LEAPWare BuildCraft CI/merge identity for Claude Code sessions working in this repo. Least-privilege: no org permissions, webhook inactive.",
+  "public": false,
+  "default_permissions": {
+    "contents": "write",
+    "pull_requests": "write",
+    "checks": "read",
+    "metadata": "read"
+  },
+  "default_events": []
+}

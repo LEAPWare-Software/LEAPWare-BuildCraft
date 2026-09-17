@@ -1,0 +1,11 @@
+{
+  "session_id": "sanitized-session-0001",
+  "transcript_path": "/sanitized/path/transcript.jsonl",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "subagent_type": "example-worker",
+    "description": "Fix the failing test in example_module",
+    "prompt": "Go look at example_module and fix the failing test. Report back with the diff."
+  }
+}

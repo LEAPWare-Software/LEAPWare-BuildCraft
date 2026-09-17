@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in buildcraft behaves differently than documented.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - core (lwb_core engine / rules)
+        - adapters/claude
+        - adapters/codex
+        - plugins/claude/lwb
+        - plugins/codex/lwb
+        - scripts (build/validate/release)
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did buildcraft do, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Policy file used (or "default"), the exact event/prompt, and the command or hook invocation.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: buildcraft version
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host and OS
+      description: e.g. "Claude Code on Windows 11" or "Codex CLI on macOS"
+    validations:
+      required: true

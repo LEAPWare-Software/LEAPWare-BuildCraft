@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        python-version: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dev dependencies
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Unit / adapter / conformance tests
+        run: python -m pytest -q
+
+      - name: Vendor drift check (scripts/lwb_build.py --check)
+        run: python scripts/lwb_build.py --check
+
+      - name: Build vendor trees for validators
+        run: python scripts/lwb_build.py
+
+      - name: Validate Claude Code plugin
+        run: python scripts/lwb_validate_claude_plugin.py
+
+      - name: Validate Codex plugin
+        run: python scripts/lwb_validate_codex_plugin.py
+
+      - name: lwb-prefix (every user-facing entrypoint starts with lwb)
+        run: python scripts/lwb_check_prefix.py
+
+      - name: lwb-env-leak (no local-environment or private-project leak)
+        run: python scripts/lwb_check_env_leak.py
+
+      - name: lwb-env-leak-history (no leak in any commit added by this PR, even one later reverted)
+        if: github.event_name == 'pull_request'
+        # Same base/head reasoning as lwb-commit-identity below: a
+        # working-tree-only scan misses a leak that was committed and then
+        # removed again within the same PR -- it is still in the branch's
+        # history, which a clone or marketplace pull carries in full. No
+        # allow-listed commits: every PR's added lines must be clean.
+        run: >-
+          python scripts/lwb_check_env_leak.py
+          --range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+
+      - name: lwb-no-instruction-dep (no CLAUDE.md/AGENTS.md runtime dependency)
+        run: python scripts/lwb_check_no_instruction_dep.py
+
+      - name: lwb-proof (proof/*.json records validate against proof/schema.json)
+        run: python scripts/lwb_check_proof.py
+
+      - name: HANDOFF.md shape check
+        run: python scripts/lwb_handoff.py --check
+
+      - name: lwb-commit-identity (LEAPWare or an allow-listed bot only)
+        if: github.event_name == 'pull_request'
+        # github.event.pull_request.*.sha, not origin/<base>..HEAD: a
+        # pull_request checkout's HEAD is the synthetic refs/pull/N/merge
+        # commit, authored under the triggering GitHub App's own identity,
+        # not a real commit on the PR branch -- checking that range flags
+        # the App itself as an offending author on every PR run.
+        run: >-
+          python scripts/lwb_check_commit_identity.py
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}
+
+      - name: lwb-lanes (per-commit lane discipline + shared-path review gate)
+        if: github.event_name == 'pull_request'
+        # Same base/head reasoning as lwb-commit-identity above: check the
+        # PR's own real commits, never the synthetic merge commit.
+        run: >-
+          python scripts/lwb_lanes.py
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}
+          --pr-number ${{ github.event.pull_request.number }}
+
+  lwb-portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run both hooks exactly as each hooks.json declares them
+        run: python scripts/lwb_check_hook_launch.py
+
+  lwb-hosted-runners:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: lwb-hosted-runners (every workflow job runs on a GitHub-hosted runner)
+        run: python scripts/lwb_check_hosted_runners.py

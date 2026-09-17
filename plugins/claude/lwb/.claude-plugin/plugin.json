@@ -1,0 +1,17 @@
+{
+  "name": "lwb",
+  "version": "0.1.0",
+  "description": "A generic SDLC gate plugin, set up here as a safe minimal skeleton: ships one no-op rule, lwb_version, which allows every event and reports the plugin's version. Policy is per-rule off/warn/deny, fails open (a missing or broken policy file never blocks a dispatch), and the engine is pure — see core/lwb_core/engine.py. BuildCraft's real stage/role/gate rules are built in a later session.",
+  "author": {
+    "name": "LEAPWare-Software",
+    "url": "https://github.com/LEAPWare-Software"
+  },
+  "homepage": "https://github.com/LEAPWare-Software/LEAPWare-BuildCraft",
+  "license": "Apache-2.0",
+  "keywords": [
+    "governance",
+    "hooks",
+    "policy",
+    "sdlc"
+  ]
+}

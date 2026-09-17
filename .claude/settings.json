@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/scripts/lwb_check_lane_write.py\" --agent claude || python \"${CLAUDE_PROJECT_DIR}/scripts/lwb_check_lane_write.py\" --agent claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "session_id": "sanitized-session-0005",
+  "transcript_path": "/sanitized/path/transcript.jsonl",
+  "hook_event_name": "Stop"
+}

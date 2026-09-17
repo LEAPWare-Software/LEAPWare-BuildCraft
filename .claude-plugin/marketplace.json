@@ -1,0 +1,25 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "leapware-buildcraft",
+  "description": "LEAPWare's own single-plugin marketplace. Hosts lwb, a generic SDLC gate layer that makes stage, role and gate policy mechanical.",
+  "owner": {
+    "name": "LEAPWare-Software",
+    "url": "https://github.com/LEAPWare-Software"
+  },
+  "plugins": [
+    {
+      "name": "lwb",
+      "description": "A generic SDLC gate plugin, set up here as a safe minimal skeleton: ships one no-op rule, lwb_version, which allows every event and reports the plugin's version. Policy is per-rule off/warn/deny and fails open. See plugins/claude/lwb/.claude-plugin/plugin.json for the full description.",
+      "version": "0.1.0",
+      "author": {
+        "name": "LEAPWare-Software",
+        "url": "https://github.com/LEAPWare-Software"
+      },
+      "homepage": "https://github.com/LEAPWare-Software/LEAPWare-BuildCraft",
+      "license": "Apache-2.0",
+      "category": "workflow",
+      "keywords": ["governance", "hooks", "policy", "sdlc"],
+      "source": "./plugins/claude/lwb"
+    }
+  ]
+}
