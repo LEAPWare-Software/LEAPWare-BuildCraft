@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lwb Proof of Completion record",
+  "description": "Owner directive 7: Proof of Completion on every deliverable; done = committed AND pushed with a proof record and green CI. See proof/README.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["deliverable", "author", "checked_by", "commit", "commands", "mutations", "unproven"],
+  "properties": {
+    "deliverable": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The deliverable's id, e.g. an issue/step number or a short slug."
+    },
+    "author": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identity of whoever did the work (a session/dispatch id, not just 'claude' or 'codex')."
+    },
+    "checked_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identity of whoever independently checked it. Must differ from 'author' — see the schema-level check in scripts/lwb_check_proof.py."
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "The commit SHA this proof record proves."
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["argv", "exit", "expect_exit", "tail", "sha256"],
+        "properties": {
+          "argv": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "The exact command run, as an argv list (no shell string — avoids a shell-quoting ambiguity in the proof record itself)."
+          },
+          "exit": { "type": "integer", "description": "The actual exit code observed." },
+          "expect_exit": { "type": "integer", "description": "The exit code this command was expected to produce." },
+          "tail": {
+            "type": "array",
+            "items": { "type": "string" },
+            "maxItems": 10,
+            "description": "At most the last 10 lines of the command's combined output."
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "sha256 of the command's full captured output (stdout+stderr concatenated), so a 10-line tail can't quietly hide a truncated failure — see scripts/lwb_check_proof.py's re-hash check."
+          }
+        }
+      }
+    },
+    "mutations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Every file this deliverable's work created or changed, repo-relative path."
+    },
+    "unproven": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Anything claimed as part of this deliverable that this record does NOT prove (an honest gap list, not a place to hide a failure as a footnote)."
+    }
+  }
+}

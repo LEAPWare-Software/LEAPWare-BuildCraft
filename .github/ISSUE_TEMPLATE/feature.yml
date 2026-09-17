@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a new rule, adapter capability, or tooling change.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What stage/role/gate rule, today, has to be enforced by convention or a prompt instead of mechanically?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed rule or change
+      description: If proposing a rule, describe its trigger condition, its off/warn/deny behavior, and any options it would take.
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints acknowledged
+      options:
+        - label: Stdlib-only at runtime (no new third-party dependency under core/ or adapters/).
+          required: true
+        - label: Fails open on a missing or broken policy (never denies by default on error).
+          required: true

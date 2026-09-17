@@ -1,0 +1,18 @@
+{
+  "description": "In-repo lane guard for this repo's own contributors (see scripts/lwb_check_lane_write.py)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/lwb_check_lane_write.py --agent codex",
+            "commandWindows": "python scripts\\lwb_check_lane_write.py --agent codex",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

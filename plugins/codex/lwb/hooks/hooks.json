@@ -1,0 +1,19 @@
+{
+  "description": "lwb gate-policy enforcement (mirrors the Claude Code plugin's hooks.json)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/bin/lwb_hook.py\" || python \"${PLUGIN_ROOT}/bin/lwb_hook.py\"",
+            "commandWindows": "python \"${PLUGIN_ROOT}\\bin\\lwb_hook.py\"",
+            "timeout": 10,
+            "statusMessage": "lwb: checking dispatch against gate policy"
+          }
+        ]
+      }
+    ]
+  }
+}

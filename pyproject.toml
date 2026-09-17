@@ -1,0 +1,16 @@
+[project]
+name = "leapware-buildcraft"
+version = "0.1.0"
+description = "A generic SDLC gate plugin: stages, roles, gates, and the checks that enforce them, mechanically."
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+# Runtime dependency policy: NONE. lwb_core and every adapter are Python
+# 3.10+ standard library only. pytest below is a dev-only dependency for
+# running tests; it is never imported by core/, adapters/, or a shipped
+# plugin's bin/ script.
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

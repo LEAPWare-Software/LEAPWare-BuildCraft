@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/LEAPWare-Software/LEAPWare-BuildCraft/core/policy/schema.json",
+  "title": "LEAPWare BuildCraft policy",
+  "description": "A policy file configures each registered rule's mode. An absent or malformed policy resolves every rule to 'off' (fail-open) rather than raising; see docs/policy.md#fail-open.",
+  "type": "object",
+  "required": ["rules"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "rules": {
+      "type": "object",
+      "description": "Keyed by rule_id (see core/lwb_core/rules/__init__.py for the registry).",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["mode"],
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["off", "warn", "deny"],
+            "description": "off: rule never runs. warn: finding is surfaced but never blocks. deny: finding blocks the action."
+          },
+          "options": {
+            "type": "object",
+            "description": "Rule-specific configuration. See docs/rules/<rule_id>.md for the options a given rule reads."
+          }
+        }
+      }
+    }
+  }
+}

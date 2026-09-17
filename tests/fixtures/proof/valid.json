@@ -1,0 +1,17 @@
+{
+  "deliverable": "example-deliverable",
+  "author": "claude-worker-session-1",
+  "checked_by": "sonnet-verifier-session-2",
+  "commit": "abc1234",
+  "commands": [
+    {
+      "argv": ["python", "-m", "pytest", "-q"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["73 passed"],
+      "sha256": "b037c9032d88e9e063ae428c62721fea96257a8d1d6eb441cc39f9b9bef2f7a9"
+    }
+  ],
+  "mutations": ["example.py"],
+  "unproven": []
+}

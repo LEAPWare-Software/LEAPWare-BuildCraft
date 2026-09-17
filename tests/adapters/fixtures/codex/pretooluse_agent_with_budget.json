@@ -1,0 +1,9 @@
+{
+  "session_id": "sanitized-session-c002",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "description": "Fix the failing test in example_module",
+    "prompt": "BUDGET: 30k\nGo look at example_module and fix the failing test. Report back with the diff."
+  }
+}
