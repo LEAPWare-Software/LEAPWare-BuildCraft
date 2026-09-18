@@ -168,6 +168,27 @@ def commit_files(sha: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
+def resolve_head_sha(rev_range: str) -> Optional[str]:
+    """Resolve the full sha of the head of `rev_range` (e.g. "base..head").
+
+    Returns None if the ref cannot be resolved, so callers can fail loudly
+    instead of silently skipping the freshness check.
+    """
+    head_ref = rev_range.split("..")[-1] if ".." in rev_range else rev_range
+    result = subprocess.run(
+        ["git", "rev-parse", head_ref],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
 def commits_in_range(rev_range: str) -> list[str]:
     result = subprocess.run(
         ["git", "log", "--format=%H", rev_range],
@@ -181,7 +202,7 @@ def commits_in_range(rev_range: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
-def _review_ok(review_path: Path, errors: list[str]) -> Optional[str]:
+def _review_ok(review_path: Path, head_sha: str, errors: list[str]) -> Optional[str]:
     """Validate one review record. Returns its reviewer_id, or None if invalid.
 
     Vendor-agnostic on purpose. This used to take an `agent` and look for
@@ -194,7 +215,10 @@ def _review_ok(review_path: Path, errors: list[str]) -> Optional[str]:
     operates this repo, so from PR #6 every shared-path change would have
     been unmergeable, and an unsatisfiable gate is worse than a strict one
     because it gets routed around. Any filename is accepted now; what is
-    enforced is AGREE and reviewer_id != commit_author_id.
+    enforced is AGREE, reviewer_id != commit_author_id, and freshness against
+    `head_sha`: a `reviews/<pr>/` record is keyed only to a PR number, and a
+    PR's code changes underneath it -- a record that reviewed an earlier
+    round of the same PR must not silently authorize the current one.
     """
     import json
 
@@ -221,17 +245,26 @@ def _review_ok(review_path: Path, errors: list[str]) -> Optional[str]:
             "a reviewer may not be the commit's own author"
         )
         return None
+    reviewed_commit = data.get("reviewed_commit")
+    if not reviewed_commit or len(reviewed_commit) < 7 or not head_sha.startswith(reviewed_commit):
+        errors.append(
+            f"{rel}: STALE — this record reviewed {reviewed_commit!r}, but the "
+            f"current head is {head_sha!r}; the change must be re-reviewed"
+        )
+        return None
     return str(reviewer_id)
 
 
-def independent_reviews(pr_number: int, commit_sha: str, errors: list[str]) -> bool:
+def independent_reviews(
+    pr_number: int, commit_sha: str, head_sha: str, errors: list[str]
+) -> bool:
     """True when this PR carries REQUIRED_INDEPENDENT_REVIEWS distinct reviewers."""
     review_dir = REPO_ROOT / "reviews" / str(pr_number)
     records = sorted(review_dir.glob("*.json")) if review_dir.is_dir() else []
 
     reviewer_ids = set()
     for record in records:
-        reviewer_id = _review_ok(record, errors)
+        reviewer_id = _review_ok(record, head_sha, errors)
         if reviewer_id is not None:
             reviewer_ids.add(reviewer_id)
 
@@ -280,6 +313,10 @@ def check_lanes(rev_range: str, pr_number: int) -> list[str]:
         return []
 
     errors: list[str] = []
+    head_sha = resolve_head_sha(rev_range)
+    if head_sha is None:
+        errors.append(f"{rev_range}: could not resolve head sha for freshness check")
+
     for sha in commits_in_range(rev_range):
         if is_bot_commit(sha):
             continue  # see BOT_AUTHOR_PATTERNS
@@ -302,8 +339,8 @@ def check_lanes(rev_range: str, pr_number: int) -> list[str]:
                     f"{agent} lane and not a shared path"
                 )
 
-        if touches_shared:
-            independent_reviews(pr_number, sha, errors)
+        if touches_shared and head_sha is not None:
+            independent_reviews(pr_number, sha, head_sha, errors)
 
     return errors
 

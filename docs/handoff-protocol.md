@@ -94,6 +94,12 @@ commands win and the narrative is corrected in the same session.
   (allow/warn/deny), never by trust.
 - No repo settings change, no merge, no force-push, no history rewrite
   without the owner.
+- No deleting a remote ref without the owner, with one carve-out: a
+  branch whose work is verified landed is deleted as ordinary cleanup
+  under "No left behinds" below. Deleting `main`, a tag, or any branch
+  whose work is not verified landed needs the owner. Verify landed by
+  diffing the branch tip against the squash commit it produced, never
+  against current `main`.
 - One GitHub App per CLI; no shared credential.
 - **No left behinds.** Finishing a task includes deleting what it created
   that is not the deliverable: merged branches **local and remote**,

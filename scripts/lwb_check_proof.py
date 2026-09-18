@@ -106,6 +106,80 @@ def _validate_record(path: Path, data: object) -> list[str]:
     if not isinstance(data["unproven"], list) or not all(isinstance(u, str) for u in data["unproven"]):
         errors.append(f"{rel}: 'unproven' must be a list of strings")
 
+    # acceptance_criteria and tokens are enforced ONLY for records whose
+    # typed `pr` is >= 12. Records from PR #11 and earlier (proof/7.json,
+    # 8.json, 9.json, 10.json, 11.json) predate both fields and are never
+    # rewritten or backfilled to add them: inventing acceptance criteria or
+    # token measurements after the fact, for work where they were never
+    # captured, would falsify the very records this gate exists to keep
+    # honest. See docs/requirements/mission.md quality floor items 1 and the
+    # efficiency section.
+    pr = data.get("pr")
+    if isinstance(pr, int) and pr >= 12:
+        errors.extend(_validate_acceptance_criteria(rel, data.get("acceptance_criteria")))
+        errors.extend(_validate_tokens(rel, data.get("tokens")))
+
+    return errors
+
+
+TOKEN_FIELDS = (
+    "total_input",
+    "cached_input",
+    "uncached_input",
+    "output",
+    "retries",
+    "setup_overhead",
+    "tool_overhead",
+    "wall_time_seconds",
+    "source",
+)
+ZERO_FORBIDDEN_FIELDS = ("total_input", "output")
+
+
+def _validate_acceptance_criteria(rel, criteria) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(criteria, list) or not criteria:
+        errors.append(f"{rel}: 'acceptance_criteria' must be a non-empty list (pr >= 12)")
+        return errors
+    for i, item in enumerate(criteria):
+        prefix = f"{rel}: acceptance_criteria[{i}]"
+        if not isinstance(item, dict):
+            errors.append(f"{prefix}: must be an object")
+            continue
+        criterion = item.get("criterion")
+        if not isinstance(criterion, str) or not criterion:
+            errors.append(f"{prefix}: 'criterion' must be a non-empty string")
+        met = item.get("met")
+        if not isinstance(met, bool):
+            errors.append(f"{prefix}: 'met' must be a boolean")
+        elif met is False:
+            errors.append(f"{prefix}: 'met' is false -- an unmet criterion means the floor was not cleared")
+    return errors
+
+
+def _validate_tokens(rel, tokens) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(tokens, dict):
+        errors.append(f"{rel}: 'tokens' must be an object (pr >= 12)")
+        return errors
+    for field in TOKEN_FIELDS:
+        if field not in tokens:
+            errors.append(f"{rel}: 'tokens' missing required field '{field}'")
+            continue
+        value = tokens[field]
+        if field == "source":
+            if not isinstance(value, str) or not value:
+                errors.append(f"{rel}: tokens.source must be a non-empty string")
+            continue
+        is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+        is_unknown = value == "unknown"
+        if not (is_number or is_unknown):
+            errors.append(f"{rel}: tokens.{field} must be a number or the string 'unknown'")
+        elif field in ZERO_FORBIDDEN_FIELDS and is_number and value == 0:
+            errors.append(
+                f"{rel}: tokens.{field} is 0 -- almost certainly an unmeasured field recorded as "
+                "zero, which the mission forbids; record 'unknown' instead"
+            )
     return errors
 
 
