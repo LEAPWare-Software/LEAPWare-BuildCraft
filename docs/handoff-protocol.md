@@ -95,6 +95,15 @@ commands win and the narrative is corrected in the same session.
 - No repo settings change, no merge, no force-push, no history rewrite
   without the owner.
 - One GitHub App per CLI; no shared credential.
+- **No left behinds.** Finishing a task includes deleting what it created
+  that is not the deliverable: merged branches **local and remote**,
+  worktrees, stashes, scratch scripts, untracked files. A squash-merged
+  branch needs `git branch -D`; `-d` refuses it because its commits are
+  not ancestors of `main`, and that refusal is not evidence of unlanded
+  work. Verify a branch's work actually landed before deleting it —
+  compare its tip against the squash commit it produced
+  (`git diff --stat <tip> <squash-sha>`), never against current `main`,
+  which has moved on. Owner ruling, 2026-09-18.
 
 ## Traps
 
@@ -110,6 +119,20 @@ commands win and the narrative is corrected in the same session.
   list is current — re-read the "Generated" timestamp.
 - Dependabot consumes PR numbers. Any rule keyed to a PR *number* (such as
   the lane bootstrap window) will be eaten by bot PRs opened overnight.
+- Human-formatted command output can be condensed into a summary that
+  looks complete and is not. `git branch -a` had its remote refs
+  collapsed into a single `remote-only (N)` line, which read as "no
+  remote branches" — and three merged branches survived a cleanup that
+  reported success on the strength of it. For any state that gates a
+  decision, use a record-per-line machine form instead:
+  `git for-each-ref --format='%(refname)' refs/heads refs/remotes`,
+  `git status --porcelain`, `gh ... --json`. A summary that looks
+  complete is more dangerous than one that looks broken.
+- Stale local branches, stashes and untracked files are invisible to CI:
+  it runs on a fresh checkout, so a CI job asserting a clean workspace
+  would always pass and prove nothing. This class of debris can only be
+  caught at a session boundary — a `Stop`-hook rule or an operator-run
+  skill, not a CI check.
 
 ## Done means committed and pushed
 
