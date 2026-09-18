@@ -33,11 +33,27 @@ now in one place.
 
 ### The quality floor
 
-Every mandatory requirement and every seeded critical safety or evidence
-failure is handled: no invented success, no missing required evidence, no
-destructive unauthorised action, no new critical false positive. Judge
-actual produced artefacts and behaviour -- keyword matching and structural
-format tests alone cannot pass.
+Quality comes first: a configuration becomes eligible on cost only once it
+has cleared the floor.
+
+1. The task's acceptance criteria were written down **before** the work
+   started.
+2. Every one of them is met.
+3. Every mechanical gate is green -- tests, leak scan, lane check, proof
+   check.
+4. Every claim of *done* carries a proof record with real captured exit
+   codes and an honest `unproven[]` list.
+5. No unauthorised destructive action occurred.
+
+A configuration that fails any of these is not cheaper -- it is
+disqualified. Cost is compared only among configurations that clear the
+floor.
+
+The floor is built from signals this repository already produces, so
+applying it costs almost nothing. Items 3 and 4 are enforced mechanically
+today. The only new habit is item 1: state what *done* means before
+starting, which is what makes the floor checkable at the end without a
+seeded-failure corpus or a severity taxonomy.
 
 ### Measuring efficiency
 
