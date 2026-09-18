@@ -45,6 +45,11 @@ has cleared the floor.
    codes and an honest `unproven[]` list.
 5. No unauthorised destructive action occurred.
 
+Item 1 has no mechanical check today -- nothing records or timestamps
+acceptance criteria before work starts -- so it is verified by the
+reviewer reading the PR's own chronology. Closing that is required work,
+not an accepted gap.
+
 A configuration that fails any of these is not cheaper -- it is
 disqualified. Cost is compared only among configurations that clear the
 floor.

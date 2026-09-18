@@ -251,36 +251,46 @@ expensive to obtain and are the basis of D12 and D13.
 session does not rediscover them by surprise: RTK removed (hook, binary,
 and the `@RTK.md` import from global `CLAUDE.md`, whose text told every
 session its output was condensed); the Ponytail skill deleted; caveman
-enabled. Backups at `.bak-2026-09-18` and `.bak2-2026-09-18`. `rtk`
+enabled. Backups at `~/.claude/CLAUDE.md.bak-2026-09-18`,
+`~/.claude/settings.json.bak-2026-09-18`, and
+`~/.claude/settings.json.bak2-2026-09-18`. `rtk`
 remains on the user PATH as a dangling entry, left for the owner.
 
-## Open assessment items · 2026-09-18
+## Required work, not deferred · 2026-09-18
 
-A structured assessment of this repo against the owner's predecessor plan
-was run item by item and got roughly halfway. What is settled is recorded
-above as D1-D14. What follows was NOT assessed and is open. A session
-reading only the decisions would think the work complete; it is not.
+The owner's rule is that nothing is deferred, with Codex (D11) the single
+approved exception. The items below are therefore REQUIRED WORK, not
+optional backlog. A structured assessment against the owner's predecessor
+plan got roughly halfway; D1-D14 above record what is settled. These are
+what remain, and they are owed.
 
-1. **Roles and stages (D2, D3) were flagged and never resolved.** Both
+1. **Land branch `lwb-mission-final` via a fresh PR.** PR #13 was abandoned
+   because its branch history carries a commit that leaked an operator
+   username into a proof record. The clean sequence is on
+   `lwb-mission-final`. Open a new PR from it, write review and proof
+   records naming the new PR number, and merge. Verify with
+   `lwb_check_env_leak.py --range origin/main..HEAD` BEFORE opening it --
+   that is the check that caught the leak.
+2. **Roles and stages (D2, D3) were flagged and never resolved.** Both
    were built without the adoption check the mission's fourth principle
    requires -- the seven stages port an internal taxonomy, and the
    reviewer-independence rule is bespoke where GitHub already ships
    "require review from someone other than the last pusher". Either record
    why building won, or adopt instead.
-2. **Architecture under D12 is unexamined.** If lwb sequences and gates
+3. **Architecture under D12 is unexamined.** If lwb sequences and gates
    adopted components rather than implementing an SDLC, what the product
    IS changes. The pure-core/adapter design was drawn for the old scope.
-3. **D13 has no trial protocol.** "Prove every adoption before it enters
+4. **D13 has no trial protocol.** "Prove every adoption before it enters
    the stack" needs a defined procedure: what is measured, against what
    baseline, what constitutes a pass. The predecessor repo's frozen
    evaluation contract has one and was never assessed for reuse.
-4. **The legacy lift was never assessed** -- the acceptance-evidence
+5. **The legacy lift was never assessed** -- the acceptance-evidence
    recorder and the provenance/vendor pattern, each needing its own origin
    and licence check before anything lands in this public repo.
-5. **No consolidated plan exists.** The original request was to merge the
+6. **No consolidated plan exists.** The original request was to merge the
    best of both repositories into one plan. The mission is merged and the
    decisions are recorded; the sequenced plan is not written.
-6. **`owner-directives.md` is still a placeholder.** The numbered
+7. **`owner-directives.md` is still a placeholder.** The numbered
    directives cited throughout this repo do not exist as a set. This needs
    the owner's time, and the requirements package cannot be finished
    without it.
@@ -297,7 +307,20 @@ reading only the decisions would think the work complete; it is not.
 3. Build token measurement. Five slots are readable from transcript
    `message.usage`; three have no runtime source. Until this exists the
    mission's efficiency half is decoration.
-4. Then items 1-6 above.
+   Measurable from a session transcript's `message.usage` blocks at
+   `~/.claude/projects/<slug>/<session-id>.jsonl`: **total_input**
+   (`input_tokens` + both cache fields), **cached_input**
+   (`cache_read_input_tokens` + `cache_creation_input_tokens`),
+   **uncached_input** (`input_tokens`), **output** (`output_tokens`, with
+   an `output_tokens_details.thinking_tokens` sub-split), and
+   **wall_time_seconds** (difference between first and last `timestamp`).
+   NOT measurable -- no source in any hook payload, transcript or script:
+   **retries**, **setup_overhead**, **tool_overhead**. Record those as
+   `"unknown"`, never `0`. Two structural limits: usage attaches per model
+   turn, never per tool call, so tokens can never be attributed to an
+   individual tool call; and subagent transcripts are frequently deleted
+   before `SubagentStop` fires, so subagent capture is lossy.
+4. Then items 2-7 above.
 
 ### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
 

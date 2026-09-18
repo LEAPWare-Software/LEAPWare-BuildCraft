@@ -18,16 +18,15 @@ In order. Do not start step *n+1* before step *n* is done and proven.
    measured token cost that clears a quality floor. Decisions D1-D14 and
    the open-items list are in `docs/requirements/decisions.md` -- READ IT
    FIRST and do not re-decide settled questions.
-   **Branch `lwb-mission-final` (pushed) holds the work**, four commits,
-   all checks green locally. PR #13 is open against the OLD branch
-   `lwb-mission-clean`, whose remote history contains a superseded commit
-   with a leaked username; its `lwb-env-leak-history` check fails and a
-   force-push to fix it was denied by the permission layer. Land the work
-   from `lwb-mission-final` instead: open a fresh PR, close #13, write
+   **Branch `lwb-mission-final` (pushed) holds the work**, six commits,
+   all checks green locally. PR #13 was against the OLD branch
+   `lwb-mission-clean`, whose history contains a superseded commit with a
+   leaked username; it is closed. The stale remote `lwb-mission-clean` is
+   deleted. Land the work from `lwb-mission-final`: open a fresh PR, write
    review and proof records naming the new PR number.
    Environment changed this session: RTK removed (hook, binary, and the
    `@RTK.md` import), Ponytail skill deleted, caveman enabled for output
-   compression only. Backups at `.bak-2026-09-18` / `.bak2-2026-09-18`.
+   compression only. Backup paths: `docs/requirements/decisions.md` (D14).
 4. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
