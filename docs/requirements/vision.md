@@ -94,13 +94,13 @@ project policy may tighten this, never loosen it.
 | Component | State |
 |---|---|
 | `plugins/claude/lwb` -- PreToolUse hook plus skills | EXISTS |
-| `plugins/codex/lwb` -- skills, no hook | EXISTS |
+| `plugins/codex/lwb` -- PreToolUse hook plus skills, same engine | EXISTS |
 | Skills `lwb-status`, `lwb-config`, `lwb-report`, `lwb-handoff` | EXISTS |
 | Skills `lwb-prove`, `lwb-stage`, `lwb-review`, `lwb-doctor` | PROPOSED |
 
 ### Tools
 
-Fourteen exist under `scripts/`: `lwb_check_proof`, `lwb_lanes`,
+Fifteen exist under `scripts/`: `lwb_check_proof`, `lwb_lanes`,
 `lwb_check_env_leak`, `lwb_check_commit_identity`,
 `lwb_check_no_instruction_dep`, `lwb_check_prefix`,
 `lwb_check_hook_launch`, `lwb_check_hosted_runners`,
