@@ -32,7 +32,7 @@ Each step ends with a Proof of Completion per `docs/handoff-protocol.md`.
 
 ## Package sections
 
-1. Vision, scope, non-goals, personas.
+1. Mission, scope, non-goals, personas.
 2. Evidence base: what was actually read/run to support every claim below
    (file, command, or doc, with enough detail to re-run it).
 3. Measured baseline: current sizes, token costs, CI durations — numbers,

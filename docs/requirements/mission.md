@@ -1,4 +1,4 @@
-# Vision and scope
+# Mission and scope
 
 Section 1 of the requirements package (`docs/requirements/approach.md`).
 Owner-approved 2026-09-18. Decisions D1-D8 in

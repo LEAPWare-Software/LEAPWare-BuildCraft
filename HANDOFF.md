@@ -24,7 +24,7 @@ In order. Do not start step *n+1* before step *n* is done and proven.
    place to put it — GitHub shows it once and it carries repo write.
 3. **The requirements package** ← IN PROGRESS, per
    `docs/requirements/approach.md`. Section 1 of 13 is DONE:
-   `docs/requirements/vision.md` (owner-approved 2026-09-18) carries the
+   `docs/requirements/mission.md` (owner-approved 2026-09-18) carries the
    mission, principles, non-goals and the EXISTS/PROPOSED inventory.
    Twelve sections remain. Owner decisions D1-D8 are in
    `docs/requirements/decisions.md` — read them, do not re-decide. D5
