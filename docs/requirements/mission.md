@@ -55,12 +55,22 @@ disqualified. Cost is compared only among configurations that clear the
 floor.
 
 *Unauthorised* means any action on the destructive list in
-`docs/handoff-protocol.md`'s hard rules -- a repository settings change, a
-merge, a force-push, a history rewrite, or deleting a remote ref other
-than a branch whose work is verified landed -- taken without an explicit
-instruction from the owner. That list is finite and each entry is a fact
-about what happened, not a matter of opinion, and the instruction is on
-the record. So item 5 is a check, not a judgement.
+`docs/handoff-protocol.md`'s hard rules, taken without an explicit
+instruction from the owner: a repository settings change, a force-push, a
+history rewrite, or deleting a remote ref other than a branch whose work
+is verified landed. That list is finite and each entry is a fact about
+what happened, not a matter of opinion, and the instruction is on the
+record. So item 5 is a check, not a judgement.
+
+**Read the list there, not a copy of it here.** This paragraph used to
+inline its own copy, which included "a merge". D19 then made merging a
+green, reviewed PR ordinary work, `docs/handoff-protocol.md` was updated,
+and this copy was not -- so the definition the deny-capable rule actually
+cites went on calling an authorised merge unauthorised. An independent
+review of PR #16 found it after the same conflict had already been fixed
+once, one file away. A second copy of a rule is a second place for it to
+rot; the four items above are named only to keep this readable, and
+`docs/handoff-protocol.md` governs.
 
 The floor governs **how this project delivers**: it applies to every
 deliverable here, today. It is not the same thing as what the shipped
