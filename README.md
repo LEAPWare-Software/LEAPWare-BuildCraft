@@ -6,7 +6,7 @@
 Stages, roles and gates are decided at the CLI's own hook boundary —
 allow, warn or deny — and every decision and every claim of *done* leaves
 an evidence record a human can audit later. See
-[`docs/requirements/vision.md`](docs/requirements/vision.md).
+[`docs/requirements/mission.md`](docs/requirements/mission.md).
 
 `LEAPWare-BuildCraft-legacy` is a separate, private, archived repository;
 this repo does not continue it, and nothing from it has been carried over
