@@ -332,6 +332,81 @@ def test_coverage_matches_a_record_by_pr_number_not_only_commit(tmp_path):
     assert shas[0] != base
 
 
+def _pr12_base(**overrides):
+    record = {
+        "deliverable": "12",
+        "author": "claude",
+        "checked_by": "codex",
+        "commit": "a" * 40,
+        "commands": [],
+        "mutations": [],
+        "unproven": [],
+        "pr": 12,
+        "acceptance_criteria": [{"criterion": "it works", "met": True}],
+        "tokens": {
+            "total_input": 1,
+            "cached_input": 0,
+            "uncached_input": 1,
+            "output": 1,
+            "retries": 0,
+            "setup_overhead": "unknown",
+            "tool_overhead": "unknown",
+            "wall_time_seconds": 1,
+            "source": "test",
+        },
+    }
+    record.update(overrides)
+    return record
+
+
+def test_pr12_record_missing_acceptance_criteria_fails():
+    record = _pr12_base()
+    del record["acceptance_criteria"]
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("acceptance_criteria" in e for e in errors)
+
+
+def test_pr12_record_with_unmet_criterion_fails():
+    record = _pr12_base(acceptance_criteria=[{"criterion": "it works", "met": False}])
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("'met' is false" in e for e in errors)
+
+
+def test_pr12_record_missing_tokens_fails():
+    record = _pr12_base()
+    del record["tokens"]
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("'tokens' must be an object" in e for e in errors)
+
+
+def test_pr12_record_with_total_input_zero_fails():
+    record = _pr12_base()
+    record["tokens"] = dict(record["tokens"])
+    record["tokens"]["total_input"] = 0
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("tokens.total_input is 0" in e for e in errors)
+
+
+def test_pr12_record_with_unknown_values_passes():
+    errors = lwb_check_proof._validate_record(Path("r.json"), _pr12_base())
+    assert errors == []
+
+
+def test_pr_below_12_record_without_new_fields_still_passes():
+    record = {
+        "deliverable": "11",
+        "author": "claude",
+        "checked_by": "codex",
+        "commit": "a" * 40,
+        "commands": [],
+        "mutations": [],
+        "unproven": [],
+        "pr": 11,
+    }
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert errors == []
+
+
 def test_coverage_still_fails_when_the_record_names_a_different_pr(tmp_path):
     repo, base, _ = _fixture_repo(tmp_path, ["feat: thing (#11)"])
     (repo / "proof").mkdir()

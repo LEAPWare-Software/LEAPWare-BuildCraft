@@ -5,6 +5,7 @@
   "additionalProperties": true,
   "required": [
     "pr",
+    "reviewed_commit",
     "reviewer_agent",
     "reviewer_id",
     "commit_author_agent",
@@ -13,6 +14,11 @@
   ],
   "properties": {
     "pr": { "type": "integer", "minimum": 1 },
+    "reviewed_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "The sha of the commit this review record actually examined. A record whose reviewed_commit is not the current head of the branch under review is STALE and must not satisfy the gate: a PR's code changes underneath a record keyed only to a PR number, so a review of an earlier round cannot stand in for a review of the current one."
+    },
     "reviewer_agent": { "type": "string", "enum": ["claude", "codex"] },
     "reviewer_id": { "type": "string", "minLength": 1 },
     "commit_author_agent": { "type": "string", "enum": ["claude", "codex", "human"] },

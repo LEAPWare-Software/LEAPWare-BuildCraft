@@ -32,6 +32,7 @@ and carried into the requirements package as an owner decision.
 ```json
 {
   "pr": 17,
+  "reviewed_commit": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
   "reviewer_agent": "claude",
   "reviewer_id": "claude-cto-session-2026-09-20",
   "commit_author_agent": "codex",
@@ -65,3 +66,14 @@ and carried into the requirements package as an owner decision.
   inequality; it is on the reviewer to give the two fields genuinely
   distinct values, not merely different-looking ones.
 - `verdict` is `"AGREE"` or `"DISAGREE"`; only `"AGREE"` satisfies the gate.
+- `reviewed_commit` is the sha of the commit the reviewer actually examined.
+  A record whose `reviewed_commit` is not a prefix of the current head of the
+  branch under review is **STALE** and fails the gate, even if the record is
+  otherwise complete, honest, and `verdict: AGREE`. This exists because it
+  nearly went wrong: a `reviews/12/` record was a genuine AGREE, from a real
+  reviewer identity, over an earlier round of PR #12 — it named 148 tests and
+  two changed files. The branch then grew to 154 tests and six files. Keyed
+  only to the PR number, that record would have kept satisfying the gate and
+  merged code it had never seen, on a verdict never given for that code. A
+  record is bound to the commit it reviewed, not just the PR it reviewed it
+  under.
