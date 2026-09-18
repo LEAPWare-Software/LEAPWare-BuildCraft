@@ -1,0 +1,40 @@
+#!/bin/sh
+# Reject a commit message with no `LWB-Agent:` trailer.
+#
+# scripts/lwb_lanes.py already enforces this in CI, but only after the
+# commit exists and has been pushed -- and the only repair at that point is
+# a history rewrite, which this machine's permission settings deny
+# outright. That cost a branch rebuild on PR #14. This hook moves the check
+# to the moment the commit is written, where fixing it is free.
+#
+# Lives under scripts/ rather than .githooks/ on purpose: scripts/ is a
+# shared path, and a repo-wide gate belongs to no single CLI's lane.
+#
+# Not installed by cloning. Enable it with:
+#   git config core.hooksPath scripts/githooks
+# See docs/maintainers/session-protocol.md.
+#
+# `human` is deliberately NOT accepted here: lwb_lanes.py reads this
+# trailer to decide which lane a commit belongs to, and CI rejects a
+# `human` trailer on an agent-authored commit.
+
+msg_file="$1"
+
+if grep -qE '^LWB-Agent: (claude|codex)$' "$msg_file"; then
+	exit 0
+fi
+
+cat >&2 <<'EOF'
+commit-msg: missing `LWB-Agent:` trailer.
+
+Every commit needs a trailer line, exactly:
+
+    LWB-Agent: claude
+
+(or `codex`). scripts/lwb_lanes.py reads it to decide which lane the
+commit belongs to. A commit without one fails the lwb-lanes CI job, and by
+then the only repair is a history rewrite.
+
+Add the trailer and commit again.
+EOF
+exit 1

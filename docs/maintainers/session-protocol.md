@@ -11,6 +11,23 @@ independent review -> proof and review records -> merge queue -> branch
 cleanup. `main` is protected by ruleset 23627212: no deletion, no
 force-push, PR required, 9 required checks, squash-only, merge queue.
 
+**Enable the commit-msg hook first, in every fresh clone:**
+
+```
+git config core.hooksPath scripts/githooks
+```
+
+It rejects a commit with no `LWB-Agent:` trailer. Without it the trailer
+is caught only by `lwb-lanes` in CI, after the commit is pushed — and the
+only repair then is a history rewrite, which this machine's permission
+settings deny outright (`Bash(git push* --force*)` is on the global deny
+list, with no prompt to approve). One missing trailer therefore costs a
+whole branch rebuild. It already has: PR #14 was rebuilt as PR #15 for
+exactly this, after PR #13 was rebuilt as PR #14 for a leaked name.
+
+The same constraint is why a commit here is never amended after it is
+pushed. Fix forward, or rebuild the branch from `origin/main`.
+
 **Merging.** Repo-level auto-merge is DISABLED and a merge queue is
 ACTIVE, so `gh pr merge --squash` fails with "Auto merge is not allowed
 for this repository". Do not enable auto-merge; do not change any repo
