@@ -2,9 +2,11 @@
 
 **New session? Read [HANDOFF.md](HANDOFF.md) first.**
 
-BuildCraft (code `lwb`) makes the generic SDLC — stages, roles, gates, and
-the checks that enforce them — **mechanical**: hooks that allow, warn, or
-deny an action, instead of a rule stated in a prompt and hoped for.
+**BuildCraft makes delivery discipline unskippable for AI coding agents.**
+Stages, roles and gates are decided at the CLI's own hook boundary —
+allow, warn or deny — and every decision and every claim of *done* leaves
+an evidence record a human can audit later. See
+[`docs/requirements/vision.md`](docs/requirements/vision.md).
 
 `LEAPWare-BuildCraft-legacy` is a separate, private, archived repository;
 this repo does not continue it, and nothing from it has been carried over
