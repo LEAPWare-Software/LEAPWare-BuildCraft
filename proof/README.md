@@ -121,7 +121,15 @@ section, and both are enforced only for records whose typed `pr` is `>=
   field that was not actually measured**; `total_input` or `output`
   recorded as `0` is a hard failure, because that is exactly how an
   efficiency claim gets manufactured. Instruction-length proxies are not
-  billed tokens.
+  billed tokens. `total_input`, `cached_input`, `uncached_input`,
+  `output` and `wall_time_seconds` are measurable from a session
+  transcript's `message.usage` blocks; `retries`, `setup_overhead` and
+  `tool_overhead` have no source on any current runtime and are always
+  `"unknown"`. Usage attaches per model turn, not per tool call, so
+  tokens can never be attributed to a single tool call, and subagent
+  transcripts are often deleted before their cost is captured, so a
+  missing subagent cost is `"unknown"`, not zero. See `schema.json` for
+  the full field-by-field derivation.
 
 Records from PR #11 and earlier (`proof/7.json` through `proof/11.json`)
 predate both fields and are **not** backfilled with them: retro-fitting
