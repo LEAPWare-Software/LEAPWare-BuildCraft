@@ -189,6 +189,66 @@ def resolve_head_sha(rev_range: str) -> Optional[str]:
     return sha or None
 
 
+def _is_record_only_commit(sha: str) -> bool:
+    """True when every file `sha` touches lives under `reviews/` or `proof/`.
+
+    A commit with no files at all (e.g. an empty commit) is NOT record-only
+    — `all()` over an empty list is vacuously True, which would wrongly let
+    a no-op commit skip past the walk.
+    """
+    files = commit_files(sha)
+    if not files:
+        return False
+    for f in files:
+        posix = f.replace("\\", "/")
+        if not (posix.startswith("reviews/") or posix.startswith("proof/")):
+            return False
+    return True
+
+
+def resolve_reviewable_head(rev_range: str) -> Optional[str]:
+    """Resolve the sha a review record's `reviewed_commit` must match.
+
+    The raw branch head is the wrong thing to compare against: committing a
+    review record itself advances the head past the sha that record names,
+    so no committed record could ever match the raw head. This walks back
+    from the head, skipping any commit whose changed files are ALL under
+    `reviews/` or `proof/` (pure record-keeping, nothing that needs its own
+    review), and returns the first commit that changed anything else --
+    the "reviewable head". If every commit from the head backward is
+    record-only, there is nothing to skip past, so this falls back to the
+    raw head rather than walking off into unrelated history.
+
+    Returns None if the head cannot be resolved at all, so callers fail
+    loudly instead of silently skipping the freshness check.
+    """
+    head_sha = resolve_head_sha(rev_range)
+    if head_sha is None:
+        return None
+
+    result = subprocess.run(
+        ["git", "log", "--format=%H", head_sha],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        return None
+    shas = [line for line in result.stdout.splitlines() if line.strip()]
+    if not shas:
+        return head_sha
+
+    for sha in shas:
+        if not _is_record_only_commit(sha):
+            return sha
+
+    # Every commit from the head backward is record-only: nothing to skip
+    # past, so fall back to the raw head rather than returning nothing.
+    return head_sha
+
+
 def commits_in_range(rev_range: str) -> list[str]:
     result = subprocess.run(
         ["git", "log", "--format=%H", rev_range],
@@ -249,7 +309,9 @@ def _review_ok(review_path: Path, head_sha: str, errors: list[str]) -> Optional[
     if not reviewed_commit or len(reviewed_commit) < 7 or not head_sha.startswith(reviewed_commit):
         errors.append(
             f"{rel}: STALE — this record reviewed {reviewed_commit!r}, but the "
-            f"current head is {head_sha!r}; the change must be re-reviewed"
+            f"current REVIEWABLE head is {head_sha!r} (record-only commits "
+            "under reviews/ and proof/ are excluded when computing this "
+            "head); the change must be re-reviewed"
         )
         return None
     return str(reviewer_id)
@@ -313,9 +375,9 @@ def check_lanes(rev_range: str, pr_number: int) -> list[str]:
         return []
 
     errors: list[str] = []
-    head_sha = resolve_head_sha(rev_range)
+    head_sha = resolve_reviewable_head(rev_range)
     if head_sha is None:
-        errors.append(f"{rev_range}: could not resolve head sha for freshness check")
+        errors.append(f"{rev_range}: could not resolve reviewable head sha for freshness check")
 
     for sha in commits_in_range(rev_range):
         if is_bot_commit(sha):

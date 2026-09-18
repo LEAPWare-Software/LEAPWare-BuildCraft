@@ -338,6 +338,109 @@ def test_review_ok_accepts_matching_reviewed_commit(tmp_path):
     assert errors == []
 
 
+def _git(repo, *args, **kwargs):
+    return subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, check=True, **kwargs
+    ).stdout.strip()
+
+
+def _init_repo(repo):
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+
+
+def _commit(repo, path: str, content: str, message: str) -> str:
+    fp = repo / path
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fp.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", message], cwd=repo, check=True)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_reviewable_head_skips_trailing_reviews_only_commit(tmp_path):
+    """A record naming a substantive commit must still pass even when a
+    LATER commit touched only reviews/ — committing the record itself
+    must not make the record it just wrote look stale."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+    _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        got = lwb_lanes.resolve_reviewable_head("HEAD")
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == substantive
+
+
+def test_reviewable_head_skips_trailing_proof_only_commit(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+    _commit(repo, "proof/9.json", "{}\n", "record proof")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        got = lwb_lanes.resolve_reviewable_head("HEAD")
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == substantive
+
+
+def test_reviewable_head_still_rejects_stale_review_before_a_later_substantive_commit(tmp_path):
+    """The fix must not defeat the original staleness protection: a record
+    naming a sha older than a LATER substantive commit is still stale."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    older_substantive = _commit(repo, "core/a.py", "a\n", "first substantive change")
+    newer_substantive = _commit(repo, "core/b.py", "b\n", "second substantive change")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        reviewable_head = lwb_lanes.resolve_reviewable_head("HEAD")
+        assert reviewable_head == newer_substantive
+
+        _write_review(repo, "verifier.json", reviewed_commit=older_substantive)
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            repo / "reviews" / "9" / "verifier.json", reviewable_head, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("STALE" in e for e in errors)
+
+
+def test_reviewable_head_falls_back_to_raw_head_when_every_commit_is_record_only(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    seed = _commit(repo, "reviews/9/first.json", "{}\n", "seed, record-only")
+    head = _commit(repo, "proof/9.json", "{}\n", "also record-only")
+    assert head != seed
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        got = lwb_lanes.resolve_reviewable_head("HEAD")
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == head
+
+
 def test_review_ok_accepts_a_short_prefix_match(tmp_path):
     """A 7-char sha prefix, the shortest allowed by the schema, still matches."""
     _write_review(tmp_path, "claude-cto.json", reviewed_commit=HEAD_SHA[:7])
