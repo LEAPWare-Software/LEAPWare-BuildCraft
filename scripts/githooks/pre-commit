@@ -1,0 +1,51 @@
+#!/bin/sh
+# Refuse to commit graphify build artifacts, whatever .gitignore says.
+#
+# Owner directive 8 (SACRED): nothing that names this machine, its operator
+# or a private project may enter this PUBLIC repository. graphify's graph,
+# its JSON, its report, its Obsidian vault and its extraction cache all
+# embed absolute filesystem paths, and on this machine those paths carry
+# the operator's username.
+#
+# .gitignore alone is not enough: `git add -f` overrides it silently, and
+# an ignore rule can be edited away in the same commit that adds the file.
+# This hook is checked against what is actually STAGED, so neither route
+# gets through.
+#
+# Enable with:
+#   git config core.hooksPath scripts/githooks
+# See docs/maintainers/session-protocol.md.
+#
+# Deliberately NOT a needle scan. scripts/lwb_check_env_leak.py does that,
+# and it needs LWB_PRIVATE_NEEDLES, which is a CI secret and is not set in
+# an ordinary local shell -- a needle scan here would fail UNCONFIGURED on
+# every commit and get disabled within a day. This hook checks paths only,
+# which needs no configuration and cannot produce a false failure.
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+blocked=$(printf '%s\n' "$staged" | grep -E '(^|/)(graphify-out|graphify-vault|obsidian)/|(^|/)(graph\.json|graph\.html|graph\.svg|graph\.graphml|GRAPH_REPORT\.md|cypher\.txt)$' || true)
+
+if [ -n "$blocked" ]; then
+	cat >&2 <<EOF
+pre-commit: refusing to commit graphify build artifacts.
+
+Staged:
+$blocked
+
+These embed absolute filesystem paths that carry the operator's username,
+and this repository is PUBLIC (owner directive 8, SACRED). They are local
+build output, rebuilt on demand with \`/graphify . --update\`, never source.
+
+Unstage them:
+
+    git restore --staged <path>
+
+If you genuinely need a graph artifact in the repo, sanitise it first and
+say so in the commit message -- do not bypass this hook silently.
+EOF
+	exit 1
+fi
+
+exit 0
