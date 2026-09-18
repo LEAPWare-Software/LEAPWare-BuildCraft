@@ -157,6 +157,14 @@ identity. The owner has a GitHub identity that is externally verifiable, so
 while he is the approver the question does not arise. It is recorded as
 moot, not answered, and returns if he delegates or Codex is undeferred.
 
+**SUPERSEDED 2026-09-18 by D19, as to mechanics.** The principle stands —
+the owner is the authority and independent review is advisory, never a
+gate on him. What changed is how his approval is obtained: D10 required it
+on every shared-path change, and nearly every path here is shared, so it
+read as "the owner approves every PR, forever". He named himself the
+bottleneck and replaced it with proceed-by-default plus a veto. See D19
+for the four classes that still escalate.
+
 Live locations of the old clause, to be removed: `AGENTS.md` lines 10-11,
 and `scripts/lwb_lanes.py`'s module docstring and its `SHARED_PREFIXES`
 comment. `CLAUDE.md` is already correct and is the template.
@@ -470,13 +478,15 @@ plan got roughly halfway; the numbered decisions above record what is
 settled. These are
 what remain, and they are owed.
 
-1. **Land branch `lwb-mission-final` via a fresh PR.** PR #13 was abandoned
-   because its branch history carries a commit that leaked an operator
-   username into a proof record. The clean sequence is on
-   `lwb-mission-final`. Open a new PR from it, write review and proof
-   records naming the new PR number, and merge. Verify with
-   `lwb_check_env_leak.py --range origin/main..HEAD` BEFORE opening it --
-   that is the check that caught the leak.
+1. **DONE 2026-09-18 — landed as PR #15**, squash-merged to `d0c1386`,
+   verified by diffing the branch tip against the squash commit (empty),
+   with `proof/15.json` and `reviews/15/`. It took three PR numbers: #13
+   was abandoned for a leaked username in its branch history, #14 for a
+   fix commit pushed without its `LWB-Agent:` trailer — unrepairable,
+   because the only repair is a history rewrite and this machine denies
+   force-push outright. The root cause is now gated at commit time by
+   `scripts/githooks/commit-msg`. Both dead branches and
+   `lwb-mission-settled` are deleted, local and remote.
 2. **DONE 2026-09-18 — roles and stages resolved as D15 and D16.** The
    adoption check was run for both. Stages are rederived from D12's map
    (D15); independence stays lwb's rule because GitHub's cannot fire with

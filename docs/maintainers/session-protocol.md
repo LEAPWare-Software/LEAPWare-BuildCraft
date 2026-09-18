@@ -11,13 +11,24 @@ independent review -> proof and review records -> merge queue -> branch
 cleanup. `main` is protected by ruleset 23627212: no deletion, no
 force-push, PR required, 9 required checks, squash-only, merge queue.
 
-**Enable the commit-msg hook first, in every fresh clone:**
+**Enable the hooks first, in every fresh clone:**
 
 ```
 git config core.hooksPath scripts/githooks
 ```
 
-It rejects a commit with no `LWB-Agent:` trailer. Without it the trailer
+That one setting enables both hooks in `scripts/githooks/`:
+
+- `commit-msg` rejects a commit with no `LWB-Agent:` trailer.
+- `pre-commit` refuses to commit graphify build artifacts — its graph,
+  JSON, report, vault or cache — which embed absolute paths carrying the
+  operator's username, into this PUBLIC repo. It checks what is STAGED,
+  so `git add -f` does not get past it either. It checks paths, never
+  needles: a needle scan needs `LWB_PRIVATE_NEEDLES`, which is a CI
+  secret absent from an ordinary shell, so it would fail UNCONFIGURED on
+  every commit and be switched off within a day.
+
+On the trailer specifically: Without it the trailer
 is caught only by `lwb-lanes` in CI, after the commit is pushed — and the
 only repair then is a history rewrite, which this machine's permission
 settings deny outright (`Bash(git push* --force*)` is on the global deny
