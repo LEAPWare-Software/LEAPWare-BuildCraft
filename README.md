@@ -2,11 +2,7 @@
 
 **New session? Read [HANDOFF.md](HANDOFF.md) first.**
 
-**BuildCraft makes delivery discipline unskippable for AI coding agents.**
-Stages, roles and gates are decided at the CLI's own hook boundary —
-allow, warn or deny — and every decision and every claim of *done* leaves
-an evidence record a human can audit later. See
-[`docs/requirements/mission.md`](docs/requirements/mission.md).
+**BuildCraft gives an AI development team full SDLC coverage at the lowest measured token cost that clears a quality floor.** Coverage comes from adopting proven skills and plugins wherever they exist. Quality is enforced mechanically at the CLI's own hook boundary — allow, warn or deny — and every claim of *done* leaves evidence a human can audit later. Efficiency is measured, never claimed. See [`docs/requirements/mission.md`](docs/requirements/mission.md).
 
 `LEAPWare-BuildCraft-legacy` is a separate, private, archived repository;
 this repo does not continue it, and nothing from it has been carried over
