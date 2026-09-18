@@ -366,6 +366,101 @@ contract is also the natural input to D13's trial protocol, since a
 component that cannot emit evidence cannot be measured against the quality
 floor either.
 
+## D18 — Trial protocol: one arm, recorded baseline, hard cap · 2026-09-18
+
+**Settles D13**, which said prove every adoption but defined no procedure.
+The owner's steer was explicit: best in class, but mind the token burn and
+the process overhead that causes delay. That rules out the textbook
+two-arm A/B, whose cost is paying twice for the same work.
+
+So a trial runs **once**:
+
+- **One arm.** The component is used on one real deliverable. The
+  comparison baseline is the token data already recorded in `proof/*.json`
+  for comparable work — already paid for, not re-run.
+- **Hard cap.** 50,000 tokens and one session per trial, no follow-on
+  dispatches. A trial that hits the cap is **abandoned**, and abandonment
+  is recorded as a result. It is never extended.
+- **Two pass criteria, by class.** A *coverage* component (it does work
+  nothing currently does — `security-review`, PagerDuty MCP) passes if it
+  produces evidence satisfying a named quality-floor item; its token cost
+  is recorded but does not disqualify it. An *efficiency* component (it
+  claims the same outcome for fewer tokens — caveman, graphify) passes
+  only on a measured token drop past a stated threshold, with the quality
+  floor held.
+- **Every trial writes a record** with the numbers, so an adoption can be
+  re-litigated later against its own evidence. That record is what was
+  missing when Ponytail and RTK went in and had to come out (D14).
+
+**Known weakness, stated rather than hidden:** a historical baseline is a
+different task than the trial task, so a one-arm comparison is indicative,
+not controlled. That is the price of not paying twice, and it is accepted
+deliberately.
+
+Rejected: one A/B for everything (a security scanner that finds real
+issues fails a token test it was never designed to pass, so the protocol
+would systematically reject the coverage half of the mission); and
+published-evidence-only with no trial (cheapest, and it did catch
+Ponytail, RTK and chisle — but D14's own closing finding is that nobody
+has published on the question this mission actually asks, so most
+candidates would be undecidable).
+
+### First scheduled trial: graphify
+
+Disposition, decided 2026-09-18: **keep installed, do not use on this
+repository, use once on the predecessor repo for required-work item 5, and
+treat that use as its D18 trial.**
+
+Not used here because the corpus is small, the work is verification
+against live state (`gh api`, running the gate scripts, diffing a claim
+against what git says), and a static graph would go stale exactly like the
+documents an independent review caught asserting false state this session.
+The predecessor repo is the opposite case: large, unfamiliar, unmapped —
+where a graph earns its indexing cost if it earns it anywhere.
+
+It is an *efficiency* component under the two-class test. If it does not
+show a measured token drop on that assessment, it is not adopted anywhere.
+
+## D19 — Proceed by default; the owner holds a veto · 2026-09-18
+
+**Supersedes D10's approval mechanics.** D10 made the owner the approver
+of every shared-path change. In this repository nearly every path is
+shared, so that read as "the owner approves every PR, forever" — a
+bottleneck by construction. The owner named it as one and chose the fix.
+
+**The CTO acts and records; the owner may reverse anything after the
+fact.** No pre-approval is sought for ordinary work: committing, pushing,
+opening and closing PRs, merging a PR whose gates and independent review
+passed, branch and worktree cleanup, and any reversible change inside this
+repository.
+
+**Four classes still escalate, because they have no working undo here:**
+
+1. Money.
+2. Licence and legal.
+3. The owner's machine settings, security settings especially.
+4. Anything that would publish private data to this public repository.
+
+**Risk accepted, recorded because the owner was told it before choosing:**
+reversal is not free here. `main` is squash-only and protected, force-push
+is denied outright by the machine's own settings, and D8 already accepted
+that a public repository cannot un-publish. For several classes of action
+the veto is therefore nominal — which is precisely why the four above stay
+escalated. Every gate, every CI check and the independent review all keep
+running; the change is that they report rather than block on the owner.
+
+Rejected: a standing authority band approved once (the CTO's own
+recommendation — it would have doubled as the missing definition of
+"authorised" for the `no_unauthorised_destructive_action` rule, which
+still needs one); and batching approvals per session (reduces
+interruptions but not approvals, and work blocks between batches, so delay
+gets worse).
+
+**Consequence still owed:** `no_unauthorised_destructive_action` ships
+deny-capable in 1.0 under D9 and has no definition of "authorised". D19
+gives the CTO broad authority but does not define the term for a *user* of
+the plugin. That definition is required work, item 10.
+
 ## Required work, not deferred · 2026-09-18
 
 The owner's rule is that nothing is deferred, with Codex (D11) the single
@@ -391,10 +486,10 @@ what remain, and they are owed.
 3. **DONE 2026-09-18 — architecture resolved as D17.** Hooks gate, a
    separate runner sequences, one I/O-free core under both. The follow-on
    work it creates is item 9.
-4. **D13 has no trial protocol.** "Prove every adoption before it enters
-   the stack" needs a defined procedure: what is measured, against what
-   baseline, what constitutes a pass. The predecessor repo's frozen
-   evaluation contract has one and was never assessed for reuse.
+4. **DONE 2026-09-18 — D13's protocol is D18.** One arm against a
+   recorded baseline, 50k-token cap, two pass criteria by component
+   class. The predecessor repo's frozen evaluation contract is still
+   unassessed for reuse; that falls inside item 5.
 5. **The legacy lift was never assessed** -- the acceptance-evidence
    recorder and the provenance/vendor pattern, each needing its own origin
    and licence check before anything lands in this public repo.
@@ -402,18 +497,34 @@ what remain, and they are owed.
    best of both repositories into one plan. The mission is merged and the
    decisions are recorded; the sequenced plan is not written.
 7. **`owner-directives.md` is still a placeholder.** The numbered
-   directives cited throughout this repo do not exist as a set. This needs
-   the owner's time, and the requirements package cannot be finished
-   without it.
+   directives cited throughout this repo do not exist as a set.
+   **Method chosen 2026-09-18 under D19, to keep the owner off the
+   critical path:** each directive is RECONSTRUCTED from the gate that
+   already enforces it — directive 8 from `lwb_check_env_leak.py`, 5 from
+   `lwb_lanes.py`, 7 from `lwb_check_proof.py` — with the enforcing code
+   path cited on every line. Nothing is invented: each entry is a reading
+   of a check that already runs. Any directive cited in prose but enforced
+   nowhere is listed separately as **UNSOURCED** for the owner to supply
+   or strike, and that list is the only part needing his time. A directive
+   that exists only in the owner's head or the predecessor repo will be
+   missing until he says so.
 8. **Rewrite the stage vocabulary against D15.** `mission.md`, the rule
    design and D16's rule text still use D2's seven legacy stage names.
    Created by D15, which supersedes D2.
 9. **Write the evidence contract, and update `docs/architecture.md` for
    the runner.** Per component: what it leaves on disk, in what shape, and
    what counts as a pass. The architecture doc currently describes one
-   entrypoint; D17 has two. Created by D17, and a prerequisite for D13's
+   entrypoint; D17 has two. Created by D17, and a prerequisite for D18's
    trial protocol (item 4) — a component that emits no evidence cannot be
    measured against the quality floor.
+10. **Define "authorised" for `no_unauthorised_destructive_action`.** The
+    rule ships deny-capable in 1.0 under D9 and has no definition of the
+    word it turns on. D19 settles the CTO's authority in this repo; it
+    does not tell a plugin user's session what counts as authorised.
+    Created by D19. Note the history: an earlier attempt at this
+    definition in this session invented a fifth destructive action that
+    contradicted the repo's own no-left-behinds rule, which is why this is
+    a named deliverable rather than a paragraph written in passing.
 
 ### Recommended order for the next session
 

@@ -113,7 +113,10 @@ user's. The mission is proven on this repo and unimplemented as a product.
 ## Common misreadings to avoid
 
 - `CLAUDE.md` still reads as though independent review is a hard pre-merge
-  gate. Decision D10 overrides it: the OWNER approves; review is advisory.
+  gate. D10 overrode it -- the OWNER approves, review is advisory -- and
+  D19 then superseded D10's mechanics: the CTO proceeds and records, the
+  owner holds a veto, and only money, licence/legal, machine settings and
+  publishing private data still escalate.
 - `mission.md`'s scope table marks all rule families PROPOSED without the
   deny/warn split. D9 has it: `proof_required` and
   `no_unauthorised_destructive_action` are deny-capable in 1.0;
