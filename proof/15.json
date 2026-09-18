@@ -1,0 +1,202 @@
+{
+  "deliverable": "mission-stages-architecture-and-trailer-gate",
+  "pr": 15,
+  "author": "claude-code-opus5-session-f8da3f9e-2026-09-18",
+  "checked_by": "lw-verifier-sonnet5-f8da3f9e-scope13to15-2026-09-18",
+  "commit": "229bd30945241adfa666807cbfe7447f8ef52d78",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 44%]",
+        "........................................................................ [ 88%]",
+        "..................                                                       [100%]",
+        "162 passed in 29.75s"
+      ],
+      "sha256": "7c51a724242b3f9050970befe04b7634e095519cfe6a7d9a13096b7ea94ec9df"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed (6 needles)"
+      ],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py",
+        "--range",
+        "origin/main..HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed (6 needles)"
+      ],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>\\HANDOFF.md passes all checks (2862 bytes)"
+      ],
+      "sha256": "b7ca09e2dbb0871b66418546bb6861405c94c538193ace2bbf69b81dc1c2b179"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-proof check passed (7 record(s))"
+      ],
+      "sha256": "2f2aa5104976540e568a2e17c7651a0e8e37dfe979160ba78dd2c52dccd388f5"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py",
+        "--pr",
+        "15"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-proof check passed (7 record(s))"
+      ],
+      "sha256": "2f2aa5104976540e568a2e17c7651a0e8e37dfe979160ba78dd2c52dccd388f5"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD",
+        "--pr-number",
+        "15"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-lanes check passed"
+      ],
+      "sha256": "5a4cc910732720cea242f7078dfef2ee3c130f9e3d9203b386cb9facb5fc275d"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "The settled mission, the testable quality floor, the enforceable directive-5 and directive-7 gates, and decisions D9-D17 land on main from a branch whose full history passes the env-leak scan",
+      "met": true
+    },
+    {
+      "criterion": "Every commit in the PR carries a valid LWB-Agent trailer, verified per commit rather than in aggregate",
+      "met": true
+    },
+    {
+      "criterion": "The two false assertions an independent review confirmed in PR #14 are removed, not restated with better numbers: HANDOFF.md's commit count and the session handoff's branch tip and open-PR claim",
+      "met": true
+    },
+    {
+      "criterion": "D15, D16 and D17 record the three assessment decisions the owner settled, and D15 states explicitly that the stage-vocabulary rewrite it implies has NOT been carried out",
+      "met": true
+    },
+    {
+      "criterion": "A commit-msg hook rejects a commit with no LWB-Agent trailer before the commit exists, tested in both directions and committed with its executable bit set",
+      "met": true
+    },
+    {
+      "criterion": "An independent reviewer examined the head commit and returned AGREE, with its three prior DISAGREE rounds recorded rather than discarded",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 308894594,
+    "cached_input": 308892762,
+    "uncached_input": 1832,
+    "output": 1186076,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 93329.6,
+    "source": "transcript message.usage summed across 916 usage-bearing assistant records in <home>/.claude/projects/<repo-slug>/<session-id>.jsonl (cached_input = cache_read + cache_creation; uncached_input = input_tokens; total_input = their sum; 412055 of the output tokens were thinking tokens). Covers the whole session, which spans PRs 12 through 15, not this deliverable alone -- usage attaches per model turn, so it cannot be split per deliverable. retries, setup_overhead and tool_overhead have no source on this runtime and are recorded as unknown, never zero."
+  },
+  "mutations": [
+    "HANDOFF.md",
+    "README.md",
+    "docs/handoff-protocol.md",
+    "docs/maintainers/session-handoff-2026-09-18.md",
+    "docs/maintainers/session-protocol.md",
+    "docs/requirements/decisions.md",
+    "docs/requirements/mission.md",
+    "proof/13.json",
+    "proof/15.json",
+    "proof/README.md",
+    "proof/schema.json",
+    "reviews/13/independent-verifier.json",
+    "reviews/15/independent-verifier.json",
+    "reviews/README.md",
+    "reviews/schema.json",
+    "scripts/githooks/commit-msg",
+    "scripts/lwb_check_proof.py",
+    "scripts/lwb_lanes.py",
+    "tests/test_lwb_check_proof.py",
+    "tests/test_lwb_lanes.py"
+  ],
+  "unproven": [
+    "Command tails and sha256 values are SANITIZED, not verbatim: absolute paths become <repo> and <home> before hashing.",
+    "'commit' names 229bd309, the substantive head, not the squash-merge commit GitHub creates at merge time. The directive-7 gates key on 'pr' for that reason.",
+    "The env-leak scan's needles come from LWB_PRIVATE_NEEDLES in this session's environment. The independent reviewer could NOT confirm that result -- its own environment has no needles configured and it was instructed not to guess private-name values -- so the clean scan is the author's claim, checked only by CI's own run against the repository secret.",
+    "The token figures cover the entire session across PRs 12-15. No mechanism attributes tokens to one deliverable, one PR or one tool call, because usage attaches per model turn.",
+    "The commit-msg hook is not installed by cloning. It protects only a checkout where `git config core.hooksPath scripts/githooks` has been run; CI's lwb-lanes job remains the backstop.",
+    "reviewer_id and commit_author_id are self-attested strings. Nothing cross-checks them against git authorship or a session registry, so reviews/15/ is an audit trail, not proof that two independent sessions existed.",
+    "This record was written by the author of the work it proves. 'checked_by' names the independent reviewer of the code, not an independent checker of this record's own contents."
+  ]
+}
