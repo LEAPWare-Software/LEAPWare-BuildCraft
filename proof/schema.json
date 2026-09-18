@@ -69,6 +69,34 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Anything claimed as part of this deliverable that this record does NOT prove (an honest gap list, not a place to hide a failure as a footnote)."
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "description": "What 'done' meant for this deliverable, agreed before the work started; quality floor item 1. Each entry is a criterion and whether it was met -- required, and enforced, for records from PR #12 onward; see scripts/lwb_check_proof.py.",
+      "items": {
+        "type": "object",
+        "required": ["criterion", "met"],
+        "properties": {
+          "criterion": { "type": "string", "minLength": 1 },
+          "met": { "type": "boolean" }
+        }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "description": "Measured token cost, per the mission's efficiency section: total input, cached input, uncached input, output, retries, setup overhead, tool overhead and wall time, separately, plus where the numbers came from. A field that cannot be measured is recorded as the string \"unknown\", NEVER as zero -- an unmeasured field recorded as zero is exactly how an efficiency claim gets manufactured. Instruction-length proxies are not billed tokens. Required, and enforced, for records from PR #12 onward; see scripts/lwb_check_proof.py.",
+      "properties": {
+        "total_input": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "cached_input": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "uncached_input": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "output": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "retries": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "setup_overhead": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "tool_overhead": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "wall_time_seconds": { "anyOf": [{ "type": "number" }, { "const": "unknown" }] },
+        "source": { "type": "string", "description": "Where these numbers came from." }
+      }
     }
   }
 }

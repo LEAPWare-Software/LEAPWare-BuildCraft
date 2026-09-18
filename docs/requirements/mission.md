@@ -49,6 +49,18 @@ A configuration that fails any of these is not cheaper -- it is
 disqualified. Cost is compared only among configurations that clear the
 floor.
 
+*Unauthorised* means any action on the destructive list in
+`docs/handoff-protocol.md`'s hard rules -- a repository settings change, a
+merge, a force-push, a history rewrite, or deleting a remote ref -- taken
+without an explicit instruction from the owner. The list is finite and the
+instruction is on the record, so item 5 is a check, not a judgement.
+
+The floor governs **how this project delivers**: it applies to every
+deliverable here, today. It is not the same thing as what the shipped
+plugin enforces for its users, which decision D1 sets to warn-only in 1.0.
+Warn-only concerns the product's behaviour toward others; the floor
+concerns ours.
+
 The floor is built from signals this repository already produces, so
 applying it costs almost nothing. Items 3 and 4 are enforced mechanically
 today. The only new habit is item 1: state what *done* means before
