@@ -1,0 +1,128 @@
+{
+  "deliverable": "mission-settled-and-review-binding",
+  "pr": 13,
+  "author": "claude-code-opus5-session-f8da3f9e-2026-09-18",
+  "checked_by": "lw-verifier-sonnet-a3e7d2481ec0eb42c-2026-09-18",
+  "commit": "d3eb1d6a55c00d86e907d6da8eea7e89a5f6e708",
+  "commands": [
+    {
+      "argv": ["python", "-m", "pytest", "tests/", "-q"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 44%]",
+        "........................................................................ [ 88%]",
+        "..................                                                       [100%]",
+        "162 passed in 42.15s"
+      ],
+      "sha256": "d6c230893f0a6232fd15ef8eb8dbf7e4e2b87537d09994bc5231670b413a62bb"
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_env_leak.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-env-leak check passed (6 needles)"],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_env_leak.py", "--range", "origin/main..HEAD"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-env-leak check passed (6 needles)"],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "argv": ["python", "scripts/lwb_handoff.py", "--check"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["OK: <repo>\\HANDOFF.md passes all checks (2827 bytes)"],
+      "sha256": "f0cbd1f4d4313271f2675b0df9bd5b404f0d4591e873cd1d4b15ec9e0c422910"
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_proof.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-proof check passed (5 record(s))"],
+      "sha256": "fd438db07edaae3445ed766c600667a6fda9ead44243921d563dc4019a0cc112"
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_prefix.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-prefix check passed"],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9"
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_no_instruction_dep.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-no-instruction-dep check passed"],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317"
+    },
+    {
+      "argv": ["python", "scripts/lwb_lanes.py", "--base", "origin/main", "--head", "HEAD", "--pr-number", "13"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-lanes check passed"],
+      "sha256": "5a4cc910732720cea242f7078dfef2ee3c130f9e3d9203b386cb9facb5fc275d"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "The product mission is settled in one place, reconciling this repo with the owner's predecessor plan, and includes token efficiency as a first-class goal",
+      "met": true
+    },
+    {
+      "criterion": "The quality floor is testable today without a seeded-failure corpus, and every term in it is defined",
+      "met": true
+    },
+    {
+      "criterion": "Decisions D9-D14 and the D1/D5/D6 amendments are recorded in git, since they existed only in a session about to be cleared",
+      "met": true
+    },
+    {
+      "criterion": "A review record cannot authorise code its reviewer never saw",
+      "met": true
+    },
+    {
+      "criterion": "Every gate added in this PR was verified to actually fire, by testing rather than by reading",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 265767645,
+    "cached_input": 261547619,
+    "uncached_input": 4220026,
+    "output": 996520,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "transcript message.usage summed across 742 usage-bearing assistant records in ~/.claude/projects/C--Users-manny-ramos-leapware-hq-leapware-software-leapware-buildcraft/f8da3f9e-f95e-46a8-bbfb-1bb1f6a9677b.jsonl (cached_input = cache_read_input_tokens; uncached_input = input_tokens + cache_creation_input_tokens; total_input = sum of all three). wall_time_seconds set to unknown: the session's first and last timestamps span 2026-09-17T21:01Z to 2026-09-18T21:45Z, which includes idle time between turns across a day, not active work time, so the raw delta would misrepresent actual wall time."
+  },
+  "mutations": [
+    "README.md",
+    "docs/handoff-protocol.md",
+    "docs/requirements/decisions.md",
+    "docs/requirements/mission.md",
+    "proof/13.json",
+    "proof/README.md",
+    "proof/schema.json",
+    "reviews/13/independent-verifier.json",
+    "reviews/README.md",
+    "reviews/schema.json",
+    "scripts/lwb_check_proof.py",
+    "scripts/lwb_lanes.py",
+    "tests/test_lwb_check_proof.py",
+    "tests/test_lwb_lanes.py"
+  ],
+  "unproven": [
+    "Command tails and sha256 are SANITIZED, not verbatim: absolute paths become <repo>, <home> and <path> before hashing.",
+    "'commit' names d3eb1d6, the substantive head, not the squash-merge commit GitHub creates at merge. The directive-7 gates key on 'pr' for that reason.",
+    "'lwb_check_proof.py --pr 13' is absent from commands[]: a record cannot prove its own existence.",
+    "Identity strings are self-attested. Per D10 the owner is the approver; this is an audit trail, not proof that two sessions existed.",
+    "The review binding was not checked under detached-HEAD or shallow-clone CI checkouts, which is how CI actually checks out.",
+    "Three gates in this repository were found unable to fire after being written and before being caught by review. Nothing proves a fourth does not exist.",
+    "Token totals were summed across the entire session transcript, not isolated to work on PR #13 alone; the session may include token spend on other turns within the same continuous session."
+  ]
+}
