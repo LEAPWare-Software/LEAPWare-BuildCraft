@@ -1,0 +1,91 @@
+{
+  "deliverable": "traps-no-left-behinds",
+  "pr": 10,
+  "author": "claude-code-opus5-session-f8da3f9e-2026-09-18",
+  "checked_by": "lw-verifier-sonnet-acc84f592377940aa-2026-09-18",
+  "commit": "9463214739b90a6de1ae0b384fdc8ac2b1e6e40c",
+  "commands": [
+    {
+      "cmd": ["python", "-m", "pytest", "tests/", "-q"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": [
+        "........................................................................ [ 48%]",
+        "........................................................................ [ 97%]",
+        "....                                                                     [100%]",
+        "148 passed in 5.38s"
+      ],
+      "sha256": "580f038a16344477e95c74f8ee3cf9b69fc6e841af534b17ab38b50e26f8beaa"
+    },
+    {
+      "cmd": ["python", "scripts/lwb_check_env_leak.py"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": ["lwb-env-leak check passed (6 needles)"],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "cmd": ["python", "scripts/lwb_check_env_leak.py", "--range", "origin/main..HEAD"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": ["lwb-env-leak check passed (6 needles)"],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "cmd": ["python", "scripts/lwb_handoff.py", "--check"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": ["OK: <repo>\\HANDOFF.md passes all checks (2826 bytes)"],
+      "sha256": "4475b3b8cc403e94656a6037d2f6a21ca321f03287d517c5188872ed72bbbbbb"
+    },
+    {
+      "cmd": ["python", "scripts/lwb_check_proof.py"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": ["lwb-proof check passed (3 record(s))"],
+      "sha256": "a783f5c50baffad5bdd70c95f3fa68a7fecda32aec870f873ff7a98415a409d7"
+    },
+    {
+      "cmd": ["python", "scripts/lwb_check_prefix.py"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": ["lwb-prefix check passed"],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9"
+    },
+    {
+      "cmd": ["python", "scripts/lwb_check_no_instruction_dep.py"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": ["lwb-no-instruction-dep check passed"],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317"
+    },
+    {
+      "cmd": ["python", "scripts/lwb_lanes.py", "--base", "origin/main", "--head", "HEAD", "--pr-number", "10"],
+      "exit_code": 0,
+      "expect_exit": 0,
+      "ok": true,
+      "tail": ["lwb-lanes check passed"],
+      "sha256": "5a4cc910732720cea242f7078dfef2ee3c130f9e3d9203b386cb9facb5fc275d"
+    }
+  ],
+  "mutations": [
+    "docs/handoff-protocol.md",
+    "proof/10.json",
+    "reviews/10/independent-verifier.json"
+  ],
+  "unproven": [
+    "Command tails and their sha256 are SANITIZED, not verbatim: absolute paths become <repo>, <home> and <path> before hashing. Reproduce a digest by applying the same substitutions.",
+    "'commit' names this branch's head at capture time, not the squash-merge commit, which GitHub creates only at merge. Both directive-7 gates key on the 'pr' field for that reason.",
+    "'python scripts/lwb_check_proof.py --pr 10' is deliberately absent from commands[]: a record cannot contain proof of its own existence.",
+    "author/checked_by and the reviews/ identity strings are self-attested; nothing cross-checks them against git authorship or a session registry. Open decision D5.",
+    "This deliverable is documentation only. It adds no rule, no check and no test. The no-left-behinds rule it records is enforced by nothing mechanical -- it is prose a session must read and choose to follow, which is precisely the advisory-rule failure mode this product exists to remove. Building the session-boundary check is scoped to the Hygiene family and is NOT done.",
+    "The git semantics the document asserts were verified by the reviewer reproducing them in a throwaway repo, not by a test in this repo. Nothing re-checks them if git's behaviour changes."
+  ]
+}
