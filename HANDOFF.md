@@ -22,33 +22,34 @@ In order. Do not start step *n+1* before step *n* is done and proven.
    merges. Do them when a second CLI or a revocable per-CLI identity is
    actually needed. Do NOT generate a private key until there is a decided
    place to put it — GitHub shows it once and it carries repo write.
-3. **The requirements package** ← NEXT, per
-   `docs/requirements/approach.md`, replacing the TODO placeholder in
-   `docs/requirements/owner-directives.md`. Eight owner decisions are
-   already recorded in **`docs/requirements/decisions.md`** (D1–D8: rule
-   families and phasing, stages, role separation, derived stage state,
-   identity-based review, Apps deferred, needles as config, history
-   accepted) — read that file, do not re-decide them. D5 carries a NAMED
-   OPEN DECISION the package must answer: what binds a reviewer identity to
-   something externally verifiable. Then the lift from the private legacy
-   repo (acceptance checker and its tests, provenance/vendor pattern), each
+3. **The requirements package** ← IN PROGRESS, per
+   `docs/requirements/approach.md`. Section 1 of 13 is DONE:
+   `docs/requirements/vision.md` (owner-approved 2026-09-18) carries the
+   mission, principles, non-goals and the EXISTS/PROPOSED inventory.
+   Twelve sections remain. Owner decisions D1-D8 are in
+   `docs/requirements/decisions.md` — read them, do not re-decide. D5
+   holds an OPEN question the package must answer: what binds a reviewer
+   identity to something externally verifiable. NOTE:
+   `docs/requirements/owner-directives.md` is STILL the TODO placeholder;
+   the numbered directives do not exist yet. Then the legacy lift
+   (acceptance checker and its tests, provenance/vendor pattern), each
    piece origin- and licence-checked before it lands.
 4. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-17 22:38 UTC
-main SHA: 68ac412247c03d109273de33948391581fdbec56
+Generated: 2026-09-18 17:36 UTC
+main SHA: 9ad59c7fbd9564e215a81e80193feea53bcf7f4e
 CLI: claude
-Session: gates-2026-09-17
+Session: handoff-2026-09-18
 
 Open PRs:
-#7 Make directives 5 and 7 actually enforceable (lwb-gates-clean)
-#6 Make directive 7 enforceable; decouple directive 5 from CLI vendor (lwb-gates-enforceable)
+(unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
 - lwb-gates-enforceable: PROVEN (commit bbb07b950d0f0c37a9edc896d2073aa359cf475f)
+- lwb-vision: PROVEN (commit 9df414f6f0ab2a86e3b2c0e1bdd2d42fbf949a59)
 
 <!-- lwb-handoff:end -->
 
