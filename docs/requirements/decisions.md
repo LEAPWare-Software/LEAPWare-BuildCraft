@@ -253,3 +253,69 @@ and the `@RTK.md` import from global `CLAUDE.md`, whose text told every
 session its output was condensed); the Ponytail skill deleted; caveman
 enabled. Backups at `.bak-2026-09-18` and `.bak2-2026-09-18`. `rtk`
 remains on the user PATH as a dangling entry, left for the owner.
+
+## Open assessment items · 2026-09-18
+
+A structured assessment of this repo against the owner's predecessor plan
+was run item by item and got roughly halfway. What is settled is recorded
+above as D1-D14. What follows was NOT assessed and is open. A session
+reading only the decisions would think the work complete; it is not.
+
+1. **Roles and stages (D2, D3) were flagged and never resolved.** Both
+   were built without the adoption check the mission's fourth principle
+   requires -- the seven stages port an internal taxonomy, and the
+   reviewer-independence rule is bespoke where GitHub already ships
+   "require review from someone other than the last pusher". Either record
+   why building won, or adopt instead.
+2. **Architecture under D12 is unexamined.** If lwb sequences and gates
+   adopted components rather than implementing an SDLC, what the product
+   IS changes. The pure-core/adapter design was drawn for the old scope.
+3. **D13 has no trial protocol.** "Prove every adoption before it enters
+   the stack" needs a defined procedure: what is measured, against what
+   baseline, what constitutes a pass. The predecessor repo's frozen
+   evaluation contract has one and was never assessed for reuse.
+4. **The legacy lift was never assessed** -- the acceptance-evidence
+   recorder and the provenance/vendor pattern, each needing its own origin
+   and licence check before anything lands in this public repo.
+5. **No consolidated plan exists.** The original request was to merge the
+   best of both repositories into one plan. The mission is merged and the
+   decisions are recorded; the sequenced plan is not written.
+6. **`owner-directives.md` is still a placeholder.** The numbered
+   directives cited throughout this repo do not exist as a set. This needs
+   the owner's time, and the requirements package cannot be finished
+   without it.
+
+### Recommended order for the next session
+
+1. Implement D10 and D11 -- remove the co-approval clause from `AGENTS.md`
+   lines 10-11 and from `scripts/lwb_lanes.py`'s module docstring and its
+   `SHARED_PREFIXES` comment; make `AGENTS.md` match `CLAUDE.md`; record
+   Codex as deferred. Small, already decided, no design needed.
+2. Ship the two deny-capable rules from D9 -- `proof_required` and
+   `no_unauthorised_destructive_action`. The plugin today registers one
+   no-op rule and enforces nothing for anyone; these two make it a product.
+3. Build token measurement. Five slots are readable from transcript
+   `message.usage`; three have no runtime source. Until this exists the
+   mission's efficiency half is decoration.
+4. Then items 1-6 above.
+
+### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
+
+Full detail on the first two in-flight steps, moved here so HANDOFF.md
+could stay under its 3000-byte cap without losing the record:
+
+- **Step 1 (DONE).** This repo stands up as the project-neutral SDLC
+  scaffold (`lwb`). PR #1 squash-merged, 16/16 green. The repo is
+  **PUBLIC** under Apache-2.0: everything committed is world-readable
+  permanently, history included.
+- **Step 2 (Ruleset DONE; GitHub Apps DEFERRED).** Ruleset `main` (id
+  23627212) is active on the default branch: no deletion, no force-push,
+  PR required, 9 required checks, squash-only, merge queue. The two Apps
+  (`lwb-claude`, `lwb-codex`, manifests in `.github/apps/`) are **not
+  created** -- GitHub has no API for App creation, the manifest flow
+  needs an authenticated browser session, and no Chrome extension is
+  reachable from a CLI session. They block nothing: `gh auth` already
+  commits and merges. Do them when a second CLI or a revocable per-CLI
+  identity is actually needed. Do NOT generate a private key until there
+  is a decided place to put it -- GitHub shows it once and it carries
+  repo write.
