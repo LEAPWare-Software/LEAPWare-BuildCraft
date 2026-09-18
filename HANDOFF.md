@@ -56,3 +56,5 @@ Deliverable proof state (from proof/):
   `docs/handoff-protocol.md`
 - Pure core, adapters, lanes, fail-open layers → `docs/architecture.md`
 - Policy file format and mode semantics → `docs/policy.md`
+- Full session detail, gates that failed, environment changes →
+  `docs/maintainers/session-handoff-2026-09-18.md`
