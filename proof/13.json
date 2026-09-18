@@ -98,7 +98,7 @@
     "setup_overhead": "unknown",
     "tool_overhead": "unknown",
     "wall_time_seconds": "unknown",
-    "source": "transcript message.usage summed across 742 usage-bearing assistant records in ~/.claude/projects/C--Users-manny-ramos-leapware-hq-leapware-software-leapware-buildcraft/f8da3f9e-f95e-46a8-bbfb-1bb1f6a9677b.jsonl (cached_input = cache_read_input_tokens; uncached_input = input_tokens + cache_creation_input_tokens; total_input = sum of all three). wall_time_seconds set to unknown: the session's first and last timestamps span 2026-09-17T21:01Z to 2026-09-18T21:45Z, which includes idle time between turns across a day, not active work time, so the raw delta would misrepresent actual wall time."
+    "source": "transcript message.usage summed across 742 usage-bearing assistant records in <home>/.claude/projects/<repo-slug>/f8da3f9e-f95e-46a8-bbfb-1bb1f6a9677b.jsonl (cached_input = cache_read_input_tokens; uncached_input = input_tokens + cache_creation_input_tokens; total_input = sum of all three). wall_time_seconds set to unknown: the session's first and last timestamps span 2026-09-17T21:01Z to 2026-09-18T21:45Z, which includes idle time between turns across a day, not active work time, so the raw delta would misrepresent actual wall time."
   },
   "mutations": [
     "README.md",
