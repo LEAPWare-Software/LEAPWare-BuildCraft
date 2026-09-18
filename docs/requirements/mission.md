@@ -51,9 +51,11 @@ floor.
 
 *Unauthorised* means any action on the destructive list in
 `docs/handoff-protocol.md`'s hard rules -- a repository settings change, a
-merge, a force-push, a history rewrite, or deleting a remote ref -- taken
-without an explicit instruction from the owner. The list is finite and the
-instruction is on the record, so item 5 is a check, not a judgement.
+merge, a force-push, a history rewrite, or deleting a remote ref other
+than a branch whose work is verified landed -- taken without an explicit
+instruction from the owner. That list is finite and each entry is a fact
+about what happened, not a matter of opinion, and the instruction is on
+the record. So item 5 is a check, not a judgement.
 
 The floor governs **how this project delivers**: it applies to every
 deliverable here, today. It is not the same thing as what the shipped
