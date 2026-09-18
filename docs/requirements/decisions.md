@@ -256,6 +256,73 @@ enabled. Backups at `~/.claude/CLAUDE.md.bak-2026-09-18`,
 `~/.claude/settings.json.bak2-2026-09-18`. `rtk`
 remains on the user PATH as a dangling entry, left for the owner.
 
+## D15 — Stages come from D12's map, not the legacy taxonomy · 2026-09-18
+
+**Supersedes D2.** The seven stages
+(`design → qa → review → security → delivery → release → operations`)
+were ported from the legacy repo's seven roles and never passed the
+adoption check the mission's fourth principle requires. D12 then changed
+what the product is: a router that sequences adopted components at the
+hook boundary plus four things lwb builds itself. A stage list that maps
+onto no tool cannot route anything.
+
+So the stage vocabulary is **derived from D12's fifteen SDLC
+responsibilities**, each stage named for the responsibility it covers and
+carrying the component that covers it. A responsibility with no component
+and no gate does not become a stage.
+
+Consequences accepted: `mission.md`, this log and the rule design are
+rewritten against the new names; D16's rule is rephrased against them; and
+`operations` stops being a stage with no gate — its responsibilities
+(observability, incident response) carry real components under D12 and are
+named for those.
+
+Rejected: keeping the seven and annotating them with tools (two
+responsibilities sharing a stage name get gated identically when their
+failure modes differ, and `operations` stays ungated); and cutting to the
+four gateable stages only (the model stops describing an SDLC and becomes
+a list of the places we happen to hold a hook).
+
+## D16 — Independence stays lwb's rule; GitHub's cannot fire here · 2026-09-18
+
+**Settles D3's open flag.** The adoption check was run against the live
+repository, not against documentation:
+
+- GitHub ships `require_last_push_approval`, but it is inert unless
+  `required_approving_review_count` is at least 1. Ruleset 23627212 has
+  that count at **0** and last-push approval **off**.
+- Raising the count cannot work with the identities actually in play. PR
+  #14's author is `LEAPWare-HQ` and the authenticated approver is
+  `LEAPWare-HQ` — one account on both ends. GitHub refuses self-approval,
+  so every PR would become unmergeable by the owner alone. That is the
+  same defect class as the five gates listed in
+  `docs/maintainers/session-handoff-2026-09-18.md`: a check that cannot
+  pass.
+- The two rules do not measure the same thing in any case. GitHub sees a
+  pull request. lwb's rule spans proof records across stages for one
+  deliverable, which GitHub cannot observe at any setting.
+
+So lwb keeps its own cross-stage author-independence rule, **warn-only**
+per D9, phrased against D15's stage names.
+
+Known limit, restated rather than implied: `reviewer_id` and
+`commit_author_id` are self-attested strings that nothing cross-checks
+against git authorship or any session registry. These records are an
+**audit trail, not proof**. This is the hole D5 flagged and D10 mooted
+while the owner is the approver.
+
+The adoption door reopens the moment a second externally verifiable
+identity exists — a GitHub App under D6, a second account, or Codex under
+D11. At that point `required_approving_review_count: 1` plus
+`require_last_push_approval: true` becomes satisfiable and should be
+adopted, because it binds independence to an identity GitHub verifies.
+
+Rejected now: creating a GitHub App or second account to satisfy the rule
+(reverses D6, and the standing instruction forbids generating a private
+key with repo write before there is a decided place to keep it); and
+deleting the rule outright (the cross-stage property is still the one the
+quality floor names, and nothing else would carry it).
+
 ## Required work, not deferred · 2026-09-18
 
 The owner's rule is that nothing is deferred, with Codex (D11) the single
@@ -271,12 +338,12 @@ what remain, and they are owed.
    records naming the new PR number, and merge. Verify with
    `lwb_check_env_leak.py --range origin/main..HEAD` BEFORE opening it --
    that is the check that caught the leak.
-2. **Roles and stages (D2, D3) were flagged and never resolved.** Both
-   were built without the adoption check the mission's fourth principle
-   requires -- the seven stages port an internal taxonomy, and the
-   reviewer-independence rule is bespoke where GitHub already ships
-   "require review from someone other than the last pusher". Either record
-   why building won, or adopt instead.
+2. **DONE 2026-09-18 — roles and stages resolved as D15 and D16.** The
+   adoption check was run for both. Stages are rederived from D12's map
+   (D15); independence stays lwb's rule because GitHub's cannot fire with
+   one account on both ends of a PR (D16). The follow-on work this
+   creates -- rewriting `mission.md` and the rule design against D15's
+   stage names -- is item 8 below.
 3. **Architecture under D12 is unexamined.** If lwb sequences and gates
    adopted components rather than implementing an SDLC, what the product
    IS changes. The pure-core/adapter design was drawn for the old scope.
@@ -294,6 +361,9 @@ what remain, and they are owed.
    directives cited throughout this repo do not exist as a set. This needs
    the owner's time, and the requirements package cannot be finished
    without it.
+8. **Rewrite the stage vocabulary against D15.** `mission.md`, the rule
+   design and D16's rule text still use D2's seven legacy stage names.
+   Created by D15, which supersedes D2.
 
 ### Recommended order for the next session
 
