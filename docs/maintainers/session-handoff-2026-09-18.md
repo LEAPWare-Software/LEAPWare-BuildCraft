@@ -2,7 +2,7 @@
 
 The full record of a long session. `HANDOFF.md` is the one-page
 transition; this is the detail behind it. `docs/requirements/decisions.md`
-holds D1-D14 and the required-work list; `docs/maintainers/session-protocol.md`
+holds the numbered decisions and the required-work list; `docs/maintainers/session-protocol.md`
 holds how to operate. Read all three.
 
 ## Re-derive first, trust nothing here
@@ -21,15 +21,26 @@ summary that hides remote refs. That trap cost this session a false
 
 ## State at handoff
 
-- `main` at `c33b560`, clean, CI green.
-- Remote `lwb-mission-final` at `4b84b5c` holds
-  7 commits of unmerged work.
-  This is the deliverable. It is NOT merged.
-- Remote `lwb-mission-settled` is a leftover from abandoned PR #12; safe
-  to delete once `lwb-mission-final` lands.
-- PRs #12 and #13 are CLOSED and abandoned. No PR is open.
+Branch tips, commit counts and open-PR lists are deliberately NOT asserted
+here. An earlier draft of this section stated a tip sha, a commit count and
+"no PR is open"; all three were false within minutes of being committed,
+and an independent review of PR #14 caught it. Run the re-derive block
+above instead — that is the whole reason it is above this section.
+
+What is durable:
+
+- `main` was at `c33b560` when this session ended. Anything at or after
+  that sha is this session's work or later.
+- Branch `lwb-mission-final` carries the unmerged deliverable: the settled
+  mission, the enforceable gates, and decisions D9 onward.
+- Branch `lwb-mission-settled` is a leftover from abandoned PR #12; delete
+  it once `lwb-mission-final` has landed.
+- PRs #12 and #13 are closed and abandoned. Do not reopen them; their
+  branch history carries the leaked name.
 - Ruleset 23627212 protects `main`: no deletion, no force-push, PR
-  required, 9 required checks, squash-only, merge queue.
+  required, 9 required checks, squash-only, merge queue. It requires zero
+  approving reviews, and `require_last_push_approval` is off — see D16 for
+  why raising either one would create a gate that cannot be satisfied.
 
 ## What landed on main this session
 
@@ -113,8 +124,9 @@ user's. The mission is proven on this repo and unimplemented as a product.
 
 ## Where the assessment stopped
 
-Roughly halfway. Settled: the mission, the quality floor, the tech-stack
-evidence, D9-D14. Not assessed: roles and stages (D2/D3 were built without
-the adoption check the mission requires), the architecture under D12, the
-trial protocol D13 needs, the legacy lift, and the consolidated plan the
-owner originally asked for. All are listed as required work.
+Settled: the mission, the quality floor, the tech-stack evidence, D9-D14,
+and — resumed while PR #14 was in flight — roles and stages as D15 and
+D16. Not assessed: the architecture under D12, the trial protocol D13
+needs, the legacy lift, and the consolidated plan the owner originally
+asked for. All are listed as required work in
+`docs/requirements/decisions.md`.

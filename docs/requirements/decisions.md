@@ -256,12 +256,123 @@ enabled. Backups at `~/.claude/CLAUDE.md.bak-2026-09-18`,
 `~/.claude/settings.json.bak2-2026-09-18`. `rtk`
 remains on the user PATH as a dangling entry, left for the owner.
 
+## D15 — Stages come from D12's map, not the legacy taxonomy · 2026-09-18
+
+**Supersedes D2.** The seven stages
+(`design → qa → review → security → delivery → release → operations`)
+were ported from the legacy repo's seven roles and never passed the
+adoption check the mission's fourth principle requires. D12 then changed
+what the product is: a router that sequences adopted components at the
+hook boundary plus four things lwb builds itself. A stage list that maps
+onto no tool cannot route anything.
+
+So the stage vocabulary is **derived from D12's fifteen SDLC
+responsibilities**, each stage named for the responsibility it covers and
+carrying the component that covers it. A responsibility with no component
+and no gate does not become a stage.
+
+Consequences accepted, and NOT yet carried out — `mission.md` §"Stages"
+still names D2's seven, and the rule design and D16's rule text still use
+them. Rewriting all three against D15's names is required work, item 8
+below. This decision settles the vocabulary; it does not claim the rewrite
+has happened. And `operations` stops being a stage with no gate — its
+responsibilities
+(observability, incident response) carry real components under D12 and are
+named for those.
+
+Rejected: keeping the seven and annotating them with tools (two
+responsibilities sharing a stage name get gated identically when their
+failure modes differ, and `operations` stays ungated); and cutting to the
+four gateable stages only (the model stops describing an SDLC and becomes
+a list of the places we happen to hold a hook).
+
+## D16 — Independence stays lwb's rule; GitHub's cannot fire here · 2026-09-18
+
+**Settles D3's open flag.** The adoption check was run against the live
+repository, not against documentation:
+
+- GitHub ships `require_last_push_approval`, but it is inert unless
+  `required_approving_review_count` is at least 1. Ruleset 23627212 has
+  that count at **0** and last-push approval **off**.
+- Raising the count cannot work with the identities actually in play. PR
+  #14's author is `LEAPWare-HQ` and the authenticated approver is
+  `LEAPWare-HQ` — one account on both ends. GitHub refuses self-approval,
+  so every PR would become unmergeable by the owner alone. That is the
+  same defect class as the five gates listed in
+  `docs/maintainers/session-handoff-2026-09-18.md`: a check that cannot
+  pass.
+- The two rules do not measure the same thing in any case. GitHub sees a
+  pull request. lwb's rule spans proof records across stages for one
+  deliverable, which GitHub cannot observe at any setting.
+
+So lwb keeps its own cross-stage author-independence rule, **warn-only**
+per D9, phrased against D15's stage names.
+
+Known limit, restated rather than implied: `reviewer_id` and
+`commit_author_id` are self-attested strings that nothing cross-checks
+against git authorship or any session registry. These records are an
+**audit trail, not proof**. This is the hole D5 flagged and D10 mooted
+while the owner is the approver.
+
+The adoption door reopens the moment a second externally verifiable
+identity exists — a GitHub App under D6, a second account, or Codex under
+D11. At that point `required_approving_review_count: 1` plus
+`require_last_push_approval: true` becomes satisfiable and should be
+adopted, because it binds independence to an identity GitHub verifies.
+
+Rejected now: creating a GitHub App or second account to satisfy the rule
+(reverses D6, and the standing instruction forbids generating a private
+key with repo write before there is a decided place to keep it); and
+deleting the rule outright (the cross-stage property is still the one the
+quality floor names, and nothing else would carry it).
+
+## D17 — Two entrypoints: hooks gate, a runner sequences · 2026-09-18
+
+D12 made lwb a router over adopted components, which the architecture drawn
+for the old scope never answered: does lwb *run* a component, or only
+*gate* on the evidence one leaves behind? Hooks cannot do the first.
+`approach.md` §8 forbids network from a hook; the fail-open argument in
+`docs/architecture.md` assumes evaluation is cheap and local; and invoking
+Spec Kit or a security scan inside a `PreToolUse` hook would put minutes of
+latency in front of every tool call, with a hung MCP server becoming a hung
+session.
+
+So lwb has **two entrypoints over one core**:
+
+- **The hook boundary gates.** Unchanged from today: pure core, fail-open,
+  no network, no spawning. It reads evidence already on disk and returns
+  allow/warn/deny. This is where `proof_required` and
+  `no_unauthorised_destructive_action` live (D9).
+- **A runner sequences.** A separate entrypoint outside the hook path — a
+  command and/or a CI job — may take minutes, call MCP servers and invoke
+  skills, driving adopted components in stage order. It has its own latency
+  and failure budget and is never in front of a tool call.
+
+`core/lwb_core` stays I/O-free and shared by both. The runner is a second
+impure edge alongside the adapters, bounded by the same rule: all I/O at
+the edges, none in the core.
+
+Rejected: gate-only with no runner (smallest build and the strongest
+fail-open story, but "full SDLC coverage" would shrink to coverage of the
+checks while the operator wires the components together by hand); and
+hooks that orchestrate (breaks the no-network rule, puts scan-length
+latency in front of every tool call, and makes fail-open unreasonable).
+
+**This creates the artifact neither option avoided: an evidence contract.**
+Each adopted component must declare what it leaves on disk for lwb to read
+— path, shape, and what counts as a pass. Without it the hook has nothing
+to gate on and the runner has no way to tell that a stage succeeded. The
+contract is also the natural input to D13's trial protocol, since a
+component that cannot emit evidence cannot be measured against the quality
+floor either.
+
 ## Required work, not deferred · 2026-09-18
 
 The owner's rule is that nothing is deferred, with Codex (D11) the single
 approved exception. The items below are therefore REQUIRED WORK, not
 optional backlog. A structured assessment against the owner's predecessor
-plan got roughly halfway; D1-D14 above record what is settled. These are
+plan got roughly halfway; the numbered decisions above record what is
+settled. These are
 what remain, and they are owed.
 
 1. **Land branch `lwb-mission-final` via a fresh PR.** PR #13 was abandoned
@@ -271,15 +382,15 @@ what remain, and they are owed.
    records naming the new PR number, and merge. Verify with
    `lwb_check_env_leak.py --range origin/main..HEAD` BEFORE opening it --
    that is the check that caught the leak.
-2. **Roles and stages (D2, D3) were flagged and never resolved.** Both
-   were built without the adoption check the mission's fourth principle
-   requires -- the seven stages port an internal taxonomy, and the
-   reviewer-independence rule is bespoke where GitHub already ships
-   "require review from someone other than the last pusher". Either record
-   why building won, or adopt instead.
-3. **Architecture under D12 is unexamined.** If lwb sequences and gates
-   adopted components rather than implementing an SDLC, what the product
-   IS changes. The pure-core/adapter design was drawn for the old scope.
+2. **DONE 2026-09-18 — roles and stages resolved as D15 and D16.** The
+   adoption check was run for both. Stages are rederived from D12's map
+   (D15); independence stays lwb's rule because GitHub's cannot fire with
+   one account on both ends of a PR (D16). The follow-on work this
+   creates -- rewriting `mission.md` and the rule design against D15's
+   stage names -- is item 8 below.
+3. **DONE 2026-09-18 — architecture resolved as D17.** Hooks gate, a
+   separate runner sequences, one I/O-free core under both. The follow-on
+   work it creates is item 9.
 4. **D13 has no trial protocol.** "Prove every adoption before it enters
    the stack" needs a defined procedure: what is measured, against what
    baseline, what constitutes a pass. The predecessor repo's frozen
@@ -294,6 +405,15 @@ what remain, and they are owed.
    directives cited throughout this repo do not exist as a set. This needs
    the owner's time, and the requirements package cannot be finished
    without it.
+8. **Rewrite the stage vocabulary against D15.** `mission.md`, the rule
+   design and D16's rule text still use D2's seven legacy stage names.
+   Created by D15, which supersedes D2.
+9. **Write the evidence contract, and update `docs/architecture.md` for
+   the runner.** Per component: what it leaves on disk, in what shape, and
+   what counts as a pass. The architecture doc currently describes one
+   entrypoint; D17 has two. Created by D17, and a prerequisite for D13's
+   trial protocol (item 4) — a component that emits no evidence cannot be
+   measured against the quality floor.
 
 ### Recommended order for the next session
 

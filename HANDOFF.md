@@ -13,17 +13,17 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 2. **DONE; GitHub Apps DEFERRED.** Ruleset `main` (id 23627212) active.
    Apps (`lwb-claude`, `lwb-codex`) not created — no App API, no browser
    session; `gh auth` covers it. Detail: `docs/requirements/decisions.md`.
-3. **Mission settled; PR #13 NOT merged.** `docs/requirements/mission.md`
-   carries the owner-approved mission: full SDLC coverage at the lowest
-   measured token cost that clears a quality floor. Decisions D1-D14 and
-   the open-items list are in `docs/requirements/decisions.md` -- READ IT
-   FIRST and do not re-decide settled questions.
-   **Branch `lwb-mission-final` (pushed) holds the work**, six commits,
-   all checks green locally. PR #13 was against the OLD branch
-   `lwb-mission-clean`, whose history contains a superseded commit with a
-   leaked username; it is closed. The stale remote `lwb-mission-clean` is
-   deleted. Land the work from `lwb-mission-final`: open a fresh PR, write
-   review and proof records naming the new PR number.
+3. **Mission settled; landing from `lwb-mission-final`.**
+   `docs/requirements/mission.md` carries the owner-approved mission: full
+   SDLC coverage at the lowest measured token cost that clears a quality
+   floor. Decisions D1-D16 and the open-items list are in
+   `docs/requirements/decisions.md` -- READ IT FIRST and do not re-decide
+   settled questions. PR #13 was against the OLD branch
+   `lwb-mission-clean`, which carries a leaked username; it is closed and
+   that remote is deleted. Branch tips, commit counts and PR state are
+   NOT written here -- they rot in minutes. Re-derive per
+   `docs/handoff-protocol.md`; the generated block below is a timestamped
+   snapshot, not the truth.
    Environment changed this session: RTK removed (hook, binary, and the
    `@RTK.md` import), Ponytail skill deleted, caveman enabled for output
    compression only. Backup paths: `docs/requirements/decisions.md` (D14).
@@ -32,13 +32,13 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-18 21:56 UTC
+Generated: 2026-09-18 22:35 UTC
 main SHA: c33b56059ac99e8d30467bd3ffdd8adcd7886760
 CLI: claude
 Session: assessment-2026-09-18
 
 Open PRs:
-#13 Settle the mission, make its floor testable, bind reviews to commits (lwb-mission-clean)
+#14 Settle the mission, make its floor testable, bind reviews to commits (lwb-mission-final)
 
 Deliverable proof state (from proof/):
 - traps-no-left-behinds: PROVEN (commit 9463214739b90a6de1ae0b384fdc8ac2b1e6e40c)
