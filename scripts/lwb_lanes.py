@@ -73,7 +73,20 @@ SHARED_PREFIXES = (
     # `tests/` still win: see classify_path's ordering.
     "tests/",
 )
-SHARED_FILES = ("HANDOFF.md", "AGENTS.md", "CLAUDE.md", "README.md")
+# Root files that belong to no single CLI's lane. `.gitignore` is here
+# because a change to it is repo-wide by construction -- PR #16 added
+# `graphify-out/` to it to keep artifacts carrying the operator's username
+# out of a PUBLIC repo, and the lane gate rejected that commit as being
+# outside the claude lane. A file whose whole purpose is to govern what the
+# whole repo tracks cannot sensibly belong to one lane; it is shared, and
+# therefore needs independent review like any other shared path.
+SHARED_FILES = (
+    "HANDOFF.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    ".gitignore",
+)
 
 # The bootstrap window, as an explicit set rather than a `<= N` threshold.
 # A threshold is wrong here because PR numbers are a shared, consumable

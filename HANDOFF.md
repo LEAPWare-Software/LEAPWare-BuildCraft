@@ -16,7 +16,7 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 3. **Mission settled; landing from `lwb-mission-final`.**
    `docs/requirements/mission.md` carries the owner-approved mission: full
    SDLC coverage at the lowest measured token cost that clears a quality
-   floor. Decisions D1-D16 and the open-items list are in
+   floor. The numbered decisions and the open-items list are in
    `docs/requirements/decisions.md` -- READ IT FIRST and do not re-decide
    settled questions. PR #13 was against the OLD branch
    `lwb-mission-clean`, which carries a leaked username; it is closed and

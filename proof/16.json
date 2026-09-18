@@ -1,0 +1,196 @@
+{
+  "deliverable": "authority-model-trial-protocol-and-claim-directive",
+  "pr": 16,
+  "author": "claude-code-opus5-session-f8da3f9e-2026-09-18",
+  "checked_by": "lw-verifier-sonnet5-f8da3f9e-scope13to16-2026-09-18",
+  "commit": "23e1c58ccc5af7c1c3bf16cbe04939f498da0998",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 44%]",
+        "........................................................................ [ 88%]",
+        "...................                                                      [100%]",
+        "163 passed in 14.53s"
+      ],
+      "sha256": "7e3923ed859e1fa2031293f4ec1637ccf88ff1a550d68810200cdd1c44f05aef"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed (6 needles)"
+      ],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py",
+        "--range",
+        "origin/main..HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed (6 needles)"
+      ],
+      "sha256": "532cbe6548808d0b2160b8cbc407392d4efc761eee7401221d35924febfab653"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>\\HANDOFF.md passes all checks (2868 bytes)"
+      ],
+      "sha256": "5e26be9b1235593e872bb478497cacd9c2c610cd93b8a64f49201465609afb94"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-proof check passed (8 record(s))"
+      ],
+      "sha256": "87a90b5ab6859179672db9dfb83754cf4949ee37be855dd92f9fe730f9658559"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py",
+        "--pr",
+        "16"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-proof check passed (8 record(s))"
+      ],
+      "sha256": "87a90b5ab6859179672db9dfb83754cf4949ee37be855dd92f9fe730f9658559"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD",
+        "--pr-number",
+        "16"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-lanes check passed"
+      ],
+      "sha256": "5a4cc910732720cea242f7078dfef2ee3c130f9e3d9203b386cb9facb5fc275d"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "D18 records a trial protocol shaped by the owner's constraint on token burn and delay: one arm against a recorded baseline, a hard cap that abandons rather than extends, and two pass criteria by component class",
+      "met": true
+    },
+    {
+      "criterion": "D19 records the owner's authority ruling -- proceed by default, owner holds a veto -- together with the risk he was told before choosing, and the four classes that still escalate",
+      "met": true
+    },
+    {
+      "criterion": "No document in the repository still claims a merge requires the owner, verified by an unrestricted sweep rather than a .md-only grep",
+      "met": true
+    },
+    {
+      "criterion": ".gitignore classifies as a shared path, so a repo-wide privacy fix is landable, with a test asserting it",
+      "met": true
+    },
+    {
+      "criterion": "graphify build artifacts cannot reach this PUBLIC repo: gitignored, plus a pre-commit hook that blocks a forced add, tested in both directions by an independent reviewer",
+      "met": true
+    },
+    {
+      "criterion": "Directive 7a is recorded in owner-directives.md as the owner stated it, with its enforcement limit stated rather than implied",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 347863736,
+    "cached_input": 347861570,
+    "uncached_input": 2166,
+    "output": 1340423,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 96578.8,
+    "source": "transcript message.usage summed across 1083 usage-bearing assistant records in <home>/.claude/projects/<repo-slug>/<session-id>.jsonl (cached_input = cache_read + cache_creation; uncached_input = input_tokens; total_input = their sum; 462822 of the output tokens were thinking tokens). Covers the whole session across PRs 12-16, not this deliverable alone, and EXCLUDES subagent spend: fifteen dispatches ran during this session whose tokens are not in this transcript. The figure is therefore a floor, not a total. See 'unproven'."
+  },
+  "mutations": [
+    ".gitignore",
+    "HANDOFF.md",
+    "docs/handoff-protocol.md",
+    "docs/maintainers/session-handoff-2026-09-18.md",
+    "docs/maintainers/session-protocol.md",
+    "docs/requirements/decisions.md",
+    "docs/requirements/mission.md",
+    "docs/requirements/owner-directives.md",
+    "proof/16.json",
+    "reviews/16/independent-verifier.json",
+    "scripts/githooks/pre-commit",
+    "scripts/lwb_lanes.py",
+    "tests/test_lwb_lanes.py"
+  ],
+  "unproven": [
+    "Command tails and sha256 values are SANITIZED, not verbatim: absolute paths become <repo> and <home> before hashing.",
+    "'commit' names 23e1c58, the substantive head, not the squash-merge commit GitHub creates at merge time. The directive-7 gates key on 'pr' for that reason.",
+    "The env-leak history scan over origin/main..HEAD is the AUTHOR's result. The independent reviewer could not reproduce it: LWB_PRIVATE_NEEDLES is a CI secret it does not hold, and it was instructed not to guess private-name values. CI's own run against the repository secret is the only independent check of it.",
+    "The token figures are a FLOOR, not a total. They exclude all subagent spend, and they come from a measuring script written by the author of this record that no one has reviewed. A measured-looking number produced by an unreviewed instrument is an estimate wearing a measurement's clothes.",
+    "Directive 7a binds conduct, not code. Nothing in this repository enforces anything about the truth of a written or spoken claim; the independent reviewer confirmed no script does. Two gates to close that gap are being built and are NOT in this PR.",
+    "Three stale statements survive this PR and are known: HANDOFF.md's generated block still names PR #14 as open and c33b560 as main, and docs/maintainers/session-handoff-2026-09-18.md still describes lwb-mission-final as carrying unmerged work. Found by an independent state audit AFTER this PR's review record was written; fixing them here would have invalidated that record, so they are named here and fixed in the next PR rather than left unrecorded.",
+    "reviewer_id and commit_author_id are self-attested strings. Nothing cross-checks them against git authorship or a session registry, so reviews/16/ is an audit trail, not proof that two independent sessions existed.",
+    "This record was written by the author of the work it proves. 'checked_by' names the independent reviewer of the code, not an independent checker of this record's own contents."
+  ]
+}

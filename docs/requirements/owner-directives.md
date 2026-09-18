@@ -11,6 +11,50 @@ binding directives it produces, one line each, following the same shape
 `docs/requirements/approach.md` describes (evidence before drafting, an
 adversarial audit before owner decisions, a freeze only after that).
 
+## Directives stated by the owner directly
+
+Not reconstructed from a gate, not inferred from a citation: stated by the
+owner in session, quoted, and dated. This is the section the placeholder
+above was waiting for, and it starts with one entry rather than none.
+
+### Directive 7a — confirm that what is claimed done is truly done · SACRED · 2026-09-18
+
+> "u must always confirm that what u say is done is truly done. sacred"
+
+An assertion of completion is not completion. Every claim that something
+is done must be backed by a command that was actually run and whose output
+was actually read — not by memory, not by intention, and not by a
+subagent's self-report taken at face value.
+
+This is directive 7 (Proof of Completion) applied to *speech* rather than
+to deliverables. Directive 7 already governs what lands in the repo; this
+governs what is said to the owner about it, which had no rule at all.
+
+Standing consequences, each traceable to a real failure in the session
+that produced this directive:
+
+- **A sha, a count or a size is copied from a command, never typed from
+  memory.** A 40-character commit sha was once written into a review
+  record from memory; it was wrong, and was caught only because it was
+  checked against `git rev-parse` before the commit.
+- **A subagent's report of its own work is a claim, not evidence.** An
+  extraction agent reported 42 nodes and 53 edges; the file it wrote held
+  41 and 61.
+- **"Should pass" is not "passes".** A claim that the lane gate would fail
+  on exactly one line was made without running it. It failed on four.
+- **A document asserting current state is stale the moment it is
+  written.** Branch tips, commit counts and open-PR lists are re-derived,
+  never quoted from prose.
+- **Where a claim cannot be independently checked, say so in the same
+  breath.** The env-leak history scan needs `LWB_PRIVATE_NEEDLES`, which
+  the independent reviewer does not have, so every proof record carrying
+  that result names it as unverified by the reviewer.
+
+Enforcement today is `scripts/lwb_check_proof.py` for deliverables and
+nothing at all for statements. Making the second half mechanical is
+required work — the honest position is that this directive currently binds
+conduct, not code.
+
 ## Directive numbers already load-bearing in this scaffold
 
 A handful of directive numbers are already cited by scripts, tests, and

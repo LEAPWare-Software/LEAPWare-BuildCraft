@@ -31,6 +31,17 @@ def test_classify_shared_prefixes_and_files():
         assert lwb_lanes.classify_path(path) == "shared", path
 
 
+def test_classify_gitignore_is_shared():
+    """`.gitignore` governs the whole repo, so it belongs to no one lane.
+
+    Found by the independent review of PR #16: that PR added `graphify-out/`
+    to `.gitignore` to keep build artifacts carrying the operator's username
+    out of this PUBLIC repo, and the lane gate rejected the commit as being
+    outside the claude lane -- an un-landable fix for a directive-8 concern.
+    """
+    assert lwb_lanes.classify_path(".gitignore") == "shared"
+
+
 def test_classify_tests_subdirectory():
     assert lwb_lanes.classify_path("tests/adapters/fixtures/claude/pretooluse_read.json") == "claude"
     assert lwb_lanes.classify_path("tests/adapters/fixtures/codex/pretooluse_read.json") == "codex"

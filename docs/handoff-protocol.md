@@ -92,8 +92,19 @@ commands win and the narrative is corrected in the same session.
   runtime — those are contributor-only docs.
 - Any stage/gate state this plugin tracks is enforced mechanically
   (allow/warn/deny), never by trust.
-- No repo settings change, no merge, no force-push, no history rewrite
-  without the owner.
+- No repo settings change, no force-push, no history rewrite without the
+  owner.
+- **Merging is ordinary work, since D19** (2026-09-18). This rule used to
+  read "no repo settings change, no merge, no force-push, no history
+  rewrite without the owner", and an independent review of PR #16 found
+  the "no merge" half now contradicts D19, which names merging a PR whose
+  gates and independent review passed as work needing no pre-approval.
+  Two live rules disagreeing is worse than either one: a session cites
+  whichever file it happened to read. So the conflict is resolved here,
+  in favour of D19, and the other three items are untouched and still
+  require the owner. Note for anyone reading `mission.md`'s quality floor,
+  which points at this list to define "unauthorised": a merge that passed
+  its gates is authorised; the remaining three are not.
 - No deleting a remote ref without the owner, with one carve-out: a
   branch whose work is verified landed is deleted as ordinary cleanup
   under "No left behinds" below. Deleting `main`, a tag, or any branch

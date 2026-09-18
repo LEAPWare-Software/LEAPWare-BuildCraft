@@ -50,3 +50,11 @@ id_ed25519*
 Thumbs.db
 desktop.ini
 *.swp
+
+# graphify build artifacts. NEVER commit these: the graph, its JSON and the
+# generated wiki embed absolute filesystem paths, which on this machine
+# carry the operator's username -- and this repo is public (owner directive
+# 8). Adopted as a documentation/comprehension component; the artifacts are
+# local build output, rebuilt with `/graphify . --update`, not source.
+graphify-out/
+graphify-vault/
