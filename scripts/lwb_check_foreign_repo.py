@@ -13,15 +13,23 @@ re-run. This script is the permanent, re-runnable, multi-OS version of that
 manual proof.
 
 Method: create a scratch git repository OUTSIDE this checkout (never
-inside it -- see `_make_scratch_repo`), then invoke
-`plugins/claude/lwb/bin/lwb_hook.py` as a SUBPROCESS -- not an in-process
-import of the rule -- with `CLAUDE_PLUGIN_ROOT` set the way Claude Code's
-own `hooks.json` sets it (see that file: `${CLAUDE_PLUGIN_ROOT}/bin/lwb_hook.py`)
-and `cwd` set to the scratch repo, feeding it the hook JSON shape
-`adapters/claude/hook_io.py` actually parses (a `PreToolUse` / `Bash` event
-carrying `tool_input.command`, plus the `cwd` field
-`adapters/claude/repo_facts.py` reads to find the repo root). That is
-exactly what a consuming repo's own Claude Code session would do.
+inside it -- see `_make_scratch_repo`), then read
+`plugins/claude/lwb/hooks/hooks.json`, find the `PreToolUse` entry whose
+`matcher` covers `Bash`, and run THAT entry's own `command` string as a
+SUBPROCESS through the platform shell -- not an in-process import of the
+rule, and not a hardcoded path to `bin/lwb_hook.py` -- with
+`CLAUDE_PLUGIN_ROOT` substituted into the command the way Claude Code
+itself substitutes it, and `cwd` set to the scratch repo, feeding it the
+hook JSON shape `adapters/claude/hook_io.py` actually parses (a
+`PreToolUse` / `Bash` event carrying `tool_input.command`, plus the `cwd`
+field `adapters/claude/repo_facts.py` reads to find the repo root). That
+proves the command `hooks.json` registers for `Bash` -- the one a
+consuming repo's Claude Code install would actually run -- behaves this
+way; it does not prove Claude Code itself is what dispatches to it, since
+this script still invokes the command directly rather than through a
+running Claude Code session. If no `PreToolUse` entry's matcher covers
+`Bash`, that is itself a failure: it means the rule can never fire in a
+consuming repo no matter what the code does.
 
 The matrix below exercises `lwb_proof_required` (docs/rules/lwb-proof-required.md)
 end to end in that foreign repo, including the slash-branch round trip
@@ -47,14 +55,58 @@ from pathlib import Path
 from typing import List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-HOOK_SCRIPT = REPO_ROOT / "plugins" / "claude" / "lwb" / "bin" / "lwb_hook.py"
 PLUGIN_ROOT = REPO_ROOT / "plugins" / "claude" / "lwb"
+HOOKS_JSON = PLUGIN_ROOT / "hooks" / "hooks.json"
+
+
+def _bash_hook_command(hooks_json: Path) -> str:
+    """The literal `command` string `hooks.json` registers for `Bash`.
+
+    Reads the actual PreToolUse registration a consuming repo's Claude
+    Code install would use to decide whether the plugin's hook runs at
+    all on a `Bash` tool call -- rather than assuming
+    `bin/lwb_hook.py` is reachable, which says nothing about whether
+    `hooks.json` actually wires it up for this tool. Mirrors the pattern
+    `scripts/lwb_check_hook_launch.py` uses for the `Agent` matcher.
+
+    A `matcher` may name more than one tool, "|"-separated (Claude Code's
+    own convention); this treats `Bash` as covered when it is the whole
+    matcher or one of the "|"-separated names in it, not merely a
+    substring (so a hypothetical "NotBash" matcher is correctly NOT
+    treated as covering "Bash").
+    """
+    hooks = json.loads(hooks_json.read_text(encoding="utf-8"))
+    for entry in hooks.get("hooks", {}).get("PreToolUse", []):
+        matcher = entry.get("matcher", "")
+        names = [name.strip() for name in matcher.split("|")]
+        if "Bash" in names:
+            for hook in entry.get("hooks", []):
+                command = hook.get("command")
+                if command:
+                    return command
+    raise SystemExit(
+        f"FAIL: no PreToolUse entry in {hooks_json} has a matcher covering "
+        "'Bash' -- lwb_proof_required can never fire in a consuming repo, "
+        "no matter what the rule code does"
+    )
 
 #: The distinctive substring lwb_proof_required.evaluate() always
 #: includes in its Finding's reason -- distinguishes its warning from
 #: lwb_version's own unconditional per-event warning when both are
 #: joined into one `permissionDecisionReason` string.
 _PROOF_MARKER = "publishing command with no proof record"
+
+#: The substring `core/lwb_core/engine.py` puts in a Finding's reason when
+#: a rule raises instead of returning -- the engine fails open at the rule
+#: level (a broken rule must not deny a dispatch), so a crash inside
+#: lwb_proof_required otherwise looks exactly like the rule staying quiet:
+#: no proof-required marker in the joined reason, decision still "allow".
+#: An independent reviewer of PR #27 proved that gap by turning a branch
+#: lookup into a `raise RuntimeError` and watching this check still print
+#: "7 of 7 ... all matched". A rule that cannot run must never look like a
+#: rule that ran and had nothing to say -- so ANY case, warn-expecting or
+#: silence-expecting, fails the moment this marker appears.
+_RULE_CRASH_MARKER = "rule 'lwb_proof_required' raised"
 
 
 def _onerror_clear_readonly(func, path, exc_info):
@@ -94,7 +146,20 @@ def _make_scratch_repo() -> Path:
     `REPO_ROOT` -- the point of this whole check is a repository BuildCraft
     knows nothing about.
     """
-    scratch = Path(tempfile.mkdtemp(prefix="lwb-foreign-repo-"))
+    scratch = Path(tempfile.mkdtemp(prefix="lwb-foreign-repo-")).resolve()
+    if scratch == REPO_ROOT or REPO_ROOT in scratch.parents:
+        # `TMP`/`TEMP`/`TMPDIR` pointed inside this checkout makes
+        # `tempfile.mkdtemp()` hand back a path under REPO_ROOT even
+        # though this function's whole job is a repo OUTSIDE it -- an
+        # independent reviewer of PR #27 set those vars to a folder
+        # inside the clone and watched this check still print "OUTSIDE
+        # this checkout". Fail loudly instead of printing a claim that
+        # is not true of the path actually used.
+        raise SystemExit(
+            f"FAIL: scratch repo {scratch} is INSIDE this checkout ({REPO_ROOT}) -- "
+            "check TMP/TEMP/TMPDIR; this check requires a scratch repo outside "
+            "the checkout to mean what it claims"
+        )
     _run_git(["init", "-q"], cwd=scratch)
     _run_git(["config", "user.email", "lwb-foreign-repo-check@example.invalid"], cwd=scratch)
     _run_git(["config", "user.name", "lwb-foreign-repo-check"], cwd=scratch)
@@ -161,8 +226,13 @@ def _run_hook(scratch: Path, command: str, ledger_path: Path) -> dict:
     env["LWB_LEDGER_PATH"] = str(ledger_path)
     env.pop("LWB_POLICY_PATH", None)  # exercise the bundled default policy
 
+    command = _bash_hook_command(HOOKS_JSON).replace(
+        "${CLAUDE_PLUGIN_ROOT}", str(PLUGIN_ROOT)
+    )
+
     result = subprocess.run(
-        [sys.executable, str(HOOK_SCRIPT)],
+        command,
+        shell=True,
         cwd=scratch,
         input=json.dumps(event),
         capture_output=True,
@@ -288,6 +358,17 @@ def main() -> int:
             # in the matrix means silent with respect to `lwb_proof_required`
             # specifically, i.e. its own marker text is absent from the
             # joined reason string, not that the reason is falsy.
+            if bool(reason) and _RULE_CRASH_MARKER in reason:
+                # A crash is a failure in EVERY case, warn-expecting and
+                # silence-expecting alike -- a rule that raised did not
+                # evaluate the event, so neither "it warned" nor "it
+                # stayed silent" is a true statement about it. See
+                # _RULE_CRASH_MARKER above.
+                errors.append(
+                    f"{case.name}: lwb_proof_required raised instead of evaluating, got: {reason!r}"
+                )
+                continue
+
             has_proof_warning = bool(reason) and _PROOF_MARKER in reason
 
             if case.expect_warn:
@@ -329,9 +410,9 @@ def main() -> int:
         f"{silents} expected silence, all matched"
     )
     print(
-        "    the shipped plugins/claude/lwb/bin/lwb_hook.py was launched as a "
+        "    the command hooks.json registers for Bash was launched as a "
         "subprocess for every case, with CLAUDE_PLUGIN_ROOT set and cwd in the "
-        "scratch repo -- not imported in-process"
+        "scratch repo -- not imported in-process, and not a hardcoded path"
     )
     print("lwb-foreign-repo check passed")
     return 0
