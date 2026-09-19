@@ -164,15 +164,94 @@ independent reviewer had read exactly one, and the author had written it
 up as "Linux" before being corrected. This supersedes it with all six
 read directly.
 
-**What this still does NOT license.** Four commands are re-executable, not
-107. The 103 that predate the verifiability fields will never be
-re-executed and are deliberately not back-filled. And the three defects
-the independent review found — UNCOMPARABLE commands counting toward
-neither failures nor the total, a recursion guard escaped by an uppercase
-filename or a wrapper, and a missing `argv` crashing the run — must be
-fixed BEFORE the gate blocks, because each becomes load-bearing the
-moment a green result gates a merge. Reproducibility was one
-precondition of three.
+**What this still does NOT license.** Six commands are re-executable now
+(4 measured at PR #21's merge, +2 from `proof/22.json`), not the 112 total
+`commands[]` entries across `proof/*.json`. The rest predate the
+verifiability fields and will never be re-executed or back-filled.
+
+**CLOSED 2026-09-19 — the three defects the independent review found,
+fixed:**
+
+1. **UNCOMPARABLE now has its own count and its own exit code.**
+   Previously a command whose `sanitiser_version` differed from the
+   running `lwb_sanitise.SANITISER_VERSION` counted toward neither
+   `failures` nor `total_reexecuted`, so one real pass next to a drifted
+   command still printed `ALL RE-EXECUTED COMMANDS MATCHED` at exit 0.
+   `reexecute_verifiable_commands` now tracks `total_uncomparable`
+   separately, prints it in the `TOTAL` line (`N of M commands
+   re-executed, U uncomparable, ...`), and `reexecute_exit_code` returns a
+   fourth constant, `REEXECUTE_EXIT_UNCOMPARABLE` (3), whenever
+   `total_uncomparable > 0` and no MISMATCH occurred. Precedence is
+   explicit in both the module docstring and the constants' own comment
+   block in `scripts/lwb_check_proof.py`: MISMATCH (1) always wins over
+   UNCOMPARABLE (3) — a digest known to be wrong is a worse finding than
+   one that could not be checked — and UNCOMPARABLE wins over both
+   ALL_MATCHED and NOTHING_REEXECUTED, so a sanitiser-version bump can
+   never silently look like a pass.
+2. **The recursion guard no longer misses an uppercase filename, a
+   module-form invocation, or a shell/subprocess wrapper.**
+   `_command_resolves_to_self` compared only an exact, case-sensitive
+   basename before; the independent reviewer CONFIRMED
+   `['python', 'scripts/LWB_CHECK_PROOF.PY']` was actually re-executed
+   rather than skipped, and listed `-m lwb_check_proof`, a `bash -c`
+   wrapper, and a `subprocess.run([...])` wrapper as further live
+   bypasses. The fix is one case-insensitive substring test (the needle
+   `"lwb_check_proof"`, without `.py`, so both the script and module
+   spellings match) against every string `argv` token — this catches all
+   four forms, plus `sh -c`/`cmd /c`/`powershell -c` wrappers, without
+   parsing argv structure. `tests/test_lwb_check_proof_reexecute.py`
+   carries one test per bypass form named above; the uppercase-filename
+   test is the one the reviewer confirmed live, and it failed against the
+   pre-fix code (10 of 33 tests in that file were red before the fix,
+   confirming the reproduction) before the fix made it pass. On top of
+   the argv guard (which must and does work standalone), every
+   re-executed child is now also launched with
+   `LWB_CHECK_PROOF_REEXECUTING=1` in its environment, and `main` refuses
+   to run `--reexecute` at all if that variable is already set on entry —
+   a second, independent line of defence, not a replacement for the argv
+   check. A hanging or deliberately blocking command can no longer stall
+   the job either: every re-executed command now carries a
+   `REEXECUTE_TIMEOUT_SECONDS = 300` timeout, and a timeout is reported as
+   a FAILURE naming the command and the limit, never a pass or a skip.
+3. **A malformed `commands[]` entry no longer crashes the whole run.** A
+   verifiable-true entry with no `argv`, a non-list `argv`, an empty
+   `argv`, or an `argv` containing a non-string element used to reach
+   `run(argv, ...)` directly and crash with an uncaught `TypeError` (never
+   misreadable as a pass, but it took every OTHER record's results down
+   with it). `reexecute_verifiable_commands` now validates `argv`'s shape
+   before ever calling `run`, reports a FAILURE against just that entry,
+   and the run continues to every remaining record, still exiting
+   non-zero overall.
+
+See `scripts/lwb_check_proof.py` (`_command_resolves_to_self`,
+`reexecute_verifiable_commands`, `reexecute_exit_code`, and the
+`REEXECUTE_EXIT_*`/`REEXECUTE_TIMEOUT_SECONDS`/
+`SELF_REEXECUTE_GUARD_ENV` constants) and
+`tests/test_lwb_check_proof_reexecute.py` for the mechanics and the
+regression tests for each defect.
+
+**What still stands between this gate and being made blocking.** Fixing
+these three defects closes the "would become load-bearing the moment a
+green result gates a merge" concern the independent review raised — it
+does not, by itself, license flipping `continue-on-error: true` off in
+`.github/workflows/ci.yml`. What is still unaddressed, all from the
+plan's earlier passes and unchanged by this fix:
+
+- The `verifiable_reason` enum constrains the WORDING an author gives for
+  opting a command out of verification; it cannot and does not constrain
+  whether that reason is actually TRUE of the command it labels. Nothing
+  stops an author from marking every command `verifiable: false` with a
+  plausible reason and getting a green, unblocking gate for a record that
+  verified nothing — see open blocker 2 below for the full statement of
+  this hole and why it is a review question, not a script one.
+- Cross-platform reproduction is measured for PR #21's 4-of-107 baseline
+  (all six OS/Python combinations matched — see the table above) but not
+  re-measured against this fix's changed re-execution path (new `env=`,
+  new `timeout=`) on a real CI runner; that is the next thing to confirm,
+  not assumed from the earlier measurement.
+- A blocking PR must say explicitly what (if anything) closes the
+  `verifiable_reason` honesty gap, rather than silently relying on the
+  enum to have done more than constrain wording.
 
 ## Open blockers
 
