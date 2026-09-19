@@ -869,6 +869,100 @@ term, so it is not a subject.
 dogfooding and is already required work. It does not answer the
 foreign-repo question, so it is a prerequisite rather than the bar.
 
+## D27 — The three decisions that make cloud-only migration possible · 2026-09-19
+
+Owner ordered migration of all BuildCraft work to the cloud on
+2026-09-19, approved directly in an inline survey. Three problems stood in
+the way. These are the CTO rulings on each, recorded here because they
+were issued to a cloud agent mid-run and would otherwise exist only in a
+transcript.
+
+### 1. Merging from the cloud — GitHub Actions does the queueing
+
+**The problem, and nobody had noticed it.** BuildCraft merges via the
+GraphQL mutation `enqueuePullRequest`: auto-merge is disabled on this
+repo and the ruleset requires the merge queue. ShellUX MEASURED that
+**GraphQL is blocked by the cloud proxy**. So every merge performed today
+would have failed from a cloud routine. The repository's entire merge path
+was unusable in the world we are migrating to.
+
+**The ruling:** a GitHub Actions workflow performs the enqueue. It runs
+INSIDE GitHub, so no proxy sits between it and the API.
+
+The reason this is right rather than a workaround: **the thing doing the
+enqueue should be the thing that can already see the checks.** An outside
+caller has to ask; a workflow already knows. It watches for a PR that is
+simultaneously all-checks-green and carrying a valid independent review
+record, and enqueues that.
+
+The proxy's CCR route may be documented as a FALLBACK, clearly marked
+measured or not measured. It is not the primary path.
+
+### 2. Independent review without a second human — the hard one
+
+**The problem.** The gate requires a review whose `reviewer_id` differs
+from the commit author and whose `reviewer_was_dispatched_by_author` is
+false. Until now that meant another session, run by another person, on
+another machine. In a cloud world there is nobody at a keyboard, and a
+reviewer spawned by the builder is self-approval with extra steps.
+
+This is not hypothetical: on 2026-09-19 PR #27 sat blocked for an hour
+because the only reachable reviewer's session had been paused by its own
+owner. Correctness was irrelevant.
+
+**The principle, already settled here and merely applied:** independence
+is a property of the REVIEWER'S IDENTITY, not of being a different human.
+PR #6 established that when it replaced "one record per CLI vendor" with
+distinct reviewer identities. D20 then settled that a single SESSION
+cannot produce one.
+
+**The ruling — a reviewer is independent when all three hold:**
+
+1. it was NOT dispatched by the author;
+2. it cannot see the author's context or reasoning;
+3. it reads only what is on GitHub.
+
+**A cron-scheduled routine satisfies all three. A subagent of the builder
+satisfies none.** The clock dispatches it, so
+`reviewer_was_dispatched_by_author` is honestly false.
+
+**TWO sources, because one is a single point of failure and today proved
+it:**
+
+- **Primary:** a reviewer routine on its own cron schedule, never spawned
+  by any conductor.
+- **Secondary, cross-repo:** ShellUX's watcher already reviews BuildCraft
+  PRs and publishes to its own `reviews/buildcraft` branch. Made
+  reciprocal. Different repository, schedule and identity.
+
+**THE STRUCTURAL RULE, and it is the part that matters:** a conductor
+routine must be **structurally incapable** of dispatching its own
+reviewer. Not a line of prose saying "do not review your own work" — this
+repository has documented eight instances of a rule that lived only in
+prose being violated, including by the author who wrote it. The reviewer
+must be a SEPARATE cron entry with no trigger path from any conductor.
+
+**WHAT THIS DOES NOT BUY, stated so the runbook cannot imply otherwise:**
+every reviewer is still the same model on the same account. This is
+separation of CONTEXT and DISPATCH. It is not separation of interest. It
+is a real improvement on self-review and it is not the same thing as an
+adversary.
+
+### 3. "Lane" means two different things — rename the new one
+
+In BuildCraft a **lane is an agent's FILE-OWNERSHIP boundary**
+(`plugins/claude/` vs `plugins/codex/`), enforced by `scripts/lwb_lanes.py`
+and a PreToolUse hook. That meaning is load-bearing in code and in CI and
+does not change.
+
+In ShellUX's runbook a "lane" is a parallel work-stream.
+
+**The ruling:** parallel work-streams in BuildCraft are **TRACKS**. Never
+"lane". The runbook carries an explicit note near the top that the two
+repositories use the word differently and that anyone porting text between
+them must translate — because a future routine will read one document and
+act in the other repository, and the collision would be silent.
+
 ### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
 
 Full detail on the first two in-flight steps, moved here so HANDOFF.md
