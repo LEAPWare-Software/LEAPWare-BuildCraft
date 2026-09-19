@@ -41,15 +41,13 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 15:22 UTC
-main SHA: de27f7230da32ccdeb25374781f81d60ad5e9940
-CLI: unknown
-Session: unknown
+Generated: 2026-09-19 16:25 UTC
+main SHA: bfe850796969980545811e1ffa551b9143965faf
+CLI: claude
+Session: conductor-track-a-01PDRLaG5
 
 Open PRs:
-#32 #27's review record claims a dispatch that did not happen (lwb-correct-27-dispatch)
-#30 The plan and the decisions the cloud routines read — they are not on main (lwb-capture-d21-d22)
-#29 Cloud-only operation: the protocol, the roles, and the merge path that was broken for a routine (cloud/runbook)
+(unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
 21/21 proven
