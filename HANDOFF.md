@@ -23,8 +23,9 @@ that no WORTHY AND VETTED tool already does it before building anything.
    `docs/handoff-protocol.md`.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
    every 2h; a separate reviewer routine writes the gating record
-   hourly. No routine can create a routine, so a conductor CANNOT
-   dispatch its reviewer -- independence is structural.
+   hourly. D27's rule: the reviewer must be a SEPARATE cron entry with
+   no trigger path from any conductor -- a maintained configuration,
+   not a platform impossibility no session has actually tested.
 3. **IN FLIGHT, each blocked on a DISAGREE review at its head:**
    #35 (this PR -- re-cuts #30, dead: its commits fail commit-identity
    permanently and force-push can't fix them; do not touch #30), #29
