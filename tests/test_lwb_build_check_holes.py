@@ -141,3 +141,65 @@ def test_git_unavailable_reports_nothing_rather_than_inventing_an_answer(tmp_pat
     monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
     assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == []
+
+
+def test_a_case_variant_stowaway_is_reported_on_every_os(tmp_path, monkeypatch, capsys):
+    """`Path.exists()` asks the FILESYSTEM, and that question is
+    case-insensitive on Windows and macOS.
+
+    A tracked `rules/LWB_VERSION.PY` therefore matched the built
+    `rules/lwb_version.py` and was reported as expected -- so a stowaway
+    differing only in case shipped unnoticed on exactly the platform most
+    contributors use, while Linux CI would have caught it. Found by the
+    independent reviewer of PR #25 and reproduced: the case variant returned
+    `[]` where it should have been reported.
+
+    Git is case-sensitive, so comparing against the SET of built relative
+    paths is the honest test and behaves identically on every OS. This test
+    passes on Linux either way; its value is on a case-insensitive disk.
+    """
+    vendor = tmp_path / "vendor"
+    staging = tmp_path / "staging"
+    (vendor / "rules").mkdir(parents=True)
+    (staging / "rules").mkdir(parents=True)
+    (staging / "rules" / "lwb_version.py").write_text("x\n", encoding="utf-8")
+    (vendor / "rules" / "lwb_version.py").write_text("x\n", encoding="utf-8")
+
+    class _Result:
+        returncode = 0
+        stdout = "vendor/rules/LWB_VERSION.PY"
+
+    monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+
+    assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == [
+        "vendor/rules/LWB_VERSION.PY"
+    ]
+
+
+def test_git_failure_says_nothing_was_checked_rather_than_passing_quietly(
+    tmp_path, monkeypatch, capsys
+):
+    """Returning an empty list on a git error is indistinguishable from
+    "checked, found nothing" -- this repository's signature defect, and the
+    reason this file exists at all. The reviewer flagged the silence.
+
+    The empty list is still correct (inventing a failure would be worse),
+    but the run must SAY that nothing was checked.
+    """
+    vendor = tmp_path / "vendor"
+    staging = tmp_path / "staging"
+    vendor.mkdir()
+    staging.mkdir()
+
+    class _Result:
+        returncode = 128
+        stdout = ""
+
+    monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+
+    assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == []
+    printed = capsys.readouterr().out
+    assert "NOTHING WAS CHECKED" in printed, printed
+    assert "not a pass" in printed, printed

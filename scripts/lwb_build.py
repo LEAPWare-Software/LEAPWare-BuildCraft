@@ -167,9 +167,32 @@ def tracked_files_the_build_does_not_produce(vendor_dir: Path, staging: Path) ->
         errors="replace",
     )
     if result.returncode != 0:
-        # Not a git repo, or git unavailable: report nothing rather than
-        # inventing a pass OR a fail. `main` prints this state explicitly.
+        # Not a git repo, or git unavailable. Report nothing rather than
+        # inventing a pass OR a fail -- but SAY SO. Returning an empty list
+        # silently is indistinguishable from "checked, found nothing", which
+        # is this repository's signature defect and the reason this file
+        # exists. The reviewer of PR #25 flagged the silence specifically.
+        print(
+            f"NOTICE: stowaway check could not run for {vendor_dir} "
+            f"(git ls-files exited {result.returncode}); NOTHING WAS CHECKED "
+            f"-- this is not a pass"
+        )
         return []
+
+    # COMPARE AGAINST A SET OF PATHS, NOT `Path.exists()`. `exists()` asks the
+    # FILESYSTEM, and on Windows and macOS that question is case-insensitive:
+    # a tracked `rules/LWB_VERSION.PY` matched the built `rules/lwb_version.py`
+    # and was reported as expected, so a stowaway differing only in case
+    # shipped unnoticed on exactly the platform most contributors use. Found by
+    # the independent reviewer of PR #25 and reproduced: the case variant
+    # returned [] where it should have been reported. Git itself is
+    # case-sensitive, so a set comparison on the relative path is the honest
+    # test and behaves identically on every OS.
+    produced = {
+        path.relative_to(staging).as_posix()
+        for path in staging.rglob("*")
+        if path.is_file()
+    }
 
     unexpected: list[str] = []
     for raw in result.stdout.split(chr(0)):
@@ -181,7 +204,7 @@ def tracked_files_the_build_does_not_produce(vendor_dir: Path, staging: Path) ->
             inside = tracked.relative_to(vendor_dir)
         except ValueError:
             continue
-        if not (staging / inside).exists():
+        if inside.as_posix() not in produced:
             unexpected.append(rel)
     return sorted(unexpected)
 
