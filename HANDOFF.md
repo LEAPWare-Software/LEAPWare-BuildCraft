@@ -8,34 +8,35 @@ next step. Session start, re-derive commands, hard rules and traps live in
 
 In order. Do not start step *n+1* before step *n* is done and proven.
 
-Detail for every item: `docs/maintainers/proof-of-completion-plan.md`.
-Read it before touching a gate.
+**THE PLAN IS `docs/requirements/build-plan.md`** -- seven phases,
+owner-approved 2026-09-19. Read it before starting anything. Session
+detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
+`docs/maintainers/proof-of-completion-plan.md`.
 
-1. **DONE.** Scaffold, ruleset, mission. Repo is **PUBLIC** (Apache-2.0):
-   all commits world-readable. Decisions:
+**THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
+that no WORTHY AND VETTED tool already does it before building anything.
+
+1. **STANDING BY.** D21-D26 and the build plan are committed LOCALLY and
+   NOT PUSHED on `lwb-capture-d21-d22`. Pushing opens a PR. Owner's call.
+2. **DONE.** Scaffold, ruleset, mission, proof-of-completion in CI
+   (#17-#26). `main` green. Decisions:
    `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
-   Branch tips and PR state are not written here; re-derive per
-   `docs/handoff-protocol.md`.
-2. **DONE. Proof of completion in CI: #17-#22.** `main` green.
-3. **IN FLIGHT:** #23 re-execute hardening, #24 open-PR post-merge. Both
-   carry an independent AGREE.
-4. **WHAT ACTUALLY BLOCKS 1.0.0 -- not a gate fix.** Version **0.1.0**,
-   zero tags, no release ever run; `core/lwb_core/rules/` holds ONE
-   rule, a self-declared no-op; every gate is a `scripts/` file wired to
-   THIS repo's CI. **A consuming repo installs `lwb` and gets a no-op.**
-   Plan doc, "1.0.0 readiness".
-5. **SETTLE FIRST -- touches the owner's permission prompts.** The lane
-   hook returns explicit `"permissionDecision": "allow"` for every edit
-   it does not deny, which may suppress the normal prompt. PLAUSIBLE.
-6. **Lane guard is a NUDGE by design**, so the ungated `Bash` path is
-   not a broken premise. Two real defects: a worktree inside the
-   checkout is denied wrongly, one outside is never checked.
-7. **The shipped hook has never been seen to fire** (`"matcher":
-   "Agent"`). Needs a NEW session, marker registered BEFORE start.
-   The *lane* hook does fire and deny, so the mechanism works.
-8. **Then:** re-execution blocking; the fork gap; install the plugin
-   here.
-9. Every deliverable: proof record, pushed, CI green, announced
+3. **IN FLIGHT: PR #27** at `c75a37b`. Two DISAGREE verdicts, both
+   addressed. A cloud routine polls its head hourly and publishes the
+   re-review to `LEAPWare-ShellUX`, branch `reviews/buildcraft`, path
+   `reviews/buildcraft/pr27-<full-head-sha>.md`. **That branch is the
+   source of truth** -- it survives any session ending. File it into
+   `reviews/27/` verbatim, then merge.
+4. **WHAT BLOCKS 1.0.0 -- not a gate fix.** 0 of 13 stages enforced,
+   2 of ~10 rules shipped, **0 armed to deny**, 2 of 8 skills working,
+   no adoption register. **A consuming repo installs `lwb` and gets a
+   no-op.** Plan Phase 1 is `lwbpoce`, internal AND external.
+5. **THE DEFECT PATTERN, three times in three layers:** "I could not
+   check" must never share a representation with "I checked and found
+   nothing". Still live in Codex's lane. Session handoff has the detail.
+6. **One reviewer identity is a single point of failure.** Item 1.7.
+7. **The hook has never been seen to fire from `hooks.json`.** Item 1.8.
+8. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->

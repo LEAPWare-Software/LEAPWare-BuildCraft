@@ -799,6 +799,76 @@ This lands in Phase 1 as item 1.5. It is the only item in that phase that
 changes the owner's process rather than our code, which is why it was the
 owner's call and not the CTO's.
 
+## D25 — Efficiency claims are order-of-magnitude only, limits stated every time · 2026-09-19
+
+Owner-decided 2026-09-19.
+
+The mission makes measured efficiency half the goal. The instrument we
+have is not fit to adjudicate close calls, and pretending otherwise would
+be the same species of false confidence this repository exists to remove.
+
+**What is wrong with the instrument, measured not assumed:**
+
+1. **Not attributable.** The `tokens` block in every proof record is
+   CUMULATIVE across PRs 12-27. One figure for sixteen deliverables. The
+   record's own `source` field says so.
+2. **Excludes every subagent.** This session dispatched roughly 149
+   subagent runs; none appears. The records call themselves *"a floor, not
+   a total"*, which is honest and means the number is a lower bound of
+   unknown tightness.
+3. **Three of eight fields are structurally unknowable.** `retries`,
+   `setup_overhead`, `tool_overhead` — `proof/schema.json` documents that
+   no source exists for them on any current runtime. Not uncollected:
+   uncollectable.
+4. **Wall time is session duration, not work duration.** It includes every
+   minute spent waiting on a reviewer.
+5. **Two instruments disagree in units.** The session spend line reports
+   weighted tokens; the proof records report raw input. Neither is
+   complete and they are not comparable.
+
+**THE DECISION: use measured cost to reject configurations that are
+dramatically more expensive, never to choose between close ones. Every
+published number states what it excludes.**
+
+This is not a lowering of the bar — the mission already demands *"the
+tested frontier and its uncertainty rather than an absolute optimum"*.
+D25 makes that operative rather than aspirational.
+
+**What would lift the ceiling, and is not in scope here:** per-deliverable
+attribution needs a start boundary, which D24's GitHub issue anchor
+supplies as a side effect; subagent capture is lossy by the runtime's
+design, already recorded in the decision log; and the three unknowable
+fields need the runtime to expose them, which we cannot fix from here.
+
+## D26 — First subjects for driving a real repo · 2026-09-19
+
+Owner-decided 2026-09-19, sequencing D22's real-repo bar.
+
+**SessionKeeper or Pulse first; ShellUX for the real bar, after its v1
+release ships.**
+
+Criteria applied: live work flowing, not mid-release, tolerant of a day's
+friction, someone actively in it, and — the one that decided it —
+**ideally not Python**.
+
+**The assumption most worth breaking:** every gate we have written is
+Python, run by Python, checking Python conventions. If BuildCraft only
+works in Python repositories we would never discover that by testing on
+Python repositories, and five of the six candidates are Python. ShellUX is
+TypeScript, which is why it carries the real bar.
+
+**Why not ShellUX first:** it is mid-v1-release. Governing a release with
+software that has never governed anything is the worst available first
+test — highest stakes, least proven tool. First contact belongs somewhere
+a day of friction costs nothing.
+
+**Excluded: Watchtower.** The owner has ruled it will not be there long
+term, so it is not a subject.
+
+**Not the bar, but on the path:** installing lwb in BuildCraft itself is
+dogfooding and is already required work. It does not answer the
+foreign-repo question, so it is a prerequisite rather than the bar.
+
 ### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
 
 Full detail on the first two in-flight steps, moved here so HANDOFF.md
