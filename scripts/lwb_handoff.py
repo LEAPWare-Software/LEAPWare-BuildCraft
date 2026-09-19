@@ -134,42 +134,73 @@ def _utc_now_iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
-def _proof_state_lines() -> list[str]:
-    """One line per proof/*.json deliverable: id and PROVEN/INVALID/reason.
+def _proof_state_lines(proof_dir: Path | None = None) -> list[str]:
+    """A block whose size is bounded by the number of UNPROVEN records, not
+    by the total record count.
+
+    Owner ruling, 2026-09-18: the old shape was one line per record, so
+    HANDOFF.md grew forever as proof/ grew and blew the 3000-byte cap at
+    ten records. The reader needs two things: how many records exist and
+    how many are proven (a single derived summary line, never hand-typed),
+    and the NAME of any record that is not fully proven -- a record that
+    fails validation, or is missing entirely, is the thing worth a line;
+    a record that simply passed is not.
+
+    Returns:
+      - line 1: "{proven}/{total} proven" (or "0/0 proven" when proof/
+        does not exist or is empty -- that is not an error, see
+        proof/README.md);
+      - line 2 onward: one "- {deliverable}: {status}" line per record
+        that is NOT proven, if any;
+      - if every existing record is proven (the normal case), line 2 is
+        an explicit "(all proven; none outstanding)" rather than nothing
+        -- an empty section reads identically to a broken generator, and
+        this repo has shipped five gates that failed silently that way.
 
     Reuses scripts/lwb_check_proof.py's own record validator so this never
-    drifts from what the `lwb-proof` CI job itself enforces. An empty
-    proof/ directory (the common case today -- see proof/README.md) is not
-    an error; it just means the list is "(none yet)".
+    drifts from what the `lwb-proof` CI job itself enforces. Parameterised
+    on `proof_dir` (defaulting to this module's PROOF_DIR) so
+    lwb_check_state_claims.py can call this SAME function against a repo
+    under test instead of maintaining a second copy that could drift out
+    of byte-for-byte agreement.
     """
-    import lwb_check_proof  # local import: only --write needs this, --check must not
+    import lwb_check_proof  # local import: only --write/re-derivation needs this
 
-    if not PROOF_DIR.is_dir():
-        return ["(none yet)"]
+    if proof_dir is None:
+        proof_dir = PROOF_DIR
+
+    if not proof_dir.is_dir():
+        return ["0/0 proven", "(none yet)"]
 
     # schema.json is the shape and exempt.json is the named-gap list (see
     # proof/README.md); neither is a proof record, and reporting exempt.json
     # as INVALID for lacking a 'deliverable' field is noise, not a finding.
     records = sorted(
-        p for p in PROOF_DIR.glob("*.json") if p.name not in ("schema.json", "exempt.json")
+        p for p in proof_dir.glob("*.json") if p.name not in ("schema.json", "exempt.json")
     )
-    if not records:
-        return ["(none yet)"]
+    total = len(records)
+    if total == 0:
+        return ["0/0 proven", "(none yet)"]
 
-    lines: list[str] = []
+    unproven: list[str] = []
+    proven = 0
     for path in records:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            lines.append(f"- {path.name}: INVALID (bad JSON: {exc})")
+            unproven.append(f"- {path.stem}: INVALID (bad JSON: {exc})")
             continue
         errors = lwb_check_proof._validate_record(path, data)
         deliverable = data.get("deliverable", path.stem) if isinstance(data, dict) else path.stem
         if errors:
-            lines.append(f"- {deliverable}: INVALID ({errors[0]})")
+            unproven.append(f"- {deliverable}: INVALID ({errors[0]})")
         else:
-            lines.append(f"- {deliverable}: PROVEN (commit {data.get('commit')})")
-    return lines
+            proven += 1
+
+    summary = f"{proven}/{total} proven"
+    if unproven:
+        return [summary, *unproven]
+    return [summary, "(all proven; none outstanding)"]
 
 
 def _generate_block(cli: str = "unknown", session: str = "unknown") -> str:

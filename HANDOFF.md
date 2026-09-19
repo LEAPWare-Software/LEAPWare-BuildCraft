@@ -30,23 +30,17 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 00:26 UTC
-main SHA: 7d9a0b79ac0e53415c84307018619a54587061aa
+Generated: 2026-09-19 01:59 UTC
+main SHA: a65e2ef64fed2dc4ce328b7464b2bc0c9cdb3cad
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-(unavailable: no `gh` auth in this environment, or no open PRs)
+#18 Fail CI when a tracked doc hand-asserts volatile git or PR state (lwb-state-claim-gate)
 
 Deliverable proof state (from proof/):
-- traps-no-left-behinds: PROVEN (commit 9463214739b90a6de1ae0b384fdc8ac2b1e6e40c)
-- mission-rename: PROVEN (commit 3ae781f12c85da8e133d0138188a65d7e655ea03)
-- mission-settled-and-review-binding: PROVEN (commit d3eb1d6a55c00d86e907d6da8eea7e89a5f6e708)
-- mission-stages-architecture-and-trailer-gate: PROVEN (commit 229bd30945241adfa666807cbfe7447f8ef52d78)
-- authority-model-trial-protocol-and-claim-directive: PROVEN (commit 23e1c58ccc5af7c1c3bf16cbe04939f498da0998)
-- lwb-gates-enforceable: PROVEN (commit bbb07b950d0f0c37a9edc896d2073aa359cf475f)
-- lwb-vision: PROVEN (commit 9df414f6f0ab2a86e3b2c0e1bdd2d42fbf949a59)
-- handoff-vision-landed: PROVEN (commit 77896a94967d23d52fb0744d78a2cfdd6e593ee5)
+10/10 proven
+(all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
 

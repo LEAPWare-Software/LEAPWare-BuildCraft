@@ -218,16 +218,33 @@ def test_cmd_write_defaults_cli_and_session_to_unknown(tmp_path, monkeypatch):
     assert "Session: unknown" in after
 
 
+def _write_proof_record(proof_dir: Path, name: str, proven: bool = True) -> None:
+    """A minimal valid (or, if proven=False, invalid) proof/*.json record.
+    An invalid record here is missing 'commands' -- REQUIRED_TOP in
+    lwb_check_proof.py -- which is enough to fail `_validate_record`
+    without needing to fake a whole broken schema."""
+    if proven:
+        body = (
+            f'{{"deliverable": "{name}", "author": "a", "checked_by": "b", '
+            '"commit": "abc1234", "commands": [], "mutations": [], "unproven": []}'
+        )
+    else:
+        body = f'{{"deliverable": "{name}", "author": "a", "checked_by": "b"}}'
+    (proof_dir / f"{name}.json").write_text(body, encoding="utf-8")
+
+
 def test_cmd_write_lists_deliverable_proof_state(tmp_path, monkeypatch):
+    """Owner ruling 2026-09-18: a proven record is COUNTED, not named --
+    naming every proven record is exactly the shape that blew the
+    3000-byte cap. Only the summary line and the explicit
+    'none outstanding' statement should appear; the record's own name and
+    commit are no longer printed when it is proven (they still live in
+    proof/ itself, per the module docstring)."""
     path = tmp_path / "HANDOFF.md"
     path.write_text(_valid_text(), encoding="utf-8")
     proof_dir = tmp_path / "proof"
     proof_dir.mkdir()
-    (proof_dir / "example.json").write_text(
-        '{"deliverable": "example", "author": "a", "checked_by": "b", '
-        '"commit": "abc1234", "commands": [], "mutations": [], "unproven": []}',
-        encoding="utf-8",
-    )
+    _write_proof_record(proof_dir, "example", proven=True)
     monkeypatch.setattr(lwb_handoff, "HANDOFF_PATH", path)
     monkeypatch.setattr(lwb_handoff, "PROOF_DIR", proof_dir)
     monkeypatch.setattr(lwb_handoff, "_run_git", lambda args: "cafef00d")
@@ -236,7 +253,9 @@ def test_cmd_write_lists_deliverable_proof_state(tmp_path, monkeypatch):
     assert lwb_handoff.cmd_write() == 0
 
     after = path.read_text(encoding="utf-8")
-    assert "example: PROVEN (commit abc1234)" in after
+    assert "1/1 proven" in after
+    assert "(all proven; none outstanding)" in after
+    assert "example" not in after  # proven records are counted, not named
 
 
 def test_cmd_write_reports_no_proof_records_yet(tmp_path, monkeypatch):
@@ -252,7 +271,68 @@ def test_cmd_write_reports_no_proof_records_yet(tmp_path, monkeypatch):
     assert lwb_handoff.cmd_write() == 0
 
     after = path.read_text(encoding="utf-8")
+    assert "0/0 proven" in after
     assert "(none yet)" in after
+
+
+def test_proof_state_section_never_silently_empty(tmp_path):
+    """An empty section reads identically to a broken generator (see the
+    module docstring on `_proof_state_lines`). Whether proof/ is absent,
+    empty, all-proven or partly-unproven, the returned block must always
+    carry at least the summary line plus one more explicit line."""
+    no_dir = lwb_handoff._proof_state_lines(tmp_path / "does-not-exist")
+    assert len(no_dir) >= 2 and no_dir[0]
+
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    lines_empty = lwb_handoff._proof_state_lines(empty_dir)
+    assert len(lines_empty) >= 2 and all(line for line in lines_empty)
+
+    all_proven_dir = tmp_path / "all-proven"
+    all_proven_dir.mkdir()
+    _write_proof_record(all_proven_dir, "a", proven=True)
+    lines_proven = lwb_handoff._proof_state_lines(all_proven_dir)
+    assert len(lines_proven) >= 2 and all(line for line in lines_proven)
+
+
+def test_unproven_record_appears_by_name(tmp_path):
+    """The whole point of the redesign: a PROVEN record is just counted,
+    but a record that is NOT fully proven must still appear by name so a
+    reader can find it without reading every file in proof/."""
+    proof_dir = tmp_path / "proof"
+    proof_dir.mkdir()
+    _write_proof_record(proof_dir, "good-one", proven=True)
+    _write_proof_record(proof_dir, "broken-one", proven=False)
+
+    lines = lwb_handoff._proof_state_lines(proof_dir)
+
+    assert lines[0] == "1/2 proven"
+    assert any("broken-one" in line for line in lines)
+    assert not any("good-one" in line for line in lines)
+
+
+def test_proof_state_block_size_bounded_by_unproven_count(tmp_path):
+    """The regression that matters: without this, the cap breaks again in
+    ~10 more PRs as proof/ grows. Construct 40 PROVEN records -- far past
+    the ten that blew the old cap -- and assert the block stays a fixed
+    couple of lines rather than growing one line per record."""
+    proof_dir = tmp_path / "proof"
+    proof_dir.mkdir()
+    for i in range(40):
+        _write_proof_record(proof_dir, f"deliverable-{i:03d}", proven=True)
+
+    lines = lwb_handoff._proof_state_lines(proof_dir)
+
+    assert lines == ["40/40 proven", "(all proven; none outstanding)"]
+    assert len(lines) <= 3  # bounded: does NOT grow with the 40 proven records
+
+    # Now add a handful of unproven records among the 40 proven ones: the
+    # block should grow by exactly the unproven count, not by 40+unproven.
+    for i in range(3):
+        _write_proof_record(proof_dir, f"broken-{i}", proven=False)
+    grown = lwb_handoff._proof_state_lines(proof_dir)
+    assert grown[0] == "40/43 proven"
+    assert len(grown) == 1 + 3  # summary + exactly the 3 unproven lines
 
 
 def test_real_handoff_md_passes_check():

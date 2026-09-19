@@ -26,25 +26,46 @@ jobs:
       - name: Install dev dependencies
         run: python -m pip install --upgrade pip pytest
 
+      # Every gate step from here to the end of this job carries
+      # `if: always()` (or `if: always() && <its own condition>`).
+      # Without it, this job's steps run sequentially and the FIRST
+      # failure skips every step after it -- so one broken gate hides
+      # whatever the rest would have found in the SAME run, and a
+      # contributor fixes gates one at a time across repeated pushes
+      # instead of seeing every problem at once. An adversarial review of
+      # this job caught exactly that: our own state-claims step claimed
+      # "cannot mask a later one" while lwb-commit-identity and lwb-lanes,
+      # right after it, carried no `always()` of their own and so were
+      # still maskable. See docs/maintainers/session-protocol.md, "Five
+      # gates that could not do their job". `Install dev dependencies`
+      # above is the one exception: nothing below it can run meaningfully
+      # without it, so letting it gate normally is correct, not a mask.
       - name: Unit / adapter / conformance tests
+        if: always()
         run: python -m pytest -q
 
       - name: Vendor drift check (scripts/lwb_build.py --check)
+        if: always()
         run: python scripts/lwb_build.py --check
 
       - name: Build vendor trees for validators
+        if: always()
         run: python scripts/lwb_build.py
 
       - name: Validate Claude Code plugin
+        if: always()
         run: python scripts/lwb_validate_claude_plugin.py
 
       - name: Validate Codex plugin
+        if: always()
         run: python scripts/lwb_validate_codex_plugin.py
 
       - name: lwb-prefix (every user-facing entrypoint starts with lwb)
+        if: always()
         run: python scripts/lwb_check_prefix.py
 
       - name: lwb-env-leak (no local-environment or private-project leak)
+        if: always()
         # The real private-name needles never live in this public repo; they
         # arrive here from a repository secret. An empty/unset value makes the
         # check fail as UNCONFIGURED rather than pass while scanning for
@@ -54,7 +75,7 @@ jobs:
         run: python scripts/lwb_check_env_leak.py
 
       - name: lwb-env-leak-history (no leak in any commit added by this PR, even one later reverted)
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         # Same base/head reasoning as lwb-commit-identity below: a
         # working-tree-only scan misses a leak that was committed and then
         # removed again within the same PR -- it is still in the branch's
@@ -67,9 +88,11 @@ jobs:
           --range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
 
       - name: lwb-no-instruction-dep (no CLAUDE.md/AGENTS.md runtime dependency)
+        if: always()
         run: python scripts/lwb_check_no_instruction_dep.py
 
       - name: lwb-proof (proof/*.json records validate against proof/schema.json)
+        if: always()
         run: python scripts/lwb_check_proof.py
 
       # Directive 7 has to be checked at TWO moments, because the two
@@ -82,14 +105,15 @@ jobs:
       # MERGE TIME. Independent review of PR #6 caught it -- a gate against
       # merging without proof that would itself have merged unable to fire.
       - name: lwb-proof-pr (this PR carries a proof record for itself)
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         run: python scripts/lwb_check_proof.py --pr ${{ github.event.pull_request.number }}
 
       - name: lwb-proof-coverage (every landed deliverable HAS a record)
         # Post-merge, on main: `before..sha` contains the squash commit that
         # GitHub has now actually written, `(#N)` subject and all.
         if: >-
-          github.event_name == 'push'
+          always()
+          && github.event_name == 'push'
           && github.ref == 'refs/heads/main'
           && github.event.before != '0000000000000000000000000000000000000000'
         run: >-
@@ -97,10 +121,15 @@ jobs:
           --coverage ${{ github.event.before }}..${{ github.sha }}
 
       - name: HANDOFF.md shape check
+        if: always()
         run: python scripts/lwb_handoff.py --check
 
+      - name: lwb-check-state-claims (no tracked doc hand-asserts volatile git/PR state)
+        if: always()
+        run: python scripts/lwb_check_state_claims.py --repo .
+
       - name: lwb-commit-identity (LEAPWare or an allow-listed bot only)
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         # github.event.pull_request.*.sha, not origin/<base>..HEAD: a
         # pull_request checkout's HEAD is the synthetic refs/pull/N/merge
         # commit, authored under the triggering GitHub App's own identity,
@@ -112,7 +141,7 @@ jobs:
           --head ${{ github.event.pull_request.head.sha }}
 
       - name: lwb-lanes (per-commit lane discipline + shared-path review gate)
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         # Same base/head reasoning as lwb-commit-identity above: check the
         # PR's own real commits, never the synthetic merge commit.
         run: >-

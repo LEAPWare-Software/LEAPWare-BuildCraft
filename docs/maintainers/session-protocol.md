@@ -73,6 +73,15 @@ repo; never hand-write an exit code or a hash. Delete the script after.
 - `unproven[]` is where the record says what it does NOT establish. Use it
   honestly; it is the most valuable part.
 
+## Before writing any status
+
+Run `python scripts/lwb_check_state_claims.py --repo .` before writing a
+status update, a handoff, or any other claim about branch tips, commit
+counts, or open PRs into a tracked `.md` file. It catches a document
+hand-asserting volatile git/PR state instead of citing a live command --
+see the script's own module docstring for exactly what it can and cannot
+catch (it makes DOCUMENTS honest, not things said aloud to the owner).
+
 ## Review discipline
 
 An independent reviewer is a separate session, briefed only on the
