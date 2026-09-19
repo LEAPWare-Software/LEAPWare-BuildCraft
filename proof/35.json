@@ -3,7 +3,7 @@
   "pr": 35,
   "author": "conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
-  "commit": "78582c9",
+  "commit": "97495ce",
   "commands": [
     {
       "argv": [
@@ -16,17 +16,18 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "........................................................................ [ 13%]",
-        "........................................................................ [ 27%]",
-        "........................................................................ [ 41%]",
-        "........................................................................ [ 55%]",
         "........................................................................ [ 68%]",
         "........................................................................ [ 82%]",
         "........................................................................ [ 96%]",
         "..................                                                       [100%]",
-        "522 passed in 21.03s"
+        "=============================== warnings summary ===============================",
+        "tests/test_lwb_check_proof_reexecute.py:248",
+        "  <repo>/tests/test_lwb_check_proof_reexecute.py:248: DeprecationWarning: invalid escape sequence '<path>'",
+        "    _assert_argv_is_skipped_as_self([\"cmd\", \"<path>\", \"python scripts/lwb_check_proof.py --reexecute\"])",
+        "-- Docs: http<path>",
+        "522 passed, 1 warning in 21.80s"
       ],
-      "sha256": "3453ccd8a3e128ddf06738282f024abd747140373ead4d1e4415493a63b28d3f",
+      "sha256": "bf58bbdc1536cad8629b366fc033c10c8eee0e7d95d4cb0f5e6e38efb921e801",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -41,10 +42,10 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "HANDOFF.md:44: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 16:47 UTC",
+        "HANDOFF.md:45: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 17:00 UTC",
         "lwb-check-state-claims check passed"
       ],
-      "sha256": "d7512e0504ff3c198cd3b432ecc79c3b9f52b379b1d810782ffeb614d88f1f39",
+      "sha256": "51cb411238357b3aa4a71dc824f6685cd0679905242b99413470f2f54e3a454f",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -57,9 +58,9 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "OK: <repo>/HANDOFF.md passes all checks (2860 bytes)"
+        "OK: <repo>/HANDOFF.md passes all checks (2942 bytes)"
       ],
-      "sha256": "666eabef8846f97dd50209f1009bb0f07e519e65576f3463c92dd23a169a373d",
+      "sha256": "b9faccbc5d5f6f595b8d73764e6236e39b3fe6ecfdcbecdd29b554fb59164ad9",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -127,6 +128,10 @@
     },
     {
       "criterion": "Independent cloud review (reviews/35/cloud-reviewer.json, DISAGREE at b8ab0888) named exactly two text edits as sufficient for AGREE, both now fixed: HANDOFF.md no longer asserts 'main green' (main's tip #34 fails lwb-proof-coverage, reproduced with `python scripts/lwb_check_proof.py --coverage de27f723..origin/main`), and item 3 no longer calls #30 'this PR' -- it names #35 and marks #30 dead. The review's findings 3 and 4 (a structural reviewer/author identifier collision on the segment 'buildcraft', and `_review_ok` testing verdict before staleness) are explicitly NOT addressed here -- both are outside a HANDOFF.md fix's scope and the review itself says they need an owner decision or a lwb_lanes.py fix, not another review.",
+      "met": true
+    },
+    {
+      "criterion": "Independent cloud review B (reviews/35/cloud-reviewer-b.json, DISAGREE at 78582c9) confirmed reviewer A's two findings were genuinely fixed (re-measured, not trusted) and raised one new finding: HANDOFF.md item 2 overstated D27's rule as a platform impossibility ('no routine can create a routine') rather than D27's actual, narrower claim ('the reviewer must be a SEPARATE cron entry with no trigger path from any conductor' -- a maintained configuration). Reworded to match D27's own text. Findings 3 and 4 (structural, owner-level) independently reconfirmed by this second reviewer; still not addressed here for the same reason as before.",
       "met": true
     }
   ],
