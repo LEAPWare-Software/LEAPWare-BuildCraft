@@ -646,7 +646,7 @@ Measured 2026-09-19, each line by command, not inference:
 
 | Goal clause | State |
 |---|---|
-| "1.0.0" | Version is **0.1.0** (`plugins/claude/lwb/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`). `git tag -l` is **empty**. `scripts/lwb_release.py` exists, is wired into no CI job, and has apparently never run — nothing in `dist/` is tracked. `CHANGELOG.md` has only `## [Unreleased]`. |
+| "1.0.0" | Version is **0.1.0** in `plugins/claude/lwb/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `pyproject.toml` and `core/lwb_core/__init__.py` — but **`plugins/codex/lwb/.codex-plugin/plugin.json` says `0.2.0+codex`**, so the two shipped plugins do not agree on a version. `git tag -l` is **empty** locally and `git ls-remote --tags origin` returns none. `scripts/lwb_release.py` **is** wired into `.github/workflows/release.yml`, which triggers on a **tag push** — so it has never fired, because there has never been a tag. `CHANGELOG.md` has only `## [Unreleased]`. |
 | "fully built" | `core/lwb_core/rules/` contains **one** rule, `lwb_version.py`, whose own docstring calls it "the walking-skeleton rule -- a safe no-op" that "never denies: even if a policy file configures it to `deny`". The shipped `vendor/policy/default.json` configures that one rule at `warn`. |
 | "ready to be used by other repos" | An install path is documented (`docs/install-claude.md`) but has **never been executed against a foreign repo**. `lwb-portable` runs the hook on three OSes **inside this checkout** (`cwd=REPO_ROOT`); `lwb-hosted-runners` asserts this repo's own jobs use hosted runners. Neither proves foreign-repo use. |
 | "where BuildCraft is used ... done is truly done" | **No shipping mechanism exists.** Every proof gate — lanes, state-claims, review independence, prefix, env-leak, proof validation — is a `scripts/` file invoked only from this repo's `.github/workflows/ci.yml`, with hardcoded lane paths (`plugins/claude/`, `plugins/codex/`), bootstrap PR-number exceptions, and this repo's own `LWB_PRIVATE_NEEDLES` secret. **None of it is vendored into the plugin.** A consuming repo that installs `lwb` today gets one no-op rule. |
@@ -659,12 +659,40 @@ has not been started, and closing it is not more gate fixes. It means
 building the protocol as actual `lwb_core` rules that ship in `vendor/`,
 then proving them in a second, separate repository.
 
+#### Corrections to this section, found by the reviewer that checked it
+
+Recorded rather than silently edited: a readiness assessment the owner may
+act on is the wrong place for an unchecked claim.
+
+- **FALSE, now fixed.** The first version said `scripts/lwb_release.py`
+  "is wired into no CI job". It **is** wired —
+  `.github/workflows/release.yml` runs it under a step named "Build zip
+  artifacts (scripts/lwb_release.py)". The accurate statement is that it is
+  wired **only to a tag-push workflow that has never fired**, because there
+  has never been a tag. I had also repeated a recon claim that no release
+  workflow existed; this repo has **three** workflows: `ci.yml`,
+  `handoff.yml`, `release.yml`.
+- **INCOMPLETE, now fixed.** The version row named only the `0.1.0`
+  manifests. The **codex** plugin declares `0.2.0+codex`. Two shipped
+  plugins, two different versions, no tag for either.
+- **OVERSTATED, now fixed.** The lane-guard passage credited the reviewer
+  with reading "every relevant file". It read the files it listed and said
+  so itself; that is a narrower claim.
+
+The substance survived all three: **no delivery path exists for any proof
+gate.** The reviewer re-derived that independently — `scripts/lwb_build.py`
+vendors only `core/lwb_core`, `core/policy/*.json` and `adapters`;
+`pyproject.toml` declares no `[project.scripts]` or entry points; there is
+no setup script or init template; and the `lwb-handoff` skill is a stub
+reading "Not yet implemented … point at `scripts/lwb_handoff.py`" — a
+script that does not exist in a consuming repo at all.
+
 ### The lane guard is a nudge, and says so
 
 Worth recording because it is easy to mistake for a hole in the premise.
 `scripts/lwb_check_lane_write.py`'s own docstring calls it "a same-session
 nudge" and states "The CI check is the check of record". An independent
-reviewer confirmed by reading every relevant file that **nothing gates
+reviewer confirmed, by reading the files listed here, that **nothing gates
 `Bash`**: `.claude/settings.json` matches only
 `Edit|Write|MultiEdit|NotebookEdit` and carries no permissions or deny
 list, `.codex/hooks.json` matches only `apply_patch`, the plugin hook
