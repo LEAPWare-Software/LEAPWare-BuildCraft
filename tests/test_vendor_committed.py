@@ -15,6 +15,8 @@ vendor/ dir equals the *set* scripts/lwb_build.py would produce, one for one.
 
 from __future__ import annotations
 
+import pathlib
+import os
 import filecmp
 import subprocess
 import sys
@@ -147,12 +149,33 @@ def test_build_check_ignores_interpreter_bytecode(tmp_path):
 
 
 def test_build_check_still_catches_a_real_difference(tmp_path):
-    """The bytecode exemption must not have widened into blindness."""
+    """A same-length edit, at depth, with IDENTICAL mtimes, must still be drift.
+
+    Forcing the mtimes is the entire point, and this test lacked it at first.
+    `filecmp.dircmp` is shallow: it calls two files equal when size AND mtime
+    match. Written without `os.utime`, the two files usually land on
+    different mtimes, so the pre-fix code "passed" this test by accident --
+    an independent review ran it against the old implementation 15 times and
+    it caught the bug in only 6. A guard that detects its own bug 40% of the
+    time is the "test that passes against unfixed code" pattern this repo has
+    now produced four times, this time in the guard rather than the guarded.
+
+    Same length, same mtime, different content, three directories down:
+    exactly the hand-edit this gate exists to catch, `"warn"` -> `"deny"`.
+    """
     a = tmp_path / "built"
     b = tmp_path / "ondisk"
+    nested = pathlib.Path("pkg") / "sub" / "deeper"
     for root in (a, b):
-        (root / "pkg").mkdir(parents=True)
-    (a / "pkg" / "mod.py").write_text("x = 1\n", encoding="utf-8")
-    (b / "pkg" / "mod.py").write_text("x = 2\n", encoding="utf-8")
+        (root / nested).mkdir(parents=True)
+    file_a = a / nested / "mod.py"
+    file_b = b / nested / "mod.py"
+    file_a.write_text('mode = "warn"\n', encoding="utf-8")
+    file_b.write_text('mode = "deny"\n', encoding="utf-8")
+    assert file_a.stat().st_size == file_b.stat().st_size, "fixture must be same-length"
+
+    stamp = 1_600_000_000
+    os.utime(file_a, (stamp, stamp))
+    os.utime(file_b, (stamp, stamp))
 
     assert not lwb_build._trees_equal(a, b), "a real content difference must still be drift"

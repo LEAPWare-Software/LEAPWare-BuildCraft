@@ -76,6 +76,15 @@ def _is_build_noise(name: str) -> bool:
     them. A gate whose own prerequisites break it gets ignored, and this
     one was: the failure was carried for at least two PRs as "pre-existing,
     environment-dependent, not mine".
+
+    Two narrow blind spots follow from this and are accepted deliberately,
+    named here so they are a decision rather than an oversight: a directory
+    literally called `__pycache__` holding real source is invisible, and a
+    file named `*.pyc`/`*.pyo` holding real source is skipped. Both were
+    demonstrated by an independent review. They are acceptable because these
+    are interpreter-reserved names in a stdlib-only repo -- no legitimate
+    vendored source carries them, and a text file named `.pyc` would not
+    import as a module anyway.
     """
     return name in _BUILD_NOISE_DIRS or name.endswith(_IGNORED_SUFFIXES)
 
