@@ -626,6 +626,36 @@ def test_zero_width_space_in_label_is_flagged(tmp_path):
     assert len(findings) == 1, findings
 
 
+def test_word_joiner_in_label_is_flagged(tmp_path):
+    """U+2060 WORD JOINER is category Cf, same as the four originally-named
+    zero-width code points, but was not one of the four the old regex
+    enumerated -- so a label hidden behind it evaded detection until the
+    strip switched from enumerating code points to matching the Cf
+    category."""
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "main⁠SHA: deadbeef1234\n")  # U+2060 word joiner
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_soft_hyphen_in_label_is_flagged(tmp_path):
+    """U+00AD SOFT HYPHEN is category Cf; not one of the four originally
+    named code points."""
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "main­SHA: deadbeef1234\n")  # U+00AD soft hyphen
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_mongolian_vowel_separator_in_label_is_flagged(tmp_path):
+    """U+180E MONGOLIAN VOWEL SEPARATOR is category Cf; not one of the four
+    originally named code points."""
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "main᠎SHA: deadbeef1234\n")  # U+180E
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
 def test_en_dash_for_colon_remains_undetected(tmp_path):
     """Documented residue, not a bug: en dash is a genuinely different
     character, not an NFKC equivalent of a colon."""
@@ -642,21 +672,24 @@ def test_cyrillic_homoglyph_remains_undetected(tmp_path):
 
 
 def test_escape_still_binds_correctly_when_paragraph_has_nfkc_rewrite(tmp_path):
-    """The critical interaction: NFKC changes string length (fullwidth
-    colon U+FF1A -> ASCII ':'), so the escape's physical-line binding
-    (built on char_linenos) must not desync. BOTH physical lines here
-    carry a fullwidth colon -- the offset-shifting character -- so a
-    length mismatch on either line would corrupt the mapping. Line 1 is
-    legitimately escaped; line 2 is a live, unescaped fullwidth-colon SHA
-    claim in the SAME paragraph and must still be flagged, not shielded
-    by line 1's escape."""
+    """The critical interaction: NFKC changes string length, so the
+    escape's physical-line binding (built on char_linenos) must not
+    desync. U+FF1A (fullwidth colon) does NOT exercise this -- it
+    normalises one-to-one to ASCII ':', so a test built on it alone never
+    actually changes any line's length despite its docstring claiming
+    otherwise. U+FB01 (the "fi" ligature) does: NFKC expands it to the two
+    ASCII characters "fi", so line 1 here genuinely grows by one character
+    under normalisation. Line 1 is legitimately escaped; line 2 is a live,
+    unescaped SHA claim in the SAME paragraph and must still be flagged,
+    not shielded by line 1's escape -- which it would be if the length
+    change desynced the char-to-lineno map."""
     repo = _init_repo(tmp_path)
     _commit_md(
         repo,
         "NOTE.md",
-        "- A note using a fullwidth colon： purely as punctuation, nothing"
+        "- A note about a ﬁle format, purely descriptive, nothing"
         " volatile here. <!-- volatile-ok: illustrative -->\n"
-        "  main SHA： deadbeef1234, a live stale claim in the same paragraph.\n",
+        "  main SHA: deadbeef1234, a live stale claim in the same paragraph.\n",
     )
     findings = m.check(repo)
     assert any("SHA" in f.label for f in findings), findings

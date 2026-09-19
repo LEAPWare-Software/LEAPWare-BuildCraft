@@ -1,0 +1,198 @@
+{
+  "deliverable": "reviewer-identity-and-declared-non-independence",
+  "pr": 19,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "verifier-sonnet5-601ba60bd50224ba-2026-09-19",
+  "commit": "47ba623771e098be1be94e75c798621b5986c397",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 54%]",
+        "........................................................................ [ 81%]",
+        ".................................................                        [100%]",
+        "265 passed in 19.72s"
+      ],
+      "sha256": "0d2c241f75a6b5ecac9319699e7683828d805d499b4c616b60924bf78a5ecf73"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed"
+      ],
+      "sha256": "5ed60d4cef192203fd8cda63217940fa01fadc9c21941fba9c2e6a375b38e384"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py",
+        "--range",
+        "origin/main..HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed"
+      ],
+      "sha256": "5ed60d4cef192203fd8cda63217940fa01fadc9c21941fba9c2e6a375b38e384"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>\\HANDOFF.md passes all checks (2214 bytes)"
+      ],
+      "sha256": "2619704d2cf54e4527ac2564cd5a21c40f7a19221350f4811976805dab7c8e8f"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-proof check passed (11 record(s))"
+      ],
+      "sha256": "f0dbbd0ff7ec387ca83dcadbbd890b005a4181ddc2c6ea2ef90f5bb90ecc5656"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py",
+        "--pr",
+        "19"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-proof check passed (11 record(s))"
+      ],
+      "sha256": "f0dbbd0ff7ec387ca83dcadbbd890b005a4181ddc2c6ea2ef90f5bb90ecc5656"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD",
+        "--pr-number",
+        "19"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: reviews\\19\\independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "NOTICE: reviews\\19\\independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "NOTICE: reviews\\19\\independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "NOTICE: reviews\\19\\independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "lwb-lanes check passed"
+      ],
+      "sha256": "31bf439a28f5ee4f1906ddd44681d3174e904371f0447d122a41a1b1f9bac3fd"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "The cutoff gates on the authoritative PR number derived from the directory a record was found under, never on a self-declared field inside the record; a record whose own 'pr' disagrees with its directory is rejected naming both values",
+      "met": true
+    },
+    {
+      "criterion": "reviews/schema.json is enforced -- required fields, declared types with bool excluded from integer, enums, and the reviewed_commit hex pattern -- where previously nothing loaded it at all",
+      "met": true
+    },
+    {
+      "criterion": "A reviewer identity parses as <role>-<model>-<session-token>-<date> from the right, so real identifiers containing hyphens are expressible without degrading them to satisfy the validator",
+      "met": true
+    },
+    {
+      "criterion": "An accidental self-review is caught by comparing both ids as sets of hyphen-delimited segments, verified against the ten real records: PRs 15, 16 and 17 flagged on a genuinely shared token, PRs 7 through 13 and 18 clean",
+      "met": true
+    },
+    {
+      "criterion": "A record must declare whether the reviewer was dispatched by the author, and a true declaration is ANNOUNCED in the gate's output rather than passing silently as though it were independence",
+      "met": true
+    },
+    {
+      "criterion": "A non-string reviewed_commit no longer crashes the script with an uncaught TypeError, verified even when schema validation is bypassed entirely",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 522398064,
+    "cached_input": 522395198,
+    "uncached_input": 2866,
+    "output": 1714423,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 107850.6,
+    "source": "transcript message.usage summed across this session's usage-bearing assistant records. Covers the WHOLE session across PRs 12-19, not this deliverable alone, and EXCLUDES all subagent spend -- this PR alone ran an implementer and a reviewer through three rounds each, none of it in this transcript. A floor, not a total."
+  },
+  "mutations": [
+    "HANDOFF.md",
+    "proof/19.json",
+    "reviews/19/independent-verifier.json",
+    "reviews/README.md",
+    "reviews/schema.json",
+    "scripts/lwb_check_state_claims.py",
+    "scripts/lwb_lanes.py",
+    "tests/test_lwb_check_state_claims.py",
+    "tests/test_lwb_lanes.py"
+  ],
+  "unproven": [
+    "THIS RECORD'S OWN checked_by IS NOT INDEPENDENT. reviews/19/ declares reviewer_was_dispatched_by_author: true -- the reviewer is a subagent of the author's session, and said so itself after twice refusing to claim otherwise. The gate announced it in four NOTICE lines, one per commit touching a shared path -- counted from the captured output in this record's own commands, not from memory. This is the first record in the repo to state this; nine of the ten before it were produced the same way and said nothing.",
+    "The declaration cannot be verified. A dishonest actor writes false as easily as inventing a distinct id was before. It raises the cost of an accident and creates a paper trail; it is not a security control and is not built as one.",
+    "A shared token shorter than 8 characters goes undetected. Not hypothetical: reviews/schema.json accepts a 7-character git short sha as a legitimate identifier, and a UUID's later groups are 4 characters. No floor value closes this without reopening the false positives the floor exists to prevent. Recorded beside the constant and in reviews/README.md.",
+    "The hand-rolled schema validator still ignores minLength, minimum, maximum, items, nested properties and additionalProperties. None is currently exploitable against reviews/schema.json -- the reviewer checked each -- but it is a real generic gap.",
+    "Command tails and sha256 values are SANITIZED by a per-session throwaway script rather than committed code. Still the first open blocker in docs/maintainers/proof-of-completion-plan.md, and still why no historical digest here is independently reproducible.",
+    "The env-leak history scan is the AUTHOR's result; the reviewer holds no repository secret and was told not to guess private-name values. CI's run is the only independent check.",
+    "The token figures are a FLOOR excluding all subagent spend, produced by an unreviewed measuring script.",
+    "All CI reasoning in the review is static analysis of the workflow file. No reviewer observed a live Actions run of these changes.",
+    "This record was written by the author of the work it proves."
+  ]
+}
