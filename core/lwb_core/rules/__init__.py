@@ -16,10 +16,14 @@ this registry is load-bearing rather than decorative.
 
 from __future__ import annotations
 
-from . import lwb_version
+from . import lwb_proof_required, lwb_version
 
+# Order matters only in that the engine stops at the first DENY. The no-op
+# `lwb_version` is kept first so its version report is recorded in the
+# ledger even on an event a later rule denies.
 RULES = [
     lwb_version,
+    lwb_proof_required,
 ]
 
-__all__ = ["RULES", "lwb_version"]
+__all__ = ["RULES", "lwb_proof_required", "lwb_version"]

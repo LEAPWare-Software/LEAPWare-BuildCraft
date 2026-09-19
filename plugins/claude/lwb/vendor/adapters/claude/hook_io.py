@@ -20,7 +20,7 @@ from typing import Any, Mapping, Optional
 
 from lwb_core.config import Policy
 from lwb_core.engine import Decision
-from lwb_core.events import Event
+from lwb_core.events import Event, RepoFacts
 
 #: Claude's env var naming the plugin's own root directory, used in
 #: hooks.json command args (e.g. "${CLAUDE_PLUGIN_ROOT}/bin/lwb_hook.py").
@@ -28,12 +28,20 @@ from lwb_core.events import Event
 PLUGIN_ROOT_VAR = "CLAUDE_PLUGIN_ROOT"
 
 
-def parse_event(raw: Mapping[str, Any]) -> Event:
+def parse_event(raw: Mapping[str, Any], repo: Optional[RepoFacts] = None) -> Event:
     """Build a neutral `Event` from a Claude Code hook's stdin JSON.
 
     Recognized top-level fields (per Claude Code hooks docs): `hook_event_name`,
     `tool_name`, `tool_input`, `session_id`, `transcript_path`. Any other
     field is preserved under `Event.extra` rather than dropped.
+
+    `repo` carries repository facts a caller already observed, for rules
+    that need them (`lwb_proof_required`). It is a PARAMETER rather than
+    something this function goes and looks up, so this module stays a pure
+    dict-to-dataclass translation with no filesystem access -- the looking
+    up lives in `repo_facts.collect_repo_facts`, called by
+    `bin/lwb_hook.py` where the rest of this adapter's I/O already is.
+    Left as None, rules that need repo facts have no opinion.
     """
     hook_event = str(raw.get("hook_event_name", ""))
     tool_name = raw.get("tool_name")
@@ -62,6 +70,7 @@ def parse_event(raw: Mapping[str, Any]) -> Event:
             raw.get("transcript_path") if isinstance(raw.get("transcript_path"), str) else None
         ),
         extra=extra,
+        repo=repo,
     )
 
 
