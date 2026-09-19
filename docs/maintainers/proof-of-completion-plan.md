@@ -504,6 +504,34 @@ correct_first_parent_is_undeterminable_not_stale`, which fails against
 the second-fix code (asserted, by stashing `scripts/lwb_check_state_
 claims.py` and re-running just that test) and passes against the third.
 
+### The record/head circularity has now bitten FOUR PRs in a row
+
+PR #18 predicted it in writing; #19, #20 and now #22 hit it. Adding
+`proof/<pr>.json` changes the proof-state lines the HANDOFF block derives,
+so the block must be regenerated — and `resolve_reviewable_head` treats
+only `reviews/` and `proof/` as record-only, so a commit touching
+`HANDOFF.md` **moves the reviewable head and invalidates the review record
+in the same act that makes the record fileable.**
+
+Measured here: with `proof/22.json` added and the block stale, the gate
+reported `[stale deliverable proof state in generated block]
+recorded=['13/13 proven'] re-derived=['14/14 proven']`.
+
+The workaround used again, for the fourth time, is ordering — regenerate
+`HANDOFF.md` **together with** `proof/22.json` in one substantive commit,
+then file `reviews/22/` in a commit touching nothing outside `reviews/`,
+which leaves the reviewable head on the substantive commit. That works but
+requires the reviewer to re-bind to a commit created *after* it gave its
+verdict, which is itself a small dishonesty pressure every time.
+
+**The structural fix is still not done**, and is named here so it stops
+being rediscovered: classify a commit whose only `HANDOFF.md` change is
+*inside the generated `lwb-handoff` markers* as record-only, since the
+block is machine-written and carries no reviewable intent. That is a
+change to `scripts/lwb_lanes.py`, a shared path, so it needs its own PR
+and its own independent review. Four occurrences and one documented
+prediction are enough evidence that ordering discipline is not holding.
+
 ## How this document should be read
 
 Everything above is a claim. Two audit rounds found thirteen blockers in
