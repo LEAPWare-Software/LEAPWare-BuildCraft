@@ -1,0 +1,73 @@
+# The merge path that works without a laptop and without the cloud proxy.
+#
+# A cloud routine cannot merge here: this repo disables repo-level auto-merge
+# and requires a merge queue, so the only way in is the GraphQL mutation
+# `enqueuePullRequest`, and GraphQL is blocked by the cloud proxy. A GitHub
+# Actions job runs inside GitHub, so no proxy sits between it and the API --
+# and it can already see the checks it is gating on.
+#
+# THIS SHIPS DISABLED, TWICE OVER:
+#   1. It never fires on its own for real work. There is no `schedule`, no
+#      `pull_request` and no `workflow_run` trigger. It runs only when a human
+#      dispatches it, or on a push to a `cloud/**` branch, which is where this
+#      package is being built and nowhere else.
+#   2. `scripts/lwb_auto_queue.py` refuses to enqueue unless the repository
+#      variable `LWB_AUTO_QUEUE` is exactly `armed`. That variable does not
+#      exist, so the mutation is unreachable.
+#
+# Turning it on is two deliberate owner actions -- create the variable, and add
+# the real triggers listed in `docs/cloud/runbook.md` -- taken after an audit,
+# not as a side effect of merging this branch.
+name: lwb-auto-queue
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to evaluate (blank = probe only)"
+        required: false
+        default: ""
+  push:
+    branches:
+      - 'cloud/**'
+
+# Read-only by design while disabled. The armed path needs
+# `pull-requests: write`; it is requested here so that the run log records
+# exactly which permissions GitHub actually grants, which the repository's
+# `default_workflow_permissions` setting can silently cap.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: lwb-auto-queue-${{ github.event.inputs.pr || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Deliberately checks out the DEFAULT BRANCH, never the pull request's
+      # code. This job holds a token and must never execute anything a pull
+      # request author controls; it reads a PR's proof and review records as
+      # JSON data over the API instead.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Probe what this runner can reach
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/lwb_auto_queue.py --probe
+
+      - name: Decide (dry run unless LWB_AUTO_QUEUE is armed)
+        if: ${{ github.event.inputs.pr != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LWB_AUTO_QUEUE: ${{ vars.LWB_AUTO_QUEUE }}
+        run: python scripts/lwb_auto_queue.py --pr "${{ github.event.inputs.pr }}"
