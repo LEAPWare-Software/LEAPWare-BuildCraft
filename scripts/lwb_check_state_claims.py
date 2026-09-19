@@ -133,8 +133,13 @@ implements):
     a normalised table row "main SHA <sha>" (no colon at all) in one
     pattern. A reordered "at <sha> ... on main" is covered in addition to
     the subject-first "main is at <sha>" form.
-  - Each physical line is NFKC-normalised and stripped of zero-width
-    characters (U+200B/U+200C/U+200D/U+FEFF) BEFORE classification and
+  - Each physical line is NFKC-normalised and stripped of invisible
+    Cf-category "format" characters (word joiner, soft hyphen, zero-width
+    space/non-joiner/joiner, the BOM, the Mongolian vowel separator, and
+    any other code point Unicode classifies the same way -- matched by
+    `unicodedata.category(ch) == "Cf"`, not by enumerating a fixed list;
+    an enumerated four-code-point regex here previously missed three more
+    Cf characters an adversarial review found) BEFORE classification and
     joining -- closing a fullwidth colon ("main SHA： <sha>", U+FF1A) and
     a zero-width space hidden inside a label ("main​SHA:"). Normalising
     per PHYSICAL line, not on the already-joined paragraph, matters: NFKC
@@ -444,20 +449,30 @@ _BULLET_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 _BLOCKQUOTE_RE = re.compile(r"^\s*>")
 _TABLE_RE = re.compile(r"^\s*\|")
 
-# Zero-width characters that can sit inside a label with no visible trace:
-# ZERO WIDTH SPACE, ZERO WIDTH NON-JOINER, ZERO WIDTH JOINER, and the BOM /
-# ZERO WIDTH NO-BREAK SPACE. Stripped alongside NFKC below. Written as
-# explicit \u escapes, never as literal invisible characters in this file.
-_ZERO_WIDTH_RE = re.compile("[​‌‍﻿]")
+# Invisible "format" characters (Unicode general category Cf) that can sit
+# inside a label with no visible trace -- ZERO WIDTH SPACE, ZERO WIDTH
+# NON-JOINER, ZERO WIDTH JOINER, the BOM / ZERO WIDTH NO-BREAK SPACE, WORD
+# JOINER, SOFT HYPHEN and MONGOLIAN VOWEL SEPARATOR among them. This used to
+# be a hand-enumerated regex naming exactly four code points
+# (U+200B/200C/200D/FEFF); an adversarial review found three more members of
+# the same class -- U+2060, U+00AD, U+180E -- that the enumeration simply
+# never named and which therefore evaded it. Stripping by CATEGORY rather
+# than by an enumerated list closes the whole class at once: any Cf
+# character is by definition intended to be invisible formatting, not
+# content, so removing all of them (not just the four originally spotted)
+# cannot lose real text. Stripped alongside NFKC below.
+def _strip_format_chars(s: str) -> str:
+    return "".join(ch for ch in s if unicodedata.category(ch) != "Cf")
 
 
 def _normalize_segment(s: str) -> str:
-    """NFKC-normalise a single physical line's text and strip zero-width
-    characters, closing a fullwidth colon (U+FF1A -> ':') and a
-    zero-width space hidden inside a label. Applied per PHYSICAL line,
-    before joining, so the length change NFKC can introduce never crosses
-    a physical-line boundary and the char-to-lineno offset map built
-    during joining stays correct -- see `_build_logical_lines`.
+    """NFKC-normalise a single physical line's text and strip invisible
+    Cf-category characters, closing a fullwidth colon (U+FF1A -> ':') and
+    a zero-width space (or any other Cf character) hidden inside a label.
+    Applied per PHYSICAL line, before joining, so the length change NFKC
+    can introduce never crosses a physical-line boundary and the
+    char-to-lineno offset map built during joining stays correct -- see
+    `_build_logical_lines`.
 
     Deliberately does NOT close every Unicode evasion: an en dash is a
     genuinely different character, not an NFKC equivalent of a colon, and
@@ -465,7 +480,7 @@ def _normalize_segment(s: str) -> str:
     confusable folding, which the stdlib does not provide. See the module
     docstring, "KNOWN EVASIONS", for why those are left open by design.
     """
-    return _ZERO_WIDTH_RE.sub("", unicodedata.normalize("NFKC", s))
+    return _strip_format_chars(unicodedata.normalize("NFKC", s))
 
 
 def _line_kind(line: str) -> str:

@@ -24,6 +24,10 @@
     "commit_author_agent": { "type": "string", "enum": ["claude", "codex", "human"] },
     "commit_author_id": { "type": "string", "minLength": 1 },
     "verdict": { "type": "string", "enum": ["AGREE", "DISAGREE"] },
-    "notes": { "type": "string" }
+    "notes": { "type": "string" },
+    "reviewer_was_dispatched_by_author": {
+      "type": "boolean",
+      "description": "Required, and enforced, for records whose typed 'pr' is >= scripts/lwb_lanes.REVIEWER_ID_FORMAT_CUTOFF_PR (19). Declares -- self-attested, not verified -- whether the reviewer identity was a subagent/dispatch of the author's own session. `true` does not fail the gate (the gate cannot tell a genuinely independent reviewer from one that simply declares itself independent), but scripts/lwb_lanes.py prints a NOTICE for it so the record is never silently read as proof of independence. See reviews/README.md."
+    }
   }
 }

@@ -30,13 +30,13 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 01:59 UTC
-main SHA: a65e2ef64fed2dc4ce328b7464b2bc0c9cdb3cad
+Generated: 2026-09-19 02:18 UTC
+main SHA: 39c951b4dd49c49f5b399eb08ab58798747889ee
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#18 Fail CI when a tracked doc hand-asserts volatile git or PR state (lwb-state-claim-gate)
+(unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
 10/10 proven

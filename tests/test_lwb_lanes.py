@@ -452,6 +452,217 @@ def test_reviewable_head_falls_back_to_raw_head_when_every_commit_is_record_only
     assert got == head
 
 
+def _write_review_pr(tmp_path, pr: int, name: str, **overrides):
+    """Like _write_review but for an arbitrary PR number, needed to exercise
+    the REVIEWER_ID_FORMAT_CUTOFF_PR behaviour (records below the cutoff are
+    exempt from the parseable-identity format; records at/above it are not)."""
+    reviews_dir = tmp_path / "reviews" / str(pr)
+    reviews_dir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "pr": pr,
+        "reviewed_commit": HEAD_SHA,
+        "reviewer_agent": "claude",
+        "reviewer_id": "reviewer-session",
+        "commit_author_agent": "claude",
+        "commit_author_id": "author-session",
+        "verdict": "AGREE",
+    }
+    record.update(overrides)
+    (reviews_dir / name).write_text(json.dumps(record), encoding="utf-8")
+
+
+def test_cutoff_constant_is_the_next_pr():
+    assert lwb_lanes.REVIEWER_ID_FORMAT_CUTOFF_PR == 19
+
+
+def test_parse_identity_accepts_well_formed_id():
+    parsed = lwb_lanes._parse_identity("verifier-sonnet-a1b2c3d4-2026-09-20", "reviewer_id", "rec", [])
+    assert parsed == ("verifier", "sonnet", "a1b2c3d4", "2026-09-20")
+
+
+def test_parse_identity_rejects_id_missing_fields():
+    errors: list[str] = []
+    parsed = lwb_lanes._parse_identity("just-three-fields", "reviewer_id", "rec", errors)
+    assert parsed is None
+    assert errors
+
+
+def test_review_ok_below_cutoff_does_not_require_parseable_ids(tmp_path):
+    """Records 7-18 use free-form ids that do not parse into the new
+    format. The cutoff means they stay valid without being rewritten."""
+    _write_review_pr(
+        tmp_path, 18, "verifier.json",
+        reviewer_id="lw-verifier-sonnet-acc84f592377940aa-2026-09-18",
+        commit_author_id="claude-code-opus5-session-f8da3f9e-2026-09-18",
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "18" / "verifier.json", HEAD_SHA, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == "lw-verifier-sonnet-acc84f592377940aa-2026-09-18"
+    assert errors == []
+
+
+def test_review_ok_at_cutoff_rejects_unparseable_reviewer_id(tmp_path):
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="lw-verifier-sonnet-acc84f592377940aa-2026-09-18",
+        commit_author_id="author-role-model-token-2026-09-20",
+        reviewer_was_dispatched_by_author=False,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("does not match" in e or "format" in e for e in errors), errors
+
+
+def test_review_ok_at_cutoff_rejects_shared_session_token(tmp_path):
+    """The accidental self-review this PR exists to catch: two ids that
+    parse fine individually but share the same session-token field -- a
+    subagent reviewing its own dispatching session."""
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="verifier-sonnet-f8da3f9e-2026-09-20",
+        commit_author_id="implementer-opus-f8da3f9e-2026-09-19",
+        reviewer_was_dispatched_by_author=False,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("session-token" in e for e in errors), errors
+
+
+def test_review_ok_at_cutoff_requires_dispatched_boolean_field(tmp_path):
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="verifier-sonnet-tokenA-2026-09-20",
+        commit_author_id="implementer-opus-tokenB-2026-09-19",
+        # no reviewer_was_dispatched_by_author
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("reviewer_was_dispatched_by_author" in e for e in errors), errors
+
+
+def test_review_ok_at_cutoff_accepts_and_notices_when_dispatched_true(tmp_path):
+    """A True value must not silently pass as though it proved
+    independence -- the gate still accepts the record (it cannot verify
+    the claim either way) but must emit a notice saying so."""
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="verifier-sonnet-tokenA-2026-09-20",
+        commit_author_id="implementer-opus-tokenB-2026-09-19",
+        reviewer_was_dispatched_by_author=True,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors, notices
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == "verifier-sonnet-tokenA-2026-09-20"
+    assert errors == []
+    assert any("audit trail" in n or "not independent" in n for n in notices), notices
+
+
+def test_review_ok_at_cutoff_accepts_cleanly_when_dispatched_false(tmp_path):
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="verifier-sonnet-tokenA-2026-09-20",
+        commit_author_id="implementer-opus-tokenB-2026-09-19",
+        reviewer_was_dispatched_by_author=False,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors, notices
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == "verifier-sonnet-tokenA-2026-09-20"
+    assert errors == []
+    assert notices == []
+
+
+def test_review_ok_validates_against_schema_required_fields(tmp_path):
+    """reviews/schema.json is now actually wired in: a record missing a
+    schema-required field (e.g. reviewer_agent) fails even below the
+    cutoff, since this is a presence check, not a format check."""
+    _write_review_pr(tmp_path, 9, "verifier.json")
+    # Remove a schema-required field after the fact.
+    path = tmp_path / "reviews" / "9" / "verifier.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data["reviewer_agent"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(path, HEAD_SHA, errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("reviewer_agent" in e for e in errors), errors
+
+
+def test_review_ok_validates_schema_enum_for_reviewer_agent(tmp_path):
+    _write_review_pr(tmp_path, 9, "verifier.json", reviewer_agent="not-a-real-agent")
+    path = tmp_path / "reviews" / "9" / "verifier.json"
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(path, HEAD_SHA, errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("reviewer_agent" in e for e in errors), errors
+
+
 def test_review_ok_accepts_a_short_prefix_match(tmp_path):
     """A 7-char sha prefix, the shortest allowed by the schema, still matches."""
     _write_review(tmp_path, "claude-cto.json", reviewed_commit=HEAD_SHA[:7])

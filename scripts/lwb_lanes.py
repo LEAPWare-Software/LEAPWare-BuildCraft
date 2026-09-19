@@ -97,6 +97,28 @@ SHARED_FILES = (
 # eaten or quietly extended by a bot.
 BOOTSTRAP_EXEMPT_PRS = frozenset({1, 5})
 
+# The PR number from which a reviews/<pr>/*.json record must carry a
+# PARSEABLE identity in both reviewer_id and commit_author_id, per the
+# "<role>-<model>-<session-token>-<date>" format below. Records 7-18 predate
+# this format -- they were measured (not guessed) to be free-form strings
+# that do not fit it, and rewriting them to fit would be editing evidence
+# to suit a validator, which is the falsification this whole change exists
+# to stop. It is a NAMED constant, not a "pr >= N" literal scattered through
+# the code, following the same precedent as scripts/lwb_check_proof.py's
+# acceptance_criteria/tokens cutoff at PR #12.
+REVIEWER_ID_FORMAT_CUTOFF_PR = 19
+
+# "<role>-<model>-<session-token>-<date>": role, model and session-token are
+# each a single dash-free segment (this is a NEW convention adopted from
+# REVIEWER_ID_FORMAT_CUTOFF_PR onward, not a retrofit onto existing ids,
+# which is exactly why it can require this), and date is an ISO YYYY-MM-DD
+# tail. session-token is structurally guaranteed distinct from date by this
+# pattern (a date always contains dashes; a session-token never does), but
+# see _parse_identity for the explicit check the spec also asks for.
+IDENTITY_FORMAT_RE = re.compile(
+    r"^(?P<role>[^-]+)-(?P<model>[^-]+)-(?P<session_token>[^-]+)-(?P<date>\d{4}-\d{2}-\d{2})$"
+)
+
 # How many DISTINCT independent reviewers a shared-path change needs. The
 # old rule was "one record per CLI vendor", which read as two but was really
 # one-each and could never be met with a single CLI in operation. One
@@ -275,7 +297,93 @@ def commits_in_range(rev_range: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
-def _review_ok(review_path: Path, head_sha: str, errors: list[str]) -> Optional[str]:
+# reviews/schema.json is the checked-in shape description. Used to be
+# "loaded by nothing" (reviews/README.md said so in plain words) -- a third
+# unenforced description of the record shape, on top of README.md and this
+# module's own hand checks, would have been worse than the two that already
+# existed. Wired in here, hand-rolled the same way scripts/lwb_check_proof.py
+# validates proof/schema.json -- this repo is stdlib-only, so a real
+# jsonschema validator is not an option, and a purpose-built check of the
+# small slice of JSON Schema this file actually uses (required, enum,
+# pattern) is honest about what it covers rather than pretending to a
+# generic implementation. Read from a path fixed at import time, NOT from
+# the (test-mutable) REPO_ROOT global -- tests reassign REPO_ROOT to a
+# throwaway tmp_path repo that has no reviews/schema.json of its own, and
+# the schema being validated against is a property of the real repo's
+# format, not of where a given test happens to stage its fake records.
+_SCHEMA_PATH = Path(__file__).resolve().parent.parent / "reviews" / "schema.json"
+
+
+def _load_review_schema() -> dict:
+    import json
+
+    return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+
+
+def _validate_against_schema(data: dict, rel, errors: list[str]) -> None:
+    """Hand-rolled subset of JSON Schema validation: required-field
+    presence, `enum`, and `pattern` on string properties -- the only
+    constructs reviews/schema.json actually uses. Appends to `errors`;
+    does not return anything, since callers already track validity via
+    the presence/absence of new error strings."""
+    schema = _load_review_schema()
+    for field in schema.get("required", ()):
+        if field not in data:
+            errors.append(f"{rel}: missing required field '{field}' (reviews/schema.json)")
+    for field, spec in schema.get("properties", {}).items():
+        if field not in data:
+            continue
+        value = data[field]
+        enum = spec.get("enum")
+        if enum is not None and value not in enum:
+            errors.append(
+                f"{rel}: '{field}' = {value!r} is not one of {enum!r} (reviews/schema.json)"
+            )
+        pattern = spec.get("pattern")
+        if pattern is not None and isinstance(value, str) and not re.match(pattern, value):
+            errors.append(
+                f"{rel}: '{field}' = {value!r} does not match pattern {pattern!r} "
+                "(reviews/schema.json)"
+            )
+
+
+def _parse_identity(
+    value: object, field_label: str, rel, errors: list[str]
+) -> Optional[tuple[str, str, str, str]]:
+    """Parse an identity string into (role, model, session_token, date) per
+    the "<role>-<model>-<session-token>-<date>" format. Returns None (and
+    appends to `errors`) when `value` is not a string, does not match the
+    format, or its session-token field is identical to its date field (the
+    format already makes this structurally near-impossible -- a date
+    contains dashes, a session-token cannot -- but the spec calls for the
+    check explicitly, so it is made explicit rather than left implicit in
+    the regex)."""
+    if not isinstance(value, str) or not value:
+        errors.append(f"{rel}: {field_label} must be a non-empty string")
+        return None
+    m = IDENTITY_FORMAT_RE.match(value)
+    if not m:
+        errors.append(
+            f"{rel}: {field_label} {value!r} does not match the required "
+            "'<role>-<model>-<session-token>-<date>' format "
+            f"(each field non-empty; required from PR #{REVIEWER_ID_FORMAT_CUTOFF_PR})"
+        )
+        return None
+    role, model, token, date = m.group("role"), m.group("model"), m.group("session_token"), m.group("date")
+    if token == date:
+        errors.append(
+            f"{rel}: {field_label} {value!r}: session-token must differ from date"
+        )
+        return None
+    return (role, model, token, date)
+
+
+def _review_ok(
+    review_path: Path,
+    head_sha: str,
+    errors: list[str],
+    notices: Optional[list[str]] = None,
+) -> Optional[str]:
     """Validate one review record. Returns its reviewer_id, or None if invalid.
 
     Vendor-agnostic on purpose. This used to take an `agent` and look for
@@ -304,6 +412,10 @@ def _review_ok(review_path: Path, head_sha: str, errors: list[str]) -> Optional[
     if not isinstance(data, dict):
         errors.append(f"{rel}: not a JSON object")
         return None
+    schema_errors_before = len(errors)
+    _validate_against_schema(data, rel, errors)
+    if len(errors) > schema_errors_before:
+        return None
     if data.get("verdict") != "AGREE":
         errors.append(f"{rel}: verdict is {data.get('verdict')!r}, want 'AGREE'")
         return None
@@ -327,11 +439,53 @@ def _review_ok(review_path: Path, head_sha: str, errors: list[str]) -> Optional[
             "head); the change must be re-reviewed"
         )
         return None
+
+    # From REVIEWER_ID_FORMAT_CUTOFF_PR onward: both ids must be parseable,
+    # must not share a session-token (the accidental self-review this PR
+    # exists to catch -- see the module docstring measurement), and the
+    # record must honestly declare whether the reviewer was dispatched by
+    # the author's own session. This CANNOT establish genuine independence
+    # -- a subagent the author dispatched itself can declare `false` -- so
+    # it is recorded and surfaced, never trusted as proof.
+    pr = data.get("pr")
+    if isinstance(pr, int) and pr >= REVIEWER_ID_FORMAT_CUTOFF_PR:
+        reviewer_parsed = _parse_identity(reviewer_id, "reviewer_id", rel, errors)
+        author_parsed = _parse_identity(author_id, "commit_author_id", rel, errors)
+        if reviewer_parsed is None or author_parsed is None:
+            return None
+        if reviewer_parsed[2] == author_parsed[2]:
+            errors.append(
+                f"{rel}: reviewer_id and commit_author_id share session-token "
+                f"{reviewer_parsed[2]!r} -- this is a subagent reviewing the work of "
+                "the session that dispatched it, not an independent reviewer"
+            )
+            return None
+        dispatched = data.get("reviewer_was_dispatched_by_author")
+        if not isinstance(dispatched, bool):
+            errors.append(
+                f"{rel}: missing or non-boolean 'reviewer_was_dispatched_by_author' "
+                f"(required from PR #{REVIEWER_ID_FORMAT_CUTOFF_PR}) -- the gate cannot "
+                "establish independence on its own and requires this record to declare "
+                "the relationship honestly instead of leaving it unstated"
+            )
+            return None
+        if dispatched and notices is not None:
+            notices.append(
+                f"{rel}: reviewer_was_dispatched_by_author=true -- this review is NOT "
+                "independent by construction (the reviewer is a subagent of the "
+                "author's own session); the record is an audit trail only, not proof "
+                "of independent review"
+            )
+
     return str(reviewer_id)
 
 
 def independent_reviews(
-    pr_number: int, commit_sha: str, head_sha: str, errors: list[str]
+    pr_number: int,
+    commit_sha: str,
+    head_sha: str,
+    errors: list[str],
+    notices: Optional[list[str]] = None,
 ) -> bool:
     """True when this PR carries REQUIRED_INDEPENDENT_REVIEWS distinct reviewers."""
     review_dir = REPO_ROOT / "reviews" / str(pr_number)
@@ -339,7 +493,7 @@ def independent_reviews(
 
     reviewer_ids = set()
     for record in records:
-        reviewer_id = _review_ok(record, head_sha, errors)
+        reviewer_id = _review_ok(record, head_sha, errors, notices)
         if reviewer_id is not None:
             reviewer_ids.add(reviewer_id)
 
@@ -375,8 +529,16 @@ def is_bot_commit(sha: str) -> bool:
     return any(pattern.search(email) for pattern in BOT_AUTHOR_PATTERNS)
 
 
-def check_lanes(rev_range: str, pr_number: int) -> list[str]:
-    """Check every commit in `rev_range`. Returns a list of failure strings."""
+def check_lanes(
+    rev_range: str, pr_number: int, notices: Optional[list[str]] = None
+) -> list[str]:
+    """Check every commit in `rev_range`. Returns a list of failure strings.
+
+    `notices` (optional, appended to in place) collects non-failing but
+    load-bearing observations -- currently: a record whose
+    `reviewer_was_dispatched_by_author` is `true`, printed so that fact is
+    never silently absorbed into an apparent pass. See _review_ok.
+    """
     # 0 means "not running under a PR" (a push to main after merge). The
     # --pr-number help text always said so and main() printed a skip message
     # for it, but check_lanes itself enforced anyway -- so a direct call with
@@ -415,7 +577,7 @@ def check_lanes(rev_range: str, pr_number: int) -> list[str]:
                 )
 
         if touches_shared and head_sha is not None:
-            independent_reviews(pr_number, sha, head_sha, errors)
+            independent_reviews(pr_number, sha, head_sha, errors, notices)
 
     return errors
 
@@ -431,7 +593,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    errors = check_lanes(f"{args.base}..{args.head}", args.pr_number)
+    notices: list[str] = []
+    errors = check_lanes(f"{args.base}..{args.head}", args.pr_number, notices)
+    for n in notices:
+        print(f"NOTICE: {n}")
     if errors:
         for e in errors:
             print(f"FAIL: {e}")
