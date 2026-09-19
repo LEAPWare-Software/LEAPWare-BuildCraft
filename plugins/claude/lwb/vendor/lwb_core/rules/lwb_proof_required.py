@@ -93,9 +93,54 @@ _QUOTES = ("'", '"')
 #: `<<-` form (leading tabs stripped from the body and terminator) is
 #: matched the same as plain `<<`; this rule only needs to find where the
 #: body ends, not reproduce tab-stripping.
+# `<<` but NOT `<<<`. A HERESTRING (`cmd <<<word`) is a single-word stdin
+# redirect with no body and no terminator -- treating it as a heredoc made
+# the stripper swallow the REST OF THE COMMAND LINE, so `cat <<<word;
+# git push` scanned as `(False, [])` and the real publish after the
+# semicolon vanished. Found by the independent reviewer of PR #26. The
+# guards are BOTH directions: `<<` may not be followed by `<` (which
+# would be the herestring itself), and may not be PRECEDED by one --
+# without the lookbehind, `<<<word` still matched starting at the
+# SECOND character, reading `<<word` as a heredoc introducer.
 _HEREDOC_START = re.compile(
-    r"<<-?\s*(?:'([^'\n]+)'|\"([^\"\n]+)\"|([A-Za-z_][A-Za-z0-9_]*))"
+    r"(?<!<)<<(?!<)-?\s*(?:'([^'\n]+)'|\"([^\"\n]+)\"|([A-Za-z_][A-Za-z0-9_]*))"
 )
+
+
+def _heredoc_start_outside_quotes(text: str):
+    """First `_HEREDOC_START` match that is NOT inside a quoted string.
+
+    `_strip_heredocs` runs BEFORE `_strip_quoted`, which is deliberate --
+    a heredoc body can contain quote characters that would otherwise
+    unbalance the quote scanner. The cost is that a heredoc introducer
+    appearing INSIDE quotes was taken at face value: `echo "a <<EOF" &&
+    git push` had everything from `<<EOF` onward discarded, so the real
+    `git push` after `&&` was never seen. Reported by the reviewer of
+    PR #26 as an under-match.
+
+    This walks the text tracking single- and double-quote state and
+    returns only a match that begins outside quotes, so the ordering can
+    stay as it is while the introducer is still read honestly.
+    """
+    in_single = False
+    in_double = False
+    i = 0
+    length = len(text)
+    while i < length:
+        ch = text[i]
+        if ch == "\\" and in_double and i + 1 < length:
+            i += 2
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        elif ch == "<" and not in_single and not in_double:
+            match = _HEREDOC_START.match(text, i)
+            if match is not None:
+                return match
+        i += 1
+    return None
 
 
 def _strip_heredocs(command: str) -> str:
@@ -117,7 +162,7 @@ def _strip_heredocs(command: str) -> str:
     """
     out = command
     while True:
-        match = _HEREDOC_START.search(out)
+        match = _heredoc_start_outside_quotes(out)
         if match is None:
             return out
         word = match.group(1) or match.group(2) or match.group(3)

@@ -126,7 +126,11 @@ can defeat it. Confirmed bypasses, from independent review of PR #26:
 
 - **No facts, so silent, so permitted.** `event.repo is None` always
   means allow (see "When it says nothing" above). Every one of these
-  yields no facts and therefore passes `deny` with no record at all:
+  permits under `deny` with no record at all. Precisely: a bare repo or a
+  missing `.git` yields no facts (`event.repo is None`), while a corrupt or
+  detached HEAD yields `RepoFacts(branch=None)` — different mechanisms,
+  identical outcome. An earlier version of this section said all four
+  "yield no facts"; the independent reviewer corrected it:
   a bare repository, a directory with no `.git`, a corrupt `HEAD`, and a
   detached HEAD.
 - **Undetected commands.** The command parser only recognizes a
@@ -158,6 +162,33 @@ every Bash call in every repository with no `.git` or an unreadable one,
 which is worse than the blind spots it would close. Until that change
 ships, treat `deny` as a report-only gate with a stricter default, not
 as enforcement.
+
+## Parser blind spots, deliberately under-matching
+
+The parser under-matches on purpose: a missed publish is a warning that did
+not fire, while a false positive is a warning on innocent work, which trains
+people to ignore the tool. These are the known misses.
+
+Two were found by the independent reviewer of PR #26 and are now **fixed**,
+listed here because the record of what was wrong is worth more than the
+absence of it:
+
+- `echo "a <<EOF" && git push` — a heredoc introducer *inside quotes* was
+  taken at face value, so everything after it was discarded and the real
+  `git push` was never seen. `_strip_heredocs` runs before `_strip_quoted`
+  deliberately (a heredoc body can contain unbalanced quotes), so the fix is
+  a quote-aware scan for the introducer rather than a reordering.
+- `cat <<<word; git push` — `<<<` is a **herestring**, a single-word stdin
+  redirect with no body and no terminator. Treating it as a heredoc swallowed
+  the rest of the line. The guard needed BOTH a lookahead and a lookbehind:
+  without the lookbehind, `<<<word` still matched starting at the second `<`.
+
+Still not detected, and not fixed:
+
+- `git -C <path> push`
+- env-prefixed pushes, e.g. `FOO=1 git push`
+- `(git push)`, `command git push`, `echo $(git push)`, `git.exe push`
+- a push inside a script that is invoked rather than typed
 
 ## Known gap: Codex
 

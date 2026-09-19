@@ -284,3 +284,41 @@ def test_the_rule_is_registered():
     from lwb_core.rules import RULES
 
     assert lwb_proof_required in RULES
+
+
+def test_no_shipped_policy_file_arms_this_rule_to_deny():
+    """EVERY shipped policy, not just the source one.
+
+    The earlier lock read `core/policy/default.json` alone. The files that
+    actually reach a consuming repo are the VENDORED copies under
+    `plugins/*/lwb/vendor/policy/`, and they were protected only indirectly,
+    by `lwb_build.py --check` requiring vendor to match source. That is a
+    real guarantee but a transitive one: it breaks the moment anyone relaxes
+    the drift check, and the thing being guarded here -- a rule that can
+    DENY a publish -- is the one thing that should not be armed by accident.
+    Gap named by the independent reviewer of PR #26.
+
+    `deny` is documented as ADVISORY, not a security control: it fails open
+    when facts are missing (a bare repo, no `.git`, a corrupt or detached
+    HEAD all permit). Shipping a policy that arms it would ship a control
+    that is not one. This test is what makes that a decision rather than a
+    preference -- it must be deleted deliberately, not drifted past.
+    """
+    import json
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    policies = sorted(repo_root.glob("core/policy/default.json")) + sorted(
+        repo_root.glob("plugins/*/lwb/vendor/policy/default.json")
+    )
+    assert len(policies) >= 3, f"expected source + both vendored policies, got {policies}"
+
+    for path in policies:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        mode = data.get("rules", {}).get("lwb_proof_required", {}).get("mode")
+        assert mode != "deny", (
+            f"{path.relative_to(repo_root)} arms lwb_proof_required to deny. "
+            "Deny fails open when repo facts are missing, so it is advisory, "
+            "not a control -- see docs/rules/lwb-proof-required.md. Make deny "
+            "fail closed before shipping a policy that turns it on."
+        )
