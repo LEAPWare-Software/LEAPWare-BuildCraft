@@ -1,0 +1,158 @@
+{
+  "deliverable": "cloud-merge-path-land-a-pr-without-a-laptop",
+  "pr": 28,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-cloud-routine-buildcraft",
+  "commit": "e500600",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 14%]",
+        "........................................................................ [ 28%]",
+        "........................................................................ [ 43%]",
+        "........................................................................ [ 57%]",
+        "........................................................................ [ 72%]",
+        "........................................................................ [ 86%]",
+        ".................................................................        [100%]",
+        "497 passed in 38.66s"
+      ],
+      "sha256": "c8278e13f8732172bdf02f2cbe82b78d298c669cc274287754ec86710ba9745b",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_auto_queue.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "..........                                                               [100%]",
+        "10 passed in 0.02s"
+      ],
+      "sha256": "4c78d91fecebd9ff2601366b209fedef5a34c74b72f29aadd727b0d4e4957970",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...                                                                      [100%]",
+        "3 passed in 0.08s"
+      ],
+      "sha256": "db7f09414dbfd608dbdbc9dc30246e56e6598dc0e7fbf509c46c3bdd43c83e32",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "THE LAST DEPENDENCY ON A LAPTOP IS REMOVED: a PR can be enqueued by a GitHub Actions job, which runs INSIDE GitHub, instead of by the GraphQL mutation a cloud routine cannot reach through the proxy",
+      "met": true
+    },
+    {
+      "criterion": "Readiness is 'every required check green', because lwb-lanes already fails without an independent review record and lwb-proof-pr without a proof record -- the gate IS the evidence, so no second weaker source of truth is introduced",
+      "met": true
+    },
+    {
+      "criterion": "Required contexts are read from the branch ruleset at runtime, not hardcoded; measured against the live repo as 9 contexts",
+      "met": true
+    },
+    {
+      "criterion": "An ABSENT check is refused, not treated as passing -- verified against the live PR #27, which reported 'required checks absent (not merely failing)'",
+      "met": true
+    },
+    {
+      "criterion": "A ruleset that cannot be read is an ERROR, and a ruleset requiring NOTHING refuses to enqueue rather than landing work on no evidence",
+      "met": true
+    },
+    {
+      "criterion": "The enqueue is pinned to a specific head commit, so a push between the check passing and the job running fails the mutation rather than landing an unreviewed head",
+      "met": true
+    },
+    {
+      "criterion": "Every trigger runs the DEFAULT BRANCH's code, so a pull request cannot edit the job that decides whether it may merge",
+      "met": true
+    },
+    {
+      "criterion": "10 tests, every one a refusal path, because a permissive error here lands unreviewed work with no human in the loop",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 999073937,
+    "cached_input": 992179582,
+    "uncached_input": 6894355,
+    "output": 2645168,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 131312.446,
+    "source": "transcript message.usage summed across this session's 2445 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T09:30:46.034Z). Cumulative across PRs 12-28 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
+  },
+  "mutations": [
+    ".github/workflows/auto-queue.yml: new -- check_suite completion and manual dispatch, default-branch code only, 5 minute timeout",
+    "scripts/cloud/auto_queue.py: new -- the readiness decision, kept out of the workflow so it is testable",
+    "tests/test_auto_queue.py: 10 tests, all refusal paths including absent/pending/failing checks, unreadable ruleset, empty ruleset, draft, closed and wrong-base",
+    ".gitignore: agent worktrees are scratch and must never be committed"
+  ],
+  "unproven": [
+    "THE WORKFLOW HAS NEVER FIRED. Its logic is tested and was run against the live repository from a laptop, but no check_suite event has yet triggered it in GitHub Actions. Until it does, 'a PR can land without a laptop' is a designed capability, not an observed one. The first real firing is the experiment.",
+    "GRAPHQL FROM INSIDE ACTIONS IS ASSUMED TO WORK, not measured. The premise is that Actions runs inside GitHub so nothing is proxied, and ShellUX's equivalent workflow works. Not yet observed for this repository.",
+    "The readiness test trusts that lwb-lanes and lwb-proof-pr are in the required-contexts list. They are today -- read live, 9 contexts -- but if a future ruleset change dropped either, 'all green' would stop implying an independent review exists. Nothing currently detects that.",
+    "check_suite completion fires per suite, not per required check. A PR whose contexts come from several workflows may be evaluated before the later ones finish; the job then refuses as not-ready and relies on a subsequent event. No cap on how long that can take.",
+    "Token accounting is cumulative across PRs 12-28 and excludes all subagent spend, carried forward from proof/26.json rather than re-derived."
+  ]
+}
