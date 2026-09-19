@@ -99,8 +99,19 @@ all-records pull request it defines the reviewed content out of
 existence.
 
 **This pull request is itself an instance.** A green `lwb-lanes` here is
-not evidence that anything in this file was reviewed. Treat the review
-record under `reviews/32/` as the evidence, and read it.
+not evidence that anything in this file was reviewed. The review record
+that demonstrated the hole (`reviews/32/`) does not exist in this tree,
+on `main`, or anywhere reachable from a fresh clone: PR #32 was closed
+unmerged, and the re-cut that carried this document forward (PR #41)
+deliberately left #32's reviewer-record commits behind. It still exists
+only on PR #32's own closed, unmerged branch on GitHub
+(`lwb-correct-27-dispatch`, https://github.com/LEAPWare-Software/LEAPWare-BuildCraft/pull/32)
+if that branch is not later deleted — it is not evidence a reader of
+this repository can rely on finding. Rely on the mechanism this
+document already names instead: `classify_path` treats `reviews/` and
+`proof/` as shared, and `resolve_reviewable_head` skips record-only
+commits, so any all-records-or-all-proof pull request is unreviewed by
+construction regardless of what its `lwb-lanes` result shows.
 
 **The mitigation in force is procedural, not mechanical:** the reviewer
 routines are never fired by hand for a PR the firing session authored.
