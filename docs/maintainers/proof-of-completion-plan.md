@@ -318,6 +318,54 @@ mechanical and is entitled to know the edges.
   has run. Installing it here is part of (e), and the degraded case must
   be visible rather than silent.
 
+## A gate that could never pass, shipped by the PR about gates that cannot fail
+
+`lwb_check_state_claims.py` re-derives HANDOFF.md's generated block and
+compared its recorded `main SHA:` against live `main` for EQUALITY. That
+is correct on a branch, where the block's `main` claim and the live
+`main` ref are the same commit. It is not correct after a squash merge:
+`main` becomes a brand-new merge commit that, by definition, did not
+exist at the moment the block was generated, so the recorded sha can
+never equal live `main` again. The check that was supposed to make gates
+honest could not itself pass once merged — and this defect was
+introduced by the very PR (#18) whose subject was "gates that cannot
+fail."
+
+Measured consequence, `main`'s own push-triggered CI run, by merge
+commit:
+
+    a65e2ef (PR #17)  success
+    39c951b (PR #18)  failure   <- introduced the equality-only check
+    a300623 (PR #19)  failure
+    f8cb770 (PR #20)  failure
+    539ee65 (PR #21)  failure
+
+Four consecutive merges to `main` ran red, unnoticed for the whole
+session. The reason it went unnoticed is itself the lesson: **a PR's
+`pull_request` check run and `main`'s own `push` check run are different
+triggers, on different commits, and a green `pull_request` run says
+nothing about whether `main`'s push run is green.** Every one of those
+four PRs merged with a green `pull_request` check — the pre-merge diff
+really did pass — and every one then turned `main` red the moment the
+squash-merge commit landed, because that commit is precisely the one
+this gate could never match. Reading only PR checks is reading half the
+signal; the other half, `main`'s own push runs, is where this sat
+undetected.
+
+Fix: `main SHA: X` is a timestamped snapshot, not a live assertion — it
+means "main was X when this was generated," which stays true after
+`main` moves on as long as X is still an ancestor of live `main` (via
+`git merge-base --is-ancestor`). Equal → pass, silently, as before. An
+ancestor → pass, but reported as an UNVERIFIABLE info line naming both
+shas, not hidden — this repo's whole problem is checks that pass
+quietly. Neither equal nor an ancestor (a sha that was never `main`, or a
+divergent history) → FAIL, a genuine lie. Cannot determine (the sha
+doesn't exist in this repo, a shallow clone truncated it out, or git
+itself is unavailable) → reported as undeterminable, never silently
+passed. See `scripts/lwb_check_state_claims.py` (`_merge_base_is_ancestor`)
+and `tests/test_lwb_check_state_claims.py` (the `ancestor` test group)
+for the mechanics.
+
 ## How this document should be read
 
 Everything above is a claim. Two audit rounds found thirteen blockers in

@@ -402,6 +402,36 @@ def _live_main_sha(repo: Path) -> str | None:
     return _rev_parse(repo, "origin/main") or _rev_parse(repo, "main")
 
 
+def _merge_base_is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool | None:
+    """True if `ancestor` is an ancestor of (or equal to) `descendant`,
+    False if it definitely is not, None if it cannot be determined (the
+    sha does not exist in this repo -- a shallow clone truncated it out,
+    or it was never a real object at all -- or git itself is
+    unavailable). `git merge-base --is-ancestor` exits 0/1 for a real
+    yes/no answer and a non-0/1 code (128 in practice) when it cannot
+    even resolve one of the two commits -- that third outcome must never
+    be folded into either a pass or a fail, per the module's degraded-path
+    convention (see `_pr_state`): "cannot tell" is its own outcome, not a
+    quiet "yes"."""
+    try:
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    return None
+
+
 def _pr_state(repo: Path, pr_number: int) -> str | None:
     """Live PR state via `gh`, or None if it cannot be determined (no
     `gh`, no auth, no network, timeout, or the PR doesn't exist). None
@@ -705,10 +735,51 @@ def _scan_generated_block(
                 infos.append(
                     Info(rel_path, lineno, f"main SHA could not be re-derived here: {stripped}")
                 )
-            elif not (live == recorded or live.startswith(recorded) or recorded.startswith(live)):
-                findings.append(
-                    Finding(rel_path, lineno, "stale main SHA in generated block", f"{stripped} (live: {live})")
-                )
+            elif live == recorded or live.startswith(recorded) or recorded.startswith(live):
+                # Equal (mod short-sha prefix matching): the block's claim
+                # is true right now. Unchanged from before -- no info line,
+                # a plain pass.
+                pass
+            else:
+                # Not equal. The block is a TIMESTAMPED SNAPSHOT -- "main
+                # SHA: X" asserts "main was X when this was generated",
+                # which stays TRUE after main moves on (e.g. a squash
+                # merge) as long as X is still an ancestor of live main.
+                # That is not the same claim as "main IS X right now", so
+                # it passes, but it is reported rather than hidden -- this
+                # repo's whole problem is checks that pass quietly. Only a
+                # sha that is neither equal NOR an ancestor is an actual
+                # lie (a sibling-branch commit, or a divergent history),
+                # and only a resolvable "no" (not "cannot tell") earns
+                # that FAIL -- see `_merge_base_is_ancestor`.
+                relation = _merge_base_is_ancestor(repo, recorded, live)
+                if relation is True:
+                    infos.append(
+                        Info(
+                            rel_path,
+                            lineno,
+                            f"recorded main SHA {recorded} predates live main {live} "
+                            f"(still an ancestor of it -- block is a timestamped snapshot)",
+                        )
+                    )
+                elif relation is False:
+                    findings.append(
+                        Finding(
+                            rel_path,
+                            lineno,
+                            "stale main SHA in generated block",
+                            f"{stripped} (live: {live})",
+                        )
+                    )
+                else:
+                    infos.append(
+                        Info(
+                            rel_path,
+                            lineno,
+                            f"main SHA ancestry could not be determined here (recorded "
+                            f"{recorded}, live {live}) -- not verified, not treated as a pass",
+                        )
+                    )
             i += 1
             continue
 
