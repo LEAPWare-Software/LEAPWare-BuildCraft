@@ -193,6 +193,35 @@ def classify_path(path: str) -> str:
     # `tests/**/*_claude_*` inside it still belong to the claude lane. No
     # shared prefix other than `tests/` can match a lane pattern, so the
     # order is a no-op for the rest.
+    # GENERATED VENDOR OUTPUT IS SHARED, NOT LANE-OWNED, and this exception
+    # must be checked FIRST, before the lane prefixes below would claim it.
+    #
+    # `plugins/<agent>/lwb/vendor/` is not hand-authored content. It is
+    # machine-written by `scripts/lwb_build.py` (a SHARED script) from
+    # `core/` and `adapters/` (SHARED and lane sources), and `lwb_build.py
+    # --check` fails CI whenever it drifts from those sources. Treating it as
+    # the agent's own lane created a DEADLOCK that had gone unnoticed because
+    # nothing had exercised it: any change to `core/` must be re-vendored into
+    # BOTH plugins or CI fails, but a claude-authored commit may not write
+    # `plugins/codex/`, so NO claude session could land a core change at all.
+    #
+    # That is not a hypothetical. `core/lwb_core/rules/` still contained
+    # exactly one rule, and the only commit in this repo's history to touch
+    # `plugins/codex/lwb/vendor/` is the bootstrap commit. The lane rule was
+    # silently holding the shared core closed against the only CLI in
+    # operation -- see docs/maintainers/proof-of-completion-plan.md.
+    #
+    # Classifying it `shared` is the honest answer rather than a loophole: the
+    # bytes are derived from shared sources, they are reviewed wherever those
+    # sources are reviewed, and a shared path still requires independent
+    # review before it lands. It does NOT weaken the lane rule for anything a
+    # human or agent actually writes -- `plugins/codex/lwb/hooks/`,
+    # `plugins/codex/lwb/bin/` and every other authored path under a lane are
+    # untouched by this exception.
+    for agent in ("claude", "codex"):
+        if posix.startswith(f"plugins/{agent}/lwb/vendor/"):
+            return "shared"
+
     for agent in ("claude", "codex"):
         if posix.startswith(f"plugins/{agent}/") or posix.startswith(f"adapters/{agent}/"):
             return agent

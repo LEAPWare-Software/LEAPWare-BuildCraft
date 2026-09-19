@@ -1,0 +1,240 @@
+"""Two holes in `scripts/lwb_build.py --check`, both found by the independent
+reviewer of PR #25 and both reproduced before being fixed.
+
+WHY THESE MATTER MORE THAN THEY LOOK. PR #25 reclassifies
+`plugins/*/lwb/vendor/` from the agent's own lane to `shared`, and its whole
+argument for why that is safe is that vendor output is only ever BUILD
+OUTPUT, verified by `--check`. That argument is worth exactly what this
+check is worth. The reviewer said so directly, then demonstrated two ways
+the check could be satisfied by a tree that is not what the build produced.
+"""
+
+from __future__ import annotations
+
+import sys
+
+import pytest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import lwb_build  # noqa: E402
+
+
+def test_a_file_replaced_by_a_same_named_directory_is_drift(tmp_path):
+    """`dircmp` files a name that is a file on one side and a directory on
+    the other under `common_funny` -- neither `left_only`, `right_only` nor
+    `diff_files` -- and `_trees_equal` never looked at it. So replacing a
+    vendored MODULE with a DIRECTORY of the same name passed the drift
+    check. Reproduced before the fix: `_trees_equal` returned True.
+
+    It can hide content rather than run it, because the core imports rules
+    by name and nothing scans the directory. But a check whose entire job is
+    "the vendor tree is exactly what the build produced" must not answer
+    True here.
+    """
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    (src / "rules").mkdir(parents=True)
+    (dst / "rules").mkdir(parents=True)
+    (src / "rules" / "lwb_version.py").write_text("reviewed source\n", encoding="utf-8")
+
+    masquerade = dst / "rules" / "lwb_version.py"
+    masquerade.mkdir()
+    (masquerade / "payload.py").write_text("payload\n", encoding="utf-8")
+
+    assert lwb_build._trees_equal(src, dst) is False
+
+
+def test_identical_trees_stay_equal_and_extra_files_still_drift(tmp_path):
+    """Guard on the guard above.
+
+    Without this, the previous test would pass against a `_trees_equal` that
+    simply returned False for everything -- a "fix" that breaks the build
+    check entirely.
+    """
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    (src / "rules").mkdir(parents=True)
+    (dst / "rules").mkdir(parents=True)
+    (src / "rules" / "lwb_version.py").write_text("reviewed source\n", encoding="utf-8")
+    (dst / "rules" / "lwb_version.py").write_text("reviewed source\n", encoding="utf-8")
+    assert lwb_build._trees_equal(src, dst) is True
+
+    (dst / "rules" / "evil.py").write_text("x\n", encoding="utf-8")
+    assert lwb_build._trees_equal(src, dst) is False
+
+
+def test_a_tracked_file_the_build_does_not_produce_is_reported(tmp_path, monkeypatch):
+    """The bytecode hole, which is NOT drift and so was invisible to drift.
+
+    `_trees_equal` ignores `__pycache__/` and `*.pyc` deliberately: they are
+    regenerated locally and are not drift, and `.gitignore` excludes them.
+    But `git add -f` commits one anyway, and a committed `.pyc` under
+    `plugins/*/lwb/vendor/` SHIPS IN THE PLUGIN and is what the interpreter
+    actually loads -- while the `.py` beside it, the file a reviewer reads,
+    never runs. The reviewer reproduced exactly that: an unchecked-hash
+    `.pyc` printed `payload` while its source said `reviewed source`, and
+    the diff a human sees is a binary blob.
+
+    The rule enforced here is deliberately NOT "no `.pyc` ships". It is
+    "nothing ships from vendor/ that the build did not write" -- bytecode is
+    merely the instance that prompted it.
+    """
+    vendor = tmp_path / "vendor"
+    staging = tmp_path / "staging"
+    (vendor / "rules").mkdir(parents=True)
+    (staging / "rules").mkdir(parents=True)
+    (staging / "rules" / "lwb_version.py").write_text("x\n", encoding="utf-8")
+    (vendor / "rules" / "lwb_version.py").write_text("x\n", encoding="utf-8")
+    stowaway = vendor / "rules" / "__pycache__" / "lwb_version.cpython-312.pyc"
+    stowaway.parent.mkdir()
+    stowaway.write_bytes(bytes([0]) + b"PAYLOAD")
+
+    class _Result:
+        returncode = 0
+        stdout = chr(0).join(
+            [
+                "vendor/rules/lwb_version.py",
+                "vendor/rules/__pycache__/lwb_version.cpython-312.pyc",
+            ]
+        )
+
+    monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+
+    found = lwb_build.tracked_files_the_build_does_not_produce(vendor, staging)
+    assert found == ["vendor/rules/__pycache__/lwb_version.cpython-312.pyc"], found
+
+
+def test_no_stowaways_when_every_tracked_file_is_built(tmp_path, monkeypatch):
+    """Guard on that guard: it must not flag files the build DID produce, or
+    `--check` would fail on every clean tree and be turned off."""
+    vendor = tmp_path / "vendor"
+    staging = tmp_path / "staging"
+    (vendor / "rules").mkdir(parents=True)
+    (staging / "rules").mkdir(parents=True)
+    for root in (vendor, staging):
+        (root / "rules" / "lwb_version.py").write_text("x\n", encoding="utf-8")
+
+    class _Result:
+        returncode = 0
+        stdout = "vendor/rules/lwb_version.py"
+
+    monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+    assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == []
+
+
+def test_git_unavailable_signals_rather_than_inventing_an_answer(tmp_path, monkeypatch):
+    """A non-zero `git ls-files` must not be dressed up as a positive
+    finding. It raises a DISTINCT signal rather than returning an empty
+    list, because "I checked and found nothing" and "I could not check"
+    must never share a representation."""
+    vendor = tmp_path / "vendor"
+    staging = tmp_path / "staging"
+    vendor.mkdir()
+    staging.mkdir()
+
+    class _Result:
+        returncode = 128
+        stdout = ""
+
+    monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+    with pytest.raises(lwb_build.CannotCheckStowaways):
+        lwb_build.tracked_files_the_build_does_not_produce(vendor, staging)
+
+
+def test_a_case_variant_stowaway_is_reported_on_every_os(tmp_path, monkeypatch, capsys):
+    """`Path.exists()` asks the FILESYSTEM, and that question is
+    case-insensitive on Windows and macOS.
+
+    A tracked `rules/LWB_VERSION.PY` therefore matched the built
+    `rules/lwb_version.py` and was reported as expected -- so a stowaway
+    differing only in case shipped unnoticed on exactly the platform most
+    contributors use, while Linux CI would have caught it. Found by the
+    independent reviewer of PR #25 and reproduced: the case variant returned
+    `[]` where it should have been reported.
+
+    Git is case-sensitive, so comparing against the SET of built relative
+    paths is the honest test and behaves identically on every OS. This test
+    passes on Linux either way; its value is on a case-insensitive disk.
+    """
+    vendor = tmp_path / "vendor"
+    staging = tmp_path / "staging"
+    (vendor / "rules").mkdir(parents=True)
+    (staging / "rules").mkdir(parents=True)
+    (staging / "rules" / "lwb_version.py").write_text("x\n", encoding="utf-8")
+    (vendor / "rules" / "lwb_version.py").write_text("x\n", encoding="utf-8")
+
+    class _Result:
+        returncode = 0
+        stdout = "vendor/rules/LWB_VERSION.PY"
+
+    monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+
+    assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == [
+        "vendor/rules/LWB_VERSION.PY"
+    ]
+
+
+def test_git_failure_says_nothing_was_checked_rather_than_passing_quietly(
+    tmp_path, monkeypatch, capsys
+):
+    """Returning an empty list on a git error is indistinguishable from
+    "checked, found nothing" -- this repository's signature defect, and the
+    reason this file exists at all. The reviewer flagged the silence.
+
+    The empty list is still correct (inventing a failure would be worse),
+    but the run must SAY that nothing was checked.
+    """
+    vendor = tmp_path / "vendor"
+    staging = tmp_path / "staging"
+    vendor.mkdir()
+    staging.mkdir()
+
+    class _Result:
+        returncode = 128
+        stdout = ""
+
+    monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+
+    with pytest.raises(lwb_build.CannotCheckStowaways):
+        lwb_build.tracked_files_the_build_does_not_produce(vendor, staging)
+
+    printed = capsys.readouterr().out
+    assert "NOTHING WAS CHECKED" in printed, printed
+    assert "not a pass" in printed, printed
+
+
+def test_the_exit_code_agrees_with_the_words_when_git_fails(monkeypatch, capsys):
+    """THE WORDS AND THE EXIT CODE MUST NOT DISAGREE.
+
+    The first version printed "NOTHING WAS CHECKED -- this is not a pass"
+    and then exited 0. The independent reviewer caught it and named the
+    precedent: it is the same contradiction PR #22 fixed in the `main SHA`
+    gate. Asserting the printed string alone -- which the previous version
+    of the test above did -- cannot catch this, because the string was
+    always right; it was the exit code that lied.
+
+    This repository has now answered the same question three times and the
+    answer must not vary: a shallow clone that cannot resolve `main^1`
+    FAILS (#22), an open-PR listing that cannot be resolved FAILS (#24),
+    and a stowaway check that cannot run FAILS here.
+    """
+    class _Result:
+        returncode = 1
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+    monkeypatch.setattr(sys, "argv", ["lwb_build.py", "--check"])
+
+    assert lwb_build.main() != 0
+
+    printed = capsys.readouterr().out
+    assert "NOTHING WAS CHECKED" in printed, printed

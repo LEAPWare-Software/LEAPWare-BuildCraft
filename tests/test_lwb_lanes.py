@@ -1057,3 +1057,56 @@ def test_review_ok_accepts_a_short_prefix_match(tmp_path):
 
     assert got == "reviewer-session"
     assert errors == []
+
+
+def test_generated_vendor_output_is_shared_not_lane_owned():
+    """The deadlock this exception exists to break.
+
+    `plugins/<agent>/lwb/vendor/` is machine-written by scripts/lwb_build.py
+    from core/ and adapters/, and `lwb_build.py --check` fails CI whenever it
+    drifts. While it classified as the agent's own lane, ANY change to core/
+    was unlandable by a claude session: the change had to be re-vendored into
+    BOTH plugins to keep CI green, and writing plugins/codex/ is outside the
+    claude lane.
+
+    That was not hypothetical. core/lwb_core/rules/ held exactly one rule --
+    a self-declared no-op -- and the only commit ever to touch
+    plugins/codex/lwb/vendor/ was the bootstrap commit. The lane rule was
+    holding the shared core closed against the only CLI in operation.
+    """
+    assert lwb_lanes.classify_path(
+        "plugins/codex/lwb/vendor/lwb_core/rules/lwb_proof_required.py"
+    ) == "shared"
+    assert lwb_lanes.classify_path(
+        "plugins/claude/lwb/vendor/lwb_core/rules/lwb_proof_required.py"
+    ) == "shared"
+    assert lwb_lanes.classify_path("plugins/codex/lwb/vendor/policy/default.json") == "shared"
+    assert lwb_lanes.classify_path("plugins/claude/lwb/vendor/adapters/claude/hook_io.py") == "shared"
+
+
+def test_the_vendor_exception_does_not_leak_into_authored_lane_paths():
+    """The exception must be exactly `vendor/`, and nothing else.
+
+    A loophole here would be worse than the deadlock it fixes: it would let
+    either agent write the other's real, hand-authored plugin code while the
+    lane gate reported success. Every authored path under a lane must still
+    classify as that lane.
+    """
+    for path in (
+        "plugins/codex/lwb/hooks/hooks.json",
+        "plugins/codex/lwb/bin/lwb_hook.py",
+        "plugins/codex/lwb/.codex-plugin/plugin.json",
+        "plugins/codex/lwb/skills/lwb-handoff/SKILL.md",
+    ):
+        assert lwb_lanes.classify_path(path) == "codex", path
+
+    for path in (
+        "plugins/claude/lwb/hooks/hooks.json",
+        "plugins/claude/lwb/bin/lwb_hook.py",
+        "plugins/claude/lwb/.claude-plugin/plugin.json",
+    ):
+        assert lwb_lanes.classify_path(path) == "claude", path
+
+    # A path merely CONTAINING the word vendor elsewhere is not exempt.
+    assert lwb_lanes.classify_path("plugins/codex/lwb/bin/vendor_helper.py") == "codex"
+    assert lwb_lanes.classify_path("plugins/codex/vendor/x.py") == "codex"

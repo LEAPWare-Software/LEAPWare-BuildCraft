@@ -40,16 +40,17 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 08:14 UTC
-main SHA: 1385baf48bf52f76b05b80edfa50bdcb492d0b9a
+Generated: 2026-09-19 09:01 UTC
+main SHA: b9a992e88744673f640b402f930cac6bf7d0c6aa
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#23 Close the three defects blocking a blocking re-execute gate (lwb-reexecute-blockable)
+#26 lwb_proof_required — the first rule that ships, and the first that can deny (lwb-ship-proof-rule)
+#25 The lane rule was holding the shared core closed (lwb-vendor-lane)
 
 Deliverable proof state (from proof/):
-16/16 proven
+17/17 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

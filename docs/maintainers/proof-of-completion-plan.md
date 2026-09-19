@@ -801,6 +801,88 @@ The pattern worth naming: **every time this repo adds a check that says
 "X is wrong", the case where X cannot be evaluated gets handled last and
 wrongly.** Three occurrences in two adjacent lines of one file.
 
+### The lane rule was holding the shared core closed
+
+Found while building the first rule intended to actually ship. It is the
+most consequential defect recorded in this document, because it explains
+the state the "1.0.0 readiness" section above measures.
+
+`scripts/lwb_build.py` vendors `core/` and `adapters/` into
+`plugins/claude/lwb/vendor/` **and** `plugins/codex/lwb/vendor/`, and
+`lwb_build.py --check` fails CI whenever either copy drifts from its
+source. But `classify_path` returned `codex` for anything under
+`plugins/codex/`, vendor output included, and a claude-authored commit may
+not touch the codex lane.
+
+**So any change to `core/` was unlandable by a claude session.** Re-vendor
+into both and the lane gate fails; re-vendor into one and
+`lwb_build.py --check` fails. There was no third option. Measured, with the
+real gate, on a real commit adding one rule to `core/`:
+
+```
+FAIL: <sha> (LWB-Agent: claude): touches
+  'plugins/codex/lwb/vendor/lwb_core/rules/lwb_proof_required.py',
+  outside the claude lane and not a shared path
+```
+
+This was never hypothetical and had simply never been exercised.
+`core/lwb_core/rules/` contained exactly one rule — the no-op walking
+skeleton — and **the only commit in this repository's history to touch
+`plugins/codex/lwb/vendor/` is the bootstrap commit.** The lane rule, whose
+purpose is to keep two agents from overwriting each other's work, was
+silently holding the shared core closed against the only CLI in operation.
+Every "why is there still only one rule" question in the readiness section
+above has this as at least part of its answer.
+
+**The fix:** `plugins/*/lwb/vendor/` classifies as `shared`. That is the
+honest classification rather than a loophole — the bytes are machine-written
+from shared sources by a shared script, they are reviewed wherever those
+sources are reviewed, and `shared` still requires independent review before
+anything lands. The exception is exactly `vendor/`: every authored path
+under a lane (`hooks/`, `bin/`, `skills/`, the plugin manifest) still
+classifies as that lane, which
+`test_the_vendor_exception_does_not_leak_into_authored_lane_paths` locks
+down. A loophole here would be worse than the deadlock, because it would
+let either agent rewrite the other's real plugin code while the gate
+reported success.
+
+#### The argument is only as strong as `--check`, and `--check` had two holes
+
+The reviewer of PR #25 agreed with classifying vendor output as `shared`
+and then attacked the reason given for it. Both holes CONFIRMED, and both
+reproduced here before being fixed:
+
+- **A committed `.pyc` runs instead of the reviewed source.** `_trees_equal`
+  ignores `__pycache__/` and `*.pyc` as build noise, and `.gitignore`
+  excludes them — but `git add -f` commits one anyway, and a committed
+  `.pyc` under `plugins/*/lwb/vendor/` ships in the plugin and is what the
+  interpreter loads, while the `.py` a reviewer reads never runs. The diff
+  a human sees is a binary blob. The reviewer demonstrated it in a scratch
+  package: the `.pyc` printed `payload` while its source said
+  `reviewed source`.
+- **A file replaced by a same-named directory passes.** `dircmp` files that
+  under `common_funny`, which nothing looked at. Turning
+  `lwb_core/rules/lwb_version.py` into a directory holding `payload.py`
+  gave `_trees_equal = True`. It can hide content rather than run it — the
+  core imports rules by name and nothing scans the directory — but a check
+  whose job is "the tree is exactly what the build produced" must not
+  answer True.
+
+Both are fixed in this PR rather than deferred, because PR #25's entire
+case for `shared` is *"vendor output is only ever build output, verified by
+`--check`"*. An argument is worth what its evidence is worth.
+
+`--check` now also refuses any git-**tracked** file under `vendor/` that
+the build does not produce. The rule enforced is deliberately "nothing
+ships from here that the build did not write", not "no `.pyc` ships from
+here" — bytecode is merely the instance that prompted it. And
+`common_funny`/`funny_files` now count as drift.
+
+Measured after the fix: a force-added `.pyc` is reported by name as a
+`STOWAWAY` and `--check` exits 1; a file-turned-directory returns False;
+identical trees still return True and an ordinary extra file still returns
+False, so the check was not simply broken into always-failing.
+
 ## 1.0.0 readiness — what the goal asks for, and what exists
 
 The stated goal is "BuildCraft 1.0.0 fully built and ready to be used by
