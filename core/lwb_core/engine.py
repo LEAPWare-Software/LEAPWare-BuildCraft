@@ -73,14 +73,21 @@ def evaluate(event: Event, policy: Policy) -> Decision:
         except Exception as exc:  # noqa: BLE001 - a broken rule must not deny.
             # Fail-open at the rule level too: an exception inside a rule is
             # a bug in that rule, not grounds to block a dispatch. Record it
-            # as a warning-shaped finding so adapters can log it.
-            findings.append(
-                Finding(
-                    rule_id=rule.rule_id,
-                    mode=RuleMode.WARN,
-                    reason=f"rule '{rule.rule_id}' raised {exc.__class__.__name__}: {exc}",
-                )
+            # as a warning-shaped finding so adapters can log it -- and
+            # actually append to `warnings`, the list
+            # `adapters/claude/hook_io.render_decision` reads to build
+            # `permissionDecisionReason`. A bare `continue` here used to
+            # drop straight past that append, so a crashing rule was
+            # recorded in `findings` but never reached the adapter's
+            # output at all -- a crash looked identical to a rule with
+            # nothing to say. Found by the independent reviewer of PR #27.
+            crash_finding = Finding(
+                rule_id=rule.rule_id,
+                mode=RuleMode.WARN,
+                reason=f"rule '{rule.rule_id}' raised {exc.__class__.__name__}: {exc}",
             )
+            findings.append(crash_finding)
+            warnings.append(crash_finding.reason)
             continue
 
         if finding is None:

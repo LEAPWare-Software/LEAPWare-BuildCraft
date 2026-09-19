@@ -56,18 +56,62 @@ _WARN_POLICY = {
 }
 
 
-def _hook_command(hooks_json: Path) -> str:
+def _agent_hook_entry(hooks_json: Path) -> dict:
+    """The literal PreToolUse hook entry `hooks.json` registers for `Agent`.
+
+    Returns the WHOLE hook dict, not just `command` -- mirrors
+    `scripts/lwb_check_foreign_repo.py`'s `_bash_hook_entry`, and for the
+    same reason: an independent reviewer found this function used to read
+    `command` out of this dict specifically to avoid assuming, then this
+    script hardcoded `timeout=30` for the subprocess call regardless of
+    what `hooks.json` declared (10, for both matchers, in both plugins).
+    A hook that runs 10-30s is killed by Claude Code at the declared
+    timeout in a real session; this check silently proved nothing about
+    that failure mode, on all three OSes the `lwb-portable` job runs, for
+    the ONLY matcher this repository ever exercises the launch of (see
+    `_check_one`'s `commandWindows` handling below for the other half of
+    the same finding). See `_check_one`.
+
+    A `matcher` may name more than one tool, "|"-separated; this treats
+    `Agent` as covered when it is the whole matcher or one of the
+    "|"-separated names in it, matching `_bash_hook_entry`'s convention
+    rather than the exact-string check this function used to do -- both
+    plugins currently declare a bare `"Agent"` matcher, so this widens
+    what would match without narrowing anything that matches today.
+    """
     hooks = json.loads(hooks_json.read_text(encoding="utf-8"))
-    for entry in hooks["hooks"]["PreToolUse"]:
-        if entry.get("matcher") == "Agent":
-            for hook in entry["hooks"]:
-                return hook["command"]
+    for entry in hooks.get("hooks", {}).get("PreToolUse", []):
+        matcher = entry.get("matcher", "")
+        names = [name.strip() for name in matcher.split("|")]
+        if "Agent" in names:
+            for hook in entry.get("hooks", []):
+                if hook.get("command"):
+                    return hook
     raise SystemExit(f"FAIL: no PreToolUse/Agent hook found in {hooks_json}")
 
 
 def _check_one(plugin_dir: Path, root_var: str, fixture: Path, errors: list[str]) -> None:
     hooks_json = plugin_dir / "hooks" / "hooks.json"
-    command = _hook_command(hooks_json).replace("${" + root_var + "}", str(plugin_dir))
+    entry = _agent_hook_entry(hooks_json)
+
+    timeout = entry.get("timeout")
+    if not isinstance(timeout, (int, float)) or isinstance(timeout, bool):
+        errors.append(
+            f"{plugin_dir}: the Agent PreToolUse entry in {hooks_json} declares no "
+            "numeric 'timeout' -- this check refuses to substitute a value "
+            "hooks.json does not itself declare"
+        )
+        return
+
+    # `commandWindows`, when declared, is the string the host actually
+    # launches on Windows (see `plugins/codex/lwb/hooks/hooks.json`,
+    # already read by `scripts/lwb_validate_codex_plugin.py`). Launching
+    # `command` unconditionally meant the one OS where `commandWindows`
+    # changes the meaning of the launch was the one OS where this check
+    # never read it -- found by an independent reviewer.
+    use_windows_command = os.name == "nt" and isinstance(entry.get("commandWindows"), str)
+    command_str = entry["commandWindows"] if use_windows_command else entry["command"]
+    command = command_str.replace("${" + root_var + "}", str(plugin_dir))
 
     with tempfile.TemporaryDirectory(prefix="lwb-portable-") as tmp:
         policy_path = Path(tmp) / "warn-policy.json"
@@ -77,18 +121,27 @@ def _check_one(plugin_dir: Path, root_var: str, fixture: Path, errors: list[str]
         env["LWB_POLICY_PATH"] = str(policy_path)
         env["LWB_LEDGER_PATH"] = str(Path(tmp) / "ledger.jsonl")
 
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=REPO_ROOT,
-            input=fixture.read_text(encoding="utf-8"),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            timeout=30,
-        )
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                cwd=REPO_ROOT,
+                input=fixture.read_text(encoding="utf-8"),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            errors.append(
+                f"{plugin_dir}: hook exceeded its declared timeout of {timeout}s "
+                f"({hooks_json}) for command {command!r} -- Claude Code would kill "
+                "this hook at that timeout in a real session\n"
+                f"stdout so far: {exc.stdout!r}\nstderr so far: {exc.stderr!r}"
+            )
+            return
 
     if result.returncode != 0:
         errors.append(
