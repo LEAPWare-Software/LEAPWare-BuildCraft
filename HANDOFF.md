@@ -30,16 +30,16 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 04:27 UTC
+Generated: 2026-09-19 05:15 UTC
 main SHA: f8cb7706488feb29cf6cd2a950a4f82f3dd879b7
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-(unavailable: no `gh` auth in this environment, or no open PRs)
+#21 CI re-executes verifiable commands — and it caught main on its first run (lwb-reexecute-digests)
 
 Deliverable proof state (from proof/):
-12/12 proven
+13/13 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
