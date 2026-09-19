@@ -3,7 +3,7 @@
   "pr": 35,
   "author": "conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
-  "commit": "97495ce",
+  "commit": "80834aa",
   "commands": [
     {
       "argv": [
@@ -25,9 +25,9 @@
         "  <repo>/tests/test_lwb_check_proof_reexecute.py:248: DeprecationWarning: invalid escape sequence '<path>'",
         "    _assert_argv_is_skipped_as_self([\"cmd\", \"<path>\", \"python scripts/lwb_check_proof.py --reexecute\"])",
         "-- Docs: http<path>",
-        "522 passed, 1 warning in 21.80s"
+        "522 passed, 1 warning in 21.52s"
       ],
-      "sha256": "bf58bbdc1536cad8629b366fc033c10c8eee0e7d95d4cb0f5e6e38efb921e801",
+      "sha256": "d020c6b17f3213383355194f744ca667373e9315799bd5920a223ff93d83750e",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -42,10 +42,10 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "HANDOFF.md:45: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 17:00 UTC",
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 17:05 UTC",
         "lwb-check-state-claims check passed"
       ],
-      "sha256": "51cb411238357b3aa4a71dc824f6685cd0679905242b99413470f2f54e3a454f",
+      "sha256": "c5f3dcd2690169e3a596b2874fadf3b96431eaacbf532d3d40f52211d93b22a2",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -58,9 +58,9 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "OK: <repo>/HANDOFF.md passes all checks (2942 bytes)"
+        "OK: <repo>/HANDOFF.md passes all checks (2980 bytes)"
       ],
-      "sha256": "b9faccbc5d5f6f595b8d73764e6236e39b3fe6ecfdcbecdd29b554fb59164ad9",
+      "sha256": "0932895089c6973e689ff9db877f4ab400f8a3938d49dd939fd2a197260cc652",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -132,6 +132,10 @@
     },
     {
       "criterion": "Independent cloud review B (reviews/35/cloud-reviewer-b.json, DISAGREE at 78582c9) confirmed reviewer A's two findings were genuinely fixed (re-measured, not trusted) and raised one new finding: HANDOFF.md item 2 overstated D27's rule as a platform impossibility ('no routine can create a routine') rather than D27's actual, narrower claim ('the reviewer must be a SEPARATE cron entry with no trigger path from any conductor' -- a maintained configuration). Reworded to match D27's own text. Findings 3 and 4 (structural, owner-level) independently reconfirmed by this second reviewer; still not addressed here for the same reason as before.",
+      "met": true
+    },
+    {
+      "criterion": "Reviewer B's addendum comment cited reviews/27/dispatch-correction.md (verified directly, fetched from origin/lwb-correct-27-dispatch) showing D27's independence rule was already tested once, informally: #27's reviewer was manually fired by its author's own session, and no gate caught it. HANDOFF.md item 2 now cites this case directly instead of the vaguer 'no session has actually tested' framing. The reviewer's own comment states this does not change its verdict or remedy -- a precision improvement on an already-agreed fix, not a response to a new blocking finding.",
       "met": true
     }
   ],
