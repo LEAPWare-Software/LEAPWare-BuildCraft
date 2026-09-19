@@ -207,9 +207,15 @@ a stated reason is honest.
 
 **The rule for marking a command `verifiable: true` (a mistake this repo
 has already made once):** a command is `verifiable: true` ONLY if its
-output depends on nothing but the repository's tracked content at the
-recorded commit. If a machine re-executing it at that same commit, on any
-machine, could ever print something different from what was recorded --
+output cannot vary between the commit where it was recorded and ANY
+LATER COMMIT where it might be re-run. Note what that is not: `--reexecute`
+never checks out the recorded commit, it runs against whatever is checked
+out now, so "invariant at the recorded commit" is the wrong test and was
+not enough -- PR #20 marked a command verifiable that satisfied exactly
+that weaker wording and still could not reproduce, because the tracked
+file it measured is itself regenerated. If a machine re-executing it, at
+any commit, on any machine, could ever print something different from what
+was recorded --
 because the output embeds a byte count, a file count, a timestamp, a live
 `gh`/network result, a generated-block value, or anything else derived
 from repo STATE rather than repo CONTENT -- it is not `verifiable: true`,

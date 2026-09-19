@@ -101,7 +101,13 @@ def run_command(
 
     **The rule for `verifiable=True`, which this function cannot enforce
     for you:** a command is verifiable ONLY if its output depends on
-    nothing but the repository's tracked content at the recorded commit.
+    nothing that varies between the commit where it was recorded and the
+    commit where it is later re-run. `--reexecute` never checks out the
+    recorded commit -- it runs against whatever is checked out now -- so
+    "invariant at the recorded commit" is not the test and was not enough:
+    PR #20 marked a command verifiable that satisfied exactly that wording
+    and still could not reproduce, because the tracked file it measured is
+    itself regenerated.
     Read the CAPTURED OUTPUT before setting this, not just the exit code --
     if it embeds a byte count, a file count, a timestamp, a live
     `gh`/network result, a resolved sha, or anything else derived from a
