@@ -846,6 +846,43 @@ down. A loophole here would be worse than the deadlock, because it would
 let either agent rewrite the other's real plugin code while the gate
 reported success.
 
+#### The argument is only as strong as `--check`, and `--check` had two holes
+
+The reviewer of PR #25 agreed with classifying vendor output as `shared`
+and then attacked the reason given for it. Both holes CONFIRMED, and both
+reproduced here before being fixed:
+
+- **A committed `.pyc` runs instead of the reviewed source.** `_trees_equal`
+  ignores `__pycache__/` and `*.pyc` as build noise, and `.gitignore`
+  excludes them — but `git add -f` commits one anyway, and a committed
+  `.pyc` under `plugins/*/lwb/vendor/` ships in the plugin and is what the
+  interpreter loads, while the `.py` a reviewer reads never runs. The diff
+  a human sees is a binary blob. The reviewer demonstrated it in a scratch
+  package: the `.pyc` printed `payload` while its source said
+  `reviewed source`.
+- **A file replaced by a same-named directory passes.** `dircmp` files that
+  under `common_funny`, which nothing looked at. Turning
+  `lwb_core/rules/lwb_version.py` into a directory holding `payload.py`
+  gave `_trees_equal = True`. It can hide content rather than run it — the
+  core imports rules by name and nothing scans the directory — but a check
+  whose job is "the tree is exactly what the build produced" must not
+  answer True.
+
+Both are fixed in this PR rather than deferred, because PR #25's entire
+case for `shared` is *"vendor output is only ever build output, verified by
+`--check`"*. An argument is worth what its evidence is worth.
+
+`--check` now also refuses any git-**tracked** file under `vendor/` that
+the build does not produce. The rule enforced is deliberately "nothing
+ships from here that the build did not write", not "no `.pyc` ships from
+here" — bytecode is merely the instance that prompted it. And
+`common_funny`/`funny_files` now count as drift.
+
+Measured after the fix: a force-added `.pyc` is reported by name as a
+`STOWAWAY` and `--check` exits 1; a file-turned-directory returns False;
+identical trees still return True and an ordinary extra file still returns
+False, so the check was not simply broken into always-failing.
+
 ## 1.0.0 readiness — what the goal asks for, and what exists
 
 The stated goal is "BuildCraft 1.0.0 fully built and ready to be used by

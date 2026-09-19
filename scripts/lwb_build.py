@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import filecmp
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -113,10 +114,76 @@ def _trees_equal(a: Path, b: Path) -> bool:
             continue
         if not filecmp.cmp(a / name, b / name, shallow=False):
             return False
+    # A NAME PRESENT ON BOTH SIDES AS DIFFERENT KINDS is not "common" in any
+    # useful sense, and `dircmp` does not report it as a difference: it goes
+    # into `common_funny` (one side a file, the other a directory, or a stat
+    # that failed), which nothing here used to look at. So replacing a
+    # vendored MODULE with a DIRECTORY of the same name passed this check --
+    # reproduced: `lwb_core/rules/lwb_version.py` turned into a directory
+    # holding `payload.py` gave `_trees_equal = True`. It could hide content
+    # rather than run it, because the core imports rules by name and nothing
+    # scans the directory, but a check whose job is "the vendor tree is
+    # exactly what the build produced" must not answer True here.
+    # `funny_files` is the same class for files that could not be compared at
+    # all. Found by the independent reviewer of PR #25, which is the PR that
+    # makes this check load-bearing for review policy.
+    if comparison.common_funny or comparison.funny_files:
+        return False
+
     for sub in comparison.common_dirs:
         if not _trees_equal(a / sub, b / sub):
             return False
     return True
+
+
+def tracked_files_the_build_does_not_produce(vendor_dir: Path, staging: Path) -> list[str]:
+    """git-TRACKED paths under `vendor_dir` that the build did not write.
+
+    `_trees_equal` deliberately ignores interpreter bytecode, because it is
+    regenerated locally and is not drift. But "ignored by the drift check"
+    and "harmless" are different claims, and the gap between them is real:
+    `.gitignore` excludes `__pycache__/` and `*.pyc`, yet `git add -f` can
+    commit one anyway, and a committed `.pyc` under `plugins/*/lwb/vendor/`
+    SHIPS IN THE PLUGIN and is what the interpreter actually loads -- while
+    the `.py` beside it, the file a reviewer reads, is never executed. The
+    reviewer of PR #25 reproduced exactly that in a scratch package: an
+    unchecked-hash `.pyc` printed `payload` while its source said
+    `reviewed source`, and the diff a human sees is a binary blob.
+
+    PR #25 argues that vendor output is safe to classify as `shared`
+    BECAUSE it is only ever build output, verified by `--check`. That
+    argument is worth no more than this function makes it worth. So the
+    check now also refuses any tracked file the build does not produce --
+    bytecode included, and not by naming bytecode specifically, because the
+    rule that matters is "nothing ships from here that the build did not
+    write", not "no .pyc ships from here".
+    """
+    result = subprocess.run(
+        ["git", "ls-files", "-z", "--", str(vendor_dir)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        # Not a git repo, or git unavailable: report nothing rather than
+        # inventing a pass OR a fail. `main` prints this state explicitly.
+        return []
+
+    unexpected: list[str] = []
+    for raw in result.stdout.split(chr(0)):
+        rel = raw.strip()
+        if not rel:
+            continue
+        tracked = REPO_ROOT / rel
+        try:
+            inside = tracked.relative_to(vendor_dir)
+        except ValueError:
+            continue
+        if not (staging / inside).exists():
+            unexpected.append(rel)
+    return sorted(unexpected)
 
 
 def main() -> int:
@@ -140,6 +207,19 @@ def main() -> int:
                     drift_found = True
                 else:
                     print(f"OK: {vendor_dir} matches source")
+
+                # Separate from drift, and reported separately: a tracked
+                # file the build does not produce is not "stale", it is
+                # something that should not be in the shipped plugin at all.
+                stowaways = tracked_files_the_build_does_not_produce(vendor_dir, staging)
+                if stowaways:
+                    print(
+                        f"STOWAWAY: {len(stowaways)} git-tracked file(s) under {vendor_dir} "
+                        f"are NOT produced by the build and would ship anyway:"
+                    )
+                    for rel in stowaways:
+                        print(f"    {rel}")
+                    drift_found = True
             else:
                 if vendor_dir.exists():
                     shutil.rmtree(vendor_dir)
