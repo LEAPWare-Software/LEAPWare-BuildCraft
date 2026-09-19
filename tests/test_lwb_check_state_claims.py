@@ -29,6 +29,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import lwb_check_state_claims as m  # noqa: E402
+import lwb_handoff  # noqa: E402
 
 
 def _init_repo(tmp_path: Path) -> Path:
@@ -386,11 +387,67 @@ def test_handoff_generated_block_passes_when_everything_rederives_clean(tmp_path
         "Generated: 2026-09-18 22:35 UTC\n"
         f"main SHA: {main_sha}\n\n"
         "Open PRs:\n(none)\n\n"
-        "Deliverable proof state (from proof/):\n(none yet)\n\n"
+        "Deliverable proof state (from proof/):\n0/0 proven\n(none yet)\n\n"
         f"{m.END_MARKER}\n\n## Where to look\n\n- nowhere\n"
     )
     _commit_md(repo, "HANDOFF.md", handoff)
     assert m.check(repo) == []
+
+
+# ---------------------------------------------------------------------------
+# Coupling: this script's re-derivation of "Deliverable proof state" MUST
+# match scripts/lwb_handoff.py's own generator byte for byte, for every
+# shape proof/ can take. Written so it fails if either side changes alone
+# -- `_derive_proof_state_lines` now just calls `lwb_handoff._proof_state_
+# lines` directly, so this test also guards against a future edit that
+# re-introduces a second, independent copy of the derivation.
+# ---------------------------------------------------------------------------
+
+
+def _write_proof_record(proof_dir: Path, name: str, proven: bool = True) -> None:
+    if proven:
+        body = (
+            f'{{"deliverable": "{name}", "author": "a", "checked_by": "b", '
+            '"commit": "abc1234", "commands": [], "mutations": [], "unproven": []}'
+        )
+    else:
+        body = f'{{"deliverable": "{name}", "author": "a", "checked_by": "b"}}'
+    (proof_dir / f"{name}.json").write_text(body, encoding="utf-8")
+
+
+def test_derivation_matches_generator_zero_records(tmp_path):
+    repo = _init_repo(tmp_path)
+    generator = lwb_handoff._proof_state_lines(repo / "proof")
+    derived = m._derive_proof_state_lines(repo)
+    assert derived == generator == ["0/0 proven", "(none yet)"]
+
+
+def test_derivation_matches_generator_all_proven(tmp_path):
+    repo = _init_repo(tmp_path)
+    proof_dir = repo / "proof"
+    proof_dir.mkdir()
+    _write_proof_record(proof_dir, "one", proven=True)
+    _write_proof_record(proof_dir, "two", proven=True)
+
+    generator = lwb_handoff._proof_state_lines(proof_dir)
+    derived = m._derive_proof_state_lines(repo)
+
+    assert derived == generator == ["2/2 proven", "(all proven; none outstanding)"]
+
+
+def test_derivation_matches_generator_some_unproven(tmp_path):
+    repo = _init_repo(tmp_path)
+    proof_dir = repo / "proof"
+    proof_dir.mkdir()
+    _write_proof_record(proof_dir, "one", proven=True)
+    _write_proof_record(proof_dir, "broken", proven=False)
+
+    generator = lwb_handoff._proof_state_lines(proof_dir)
+    derived = m._derive_proof_state_lines(repo)
+
+    assert derived == generator
+    assert derived[0] == "1/2 proven"
+    assert any("broken" in line for line in derived)
 
 
 # ---------------------------------------------------------------------------

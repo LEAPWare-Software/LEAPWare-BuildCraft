@@ -98,9 +98,11 @@ implements):
     against live git/gh state where possible and compared; a mismatch is
     a finding, and inability to re-derive (no `gh` auth, e.g. in CI) is
     printed as UNVERIFIABLE rather than silently treated as passing. Its
-    `Deliverable proof state (from proof/):` bullets are re-derived via
-    the same validator `lwb_check_proof.py` uses and compared line for
-    line.
+    `Deliverable proof state (from proof/):` lines -- a summary line plus
+    one line per UNPROVEN record, so the section's size tracks problem
+    count rather than record count, owner ruling 2026-09-18 -- are
+    re-derived by calling `lwb_handoff._proof_state_lines()` directly and
+    compared line for line.
   - The marker is bound to `HANDOFF.md` specifically; the same text in
     any other file grants no exemption. Inside HANDOFF.md, exactly one
     BEGIN and one matching END are required -- a missing/duplicated/
@@ -156,7 +158,6 @@ exits 0 (after printing any UNVERIFIABLE notes) otherwise.
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import subprocess
 import sys
@@ -422,35 +423,16 @@ def _pr_state(repo: Path, pr_number: int) -> str | None:
 
 
 def _derive_proof_state_lines(repo: Path) -> list[str]:
-    """Mirror scripts/lwb_handoff.py's `_proof_state_lines()`, but
-    parameterised on `repo` instead of that module's own REPO_ROOT
-    global, so this can be re-derived against any repo under test."""
-    import lwb_check_proof  # local import: only needed when a HANDOFF.md exists
+    """Re-derive the "Deliverable proof state" content lines by calling
+    scripts/lwb_handoff.py's OWN `_proof_state_lines()` directly, rather
+    than maintaining a second copy of that logic here. Two independent
+    implementations of the same derivation is exactly how this coupling
+    broke before (see the module docstring): they drift, and then either
+    a correct file fails forever or the gate silently stops checking. One
+    function, called from both scripts, cannot drift from itself."""
+    import lwb_handoff  # local import: only needed when a HANDOFF.md exists
 
-    proof_dir = repo / "proof"
-    if not proof_dir.is_dir():
-        return ["(none yet)"]
-
-    records = sorted(
-        p for p in proof_dir.glob("*.json") if p.name not in ("schema.json", "exempt.json")
-    )
-    if not records:
-        return ["(none yet)"]
-
-    lines: list[str] = []
-    for path in records:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            lines.append(f"- {path.name}: INVALID (bad JSON: {exc})")
-            continue
-        errors = lwb_check_proof._validate_record(path, data)
-        deliverable = data.get("deliverable", path.stem) if isinstance(data, dict) else path.stem
-        if errors:
-            lines.append(f"- {deliverable}: INVALID ({errors[0]})")
-        else:
-            lines.append(f"- {deliverable}: PROVEN (commit {data.get('commit')})")
-    return lines
+    return lwb_handoff._proof_state_lines(repo / "proof")
 
 
 # ---------------------------------------------------------------------------
