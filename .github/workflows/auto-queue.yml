@@ -86,27 +86,27 @@ jobs:
       # A fallback to `github.token` would be the exact defect this repository
       # keeps shipping: a path that cannot work, reporting the same success as
       # one that does. So the secret is REQUIRED, and its absence fails loudly.
-      - name: Require the AUTO_QUEUE_TOKEN secret
+      - name: Require the AUTO_TOKEN_QUEUE secret
         if: steps.find.outputs.prs != ''
         env:
-          AUTO_QUEUE_TOKEN: ${{ secrets.AUTO_QUEUE_TOKEN }}
+          AUTO_TOKEN_QUEUE: ${{ secrets.AUTO_TOKEN_QUEUE }}
         run: |
-          if [ -z "$AUTO_QUEUE_TOKEN" ]; then
-            echo "::error::AUTO_QUEUE_TOKEN is not set. The built-in GITHUB_TOKEN"
+          if [ -z "$AUTO_TOKEN_QUEUE" ]; then
+            echo "::error::AUTO_TOKEN_QUEUE is not set. The built-in GITHUB_TOKEN"
             echo "::error::cannot start the merge_group checks, so an enqueue made"
             echo "::error::with it leaves the pull request stalled in the queue."
             echo "::error::Create a classic repo-scope token and add it as the"
-            echo "::error::Actions secret AUTO_QUEUE_TOKEN. There is no fallback"
+            echo "::error::Actions secret AUTO_TOKEN_QUEUE. There is no fallback"
             echo "::error::on purpose: a path that cannot work must not report"
             echo "::error::the same success as one that can."
             exit 1
           fi
-          echo "AUTO_QUEUE_TOKEN is present."
+          echo "AUTO_TOKEN_QUEUE is present."
 
       - name: Enqueue if ready
         if: steps.find.outputs.prs != ''
         env:
-          GH_TOKEN: ${{ secrets.AUTO_QUEUE_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTO_TOKEN_QUEUE }}
         run: |
           for pr in $(echo "${{ steps.find.outputs.prs }}" | tr ',' ' '); do
             echo "::group::PR #$pr"
