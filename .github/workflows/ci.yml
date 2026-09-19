@@ -145,6 +145,22 @@ jobs:
         # observed reproducing here. See
         # docs/maintainers/proof-of-completion-plan.md, blocker 2.
         continue-on-error: true
+        # REPORT-ONLY DOES NOT BOUND TIME, which the independent reviewer
+        # of this PR pushed back on and which is right: continue-on-error
+        # stops a FAILURE from failing the job, it does not stop a HANG.
+        # This workflow had no timeout-minutes anywhere, so GitHub's
+        # 360-minute default was the only cap. The per-command
+        # REEXECUTE_TIMEOUT_SECONDS = 300 in scripts/lwb_check_proof.py is
+        # not sufficient alone: on Windows a command that TIMES OUT and is
+        # KILLED, while a child process it spawned keeps the pipes open,
+        # makes subprocess.run wait for that child anyway -- the reviewer
+        # measured a 2-second limit taking 20 seconds. (An earlier version
+        # of this comment said "a command that exits but leaves a child
+        # process"; that is not what was measured, and the reviewer
+        # corrected it.) This step-level cap is the outer bound that
+        # holds regardless. 15 minutes is many times the whole job's
+        # current runtime, so it can only fire on a genuine hang.
+        timeout-minutes: 15
         run: python scripts/lwb_check_proof.py --reexecute
 
       - name: lwb-proof-coverage (every landed deliverable HAS a record)
