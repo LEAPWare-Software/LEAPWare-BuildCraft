@@ -24,7 +24,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dev dependencies
-        run: python -m pip install --upgrade pip pytest
+        # pyyaml is for tests/test_workflows_parse.py ONLY -- nothing
+        # shipped imports it (Python 3.10+ stdlib only, per the hard
+        # rules). That test FAILS rather than skips when PyYAML is
+        # missing in CI, because a skipped parse check here would
+        # recreate the blindness it exists to prevent: an unparseable
+        # workflow produces NO run at all, not a red one, and eleven
+        # commits once landed on a branch whose CI had silently stopped.
+        run: python -m pip install --upgrade pip pytest pyyaml
 
       # Every gate step from here to the end of this job carries
       # `if: always()` (or `if: always() && <its own condition>`).
