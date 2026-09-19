@@ -120,7 +120,7 @@ jobs:
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
 
-      - name: lwb-proof-reexecute (report-only: re-run verifiable commands, compare digests)
+      - name: "lwb-proof-reexecute (report-only: re-run verifiable commands, compare digests)"
         if: always()
         # REPORT-ONLY, deliberately: this step can never fail the job
         # (continue-on-error: true, plus if: always() above like every
