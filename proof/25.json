@@ -1,0 +1,170 @@
+{
+  "deliverable": "generated-vendor-output-is-shared-not-lane-owned",
+  "pr": 25,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-claude-3b64530b-2026-09-19",
+  "commit": "c387368",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 17%]",
+        "........................................................................ [ 34%]",
+        "........................................................................ [ 51%]",
+        "........................................................................ [ 69%]",
+        "........................................................................ [ 86%]",
+        ".........................................................                [100%]",
+        "417 passed in 97.96s (0:01:37)"
+      ],
+      "sha256": "79d86f0c01096a83457fa1ec61fbcd52409d9e0b21a721ac877adef97b678b1c",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_lwb_build_check_holes.py",
+        "tests/test_lwb_lanes.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "....................................................................     [100%]",
+        "68 passed in 6.60s"
+      ],
+      "sha256": "bd15de73ae8075651548090a31a128002691e89b226e720303976cf6dd3b7ea0",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "THE DEADLOCK IS REAL AND WAS MEASURED, not argued: a claude-authored commit adding one rule to core/ failed the lane gate on four plugins/codex/lwb/vendor/ paths, because lwb_build.py vendors core into BOTH plugins and lwb_build --check fails if either drifts",
+      "met": true
+    },
+    {
+      "criterion": "plugins/*/lwb/vendor/ classifies as shared, so a core change is landable by a claude session while still requiring independent review",
+      "met": true
+    },
+    {
+      "criterion": "THE EXCEPTION IS EXACTLY vendor/ AND LEAKS NOWHERE: hooks/, bin/, skills/ and the plugin manifest under either lane still classify as that lane, including the near-misses bin/vendor_helper.py and plugins/codex/vendor/x.py",
+      "met": true
+    },
+    {
+      "criterion": "The deadlock test was confirmed RED against the pre-fix classifier by restoring it and re-running, and the leak test passes against BOTH versions, as a guard test should",
+      "met": true
+    },
+    {
+      "criterion": "HOLE CLOSED: a git-tracked file under vendor/ that the build does not produce is reported by name as a STOWAWAY and --check exits 1 -- a force-added .pyc ships in the plugin and is what the interpreter loads, while the reviewed .py never runs",
+      "met": true
+    },
+    {
+      "criterion": "HOLE CLOSED: a file replaced by a same-named directory is drift. dircmp files it under common_funny, which nothing checked, so _trees_equal returned True",
+      "met": true
+    },
+    {
+      "criterion": "The two hole fixes carry guards on the guards: identical trees still compare equal and an ordinary extra file is still drift, so the check was not broken into always-failing",
+      "met": true
+    },
+    {
+      "criterion": "HOLE CLOSED, and it only bit on the platform most contributors use: a tracked stowaway differing ONLY IN CASE was missed, because Path.exists() asks the filesystem and that question is case-insensitive on Windows and macOS. Now a set comparison against the built relative paths, identical on every OS",
+      "met": true
+    },
+    {
+      "criterion": "A git failure no longer passes in silence: the stowaway check prints NOTHING WAS CHECKED -- this is not a pass, rather than returning an empty list that reads as 'checked, found nothing'",
+      "met": true
+    },
+    {
+      "criterion": "THE WORDS AND THE EXIT CODE AGREE: when the stowaway check cannot run, --check exits non-zero rather than printing THIS IS NOT A PASS and exiting 0. Same answer this repo gave in PR #22 (shallow clone) and PR #24 (unresolvable open-PR listing)",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 952176465,
+    "cached_input": 945410969,
+    "uncached_input": 6765496,
+    "output": 2553719,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 129582.517,
+    "source": "transcript message.usage summed across this session's 2341 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T09:01:56.105Z). Cumulative across PRs 12-25 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
+  },
+  "mutations": [
+    "scripts/lwb_lanes.py: classify_path returns 'shared' for plugins/*/lwb/vendor/, checked BEFORE the lane prefixes would claim it",
+    "scripts/lwb_build.py: _trees_equal now treats common_funny/funny_files as drift; new tracked_files_the_build_does_not_produce() reports git-tracked stowaways under vendor/; main() reports them separately from drift and exits non-zero",
+    "tests/test_lwb_lanes.py: the deadlock test and the leak test, the latter covering four authored codex paths plus two near-misses",
+    "tests/test_lwb_build_check_holes.py: five tests for the two holes, including guards on the guards and the git-unavailable degraded path",
+    "docs/maintainers/proof-of-completion-plan.md: the deadlock recorded as the reason core/lwb_core/rules/ still held one rule, plus both holes",
+    "scripts/lwb_build.py: stowaway membership test changed from Path.exists() to a set of built relative paths (case-insensitive filesystems); git-failure branch now prints an explicit NOTHING WAS CHECKED notice",
+    "tests/test_lwb_build_check_holes.py: two further tests, for the case variant and for the git-failure notice",
+    "scripts/lwb_build.py: CannotCheckStowaways signal replaces a bare empty-list return when git ls-files fails, and main() turns it into a non-zero exit"
+  ],
+  "unproven": [
+    "PATH-TRAVERSAL IN THE WRITE HOOK, PLAUSIBLE AND PRE-EXISTING, NOT FIXED: the reviewer found 'plugins/codex/lwb/vendor/../bin/lwb_hook.py' classifies 'shared' and the write hook ALLOWS a claude Edit on it. It also found the identical shape already on main before this PR -- 'docs/../plugins/codex/lwb/bin/lwb_hook.py' was already shared+allow -- so this PR does not introduce it. CI is unaffected because the lane gate reads canonical paths from git diff-tree --name-only, and the write hook is the documented nudge, not the check of record. Normalising the path in _relativize would close it.",
+    "CASE VARIANTS ARE NOT EXEMPTED BUT ARE NOT LANE-CLASSIFIED EITHER: the reviewer measured 'plugins/Codex/lwb/Vendor/x.py' as 'other', which CI REJECTS because check_lanes errors on any class that is neither shared nor the agent's own. 'plugins/codex/lwb/Vendor/x.py' stays codex. Neither is a bypass, but the behaviour is incidental rather than designed.",
+    "THE STOWAWAY CHECK STILL DEPENDS ON git ls-files. If git is unavailable or the directory is not a repo it returns an empty list -- the right value, since inventing a failure would be worse -- but in that state it provides NO protection at all. It now says so explicitly (NOTHING WAS CHECKED -- this is not a pass) rather than returning silently, which is the only part of this that was fixed.",
+    "THE CASE-VARIANT FIX WAS VERIFIED ON WINDOWS ONLY. The reviewer reasoned it would already have been flagged on Linux, where the filesystem is case-sensitive, and marked that PLAUSIBLE rather than run. The set comparison now makes the behaviour identical on every OS by construction, but no Linux run has confirmed it.",
+    "The reviewer did not check CI on 74df39a or 5000101, and did not read the plan-doc additions.",
+    "SYMLINK COVERAGE IS PARTIAL, corrected from an earlier version of this record which said symlinks were untested. The reviewer DID test a tracked symlink at a NEW path at 5000101: it was reported as a STOWAWAY with exit 1. What remains reasoned rather than tested is a symlink that REPLACES a built file under the same name.",
+    "Token accounting is cumulative across PRs 12-25, not attributable to this PR alone."
+  ]
+}

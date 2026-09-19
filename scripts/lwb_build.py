@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import filecmp
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -113,10 +114,125 @@ def _trees_equal(a: Path, b: Path) -> bool:
             continue
         if not filecmp.cmp(a / name, b / name, shallow=False):
             return False
+    # A NAME PRESENT ON BOTH SIDES AS DIFFERENT KINDS is not "common" in any
+    # useful sense, and `dircmp` does not report it as a difference: it goes
+    # into `common_funny` (one side a file, the other a directory, or a stat
+    # that failed), which nothing here used to look at. So replacing a
+    # vendored MODULE with a DIRECTORY of the same name passed this check --
+    # reproduced: `lwb_core/rules/lwb_version.py` turned into a directory
+    # holding `payload.py` gave `_trees_equal = True`. It could hide content
+    # rather than run it, because the core imports rules by name and nothing
+    # scans the directory, but a check whose job is "the vendor tree is
+    # exactly what the build produced" must not answer True here.
+    # `funny_files` is the same class for files that could not be compared at
+    # all. Found by the independent reviewer of PR #25, which is the PR that
+    # makes this check load-bearing for review policy.
+    if comparison.common_funny or comparison.funny_files:
+        return False
+
     for sub in comparison.common_dirs:
         if not _trees_equal(a / sub, b / sub):
             return False
     return True
+
+
+class CannotCheckStowaways(RuntimeError):
+    """Raised when the stowaway check could not run at all.
+
+    A distinct signal rather than an empty list, because "I checked and
+    found nothing" and "I could not check" must never share a
+    representation. The independent reviewer of PR #25 found the first
+    version printing "NOTHING WAS CHECKED -- this is not a pass" and then
+    exiting 0: the words and the exit code disagreed, which is exactly the
+    contradiction PR #22 fixed in the `main SHA` gate.
+
+    THIS REPOSITORY HAS NOW ANSWERED THE SAME QUESTION THREE TIMES, and the
+    answer has to stay the same each time or the codebase holds two
+    standards: a shallow clone that cannot resolve `main^1` FAILS (PR #22),
+    an open-PR listing that cannot be resolved FAILS (PR #24), and a
+    stowaway check that cannot run FAILS here. In every case the exit code
+    is non-zero and the REASON says the check was undeterminable rather
+    than accusing the tree of being wrong.
+
+    CI always has git, so this cannot fire there. It fires for someone
+    running `--check` outside a git repository, and telling that person
+    "OK" would be the lie this whole file exists to prevent.
+    """
+
+
+def tracked_files_the_build_does_not_produce(vendor_dir: Path, staging: Path) -> list[str]:
+    """git-TRACKED paths under `vendor_dir` that the build did not write.
+
+    `_trees_equal` deliberately ignores interpreter bytecode, because it is
+    regenerated locally and is not drift. But "ignored by the drift check"
+    and "harmless" are different claims, and the gap between them is real:
+    `.gitignore` excludes `__pycache__/` and `*.pyc`, yet `git add -f` can
+    commit one anyway, and a committed `.pyc` under `plugins/*/lwb/vendor/`
+    SHIPS IN THE PLUGIN and is what the interpreter actually loads -- while
+    the `.py` beside it, the file a reviewer reads, is never executed. The
+    reviewer of PR #25 reproduced exactly that in a scratch package: an
+    unchecked-hash `.pyc` printed `payload` while its source said
+    `reviewed source`, and the diff a human sees is a binary blob.
+
+    PR #25 argues that vendor output is safe to classify as `shared`
+    BECAUSE it is only ever build output, verified by `--check`. That
+    argument is worth no more than this function makes it worth. So the
+    check now also refuses any tracked file the build does not produce --
+    bytecode included, and not by naming bytecode specifically, because the
+    rule that matters is "nothing ships from here that the build did not
+    write", not "no .pyc ships from here".
+    """
+    result = subprocess.run(
+        ["git", "ls-files", "-z", "--", str(vendor_dir)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        # Not a git repo, or git unavailable. Report nothing rather than
+        # inventing a pass OR a fail -- but SAY SO. Returning an empty list
+        # silently is indistinguishable from "checked, found nothing", which
+        # is this repository's signature defect and the reason this file
+        # exists. The reviewer of PR #25 flagged the silence specifically.
+        print(
+            f"NOTICE: stowaway check could not run for {vendor_dir} "
+            f"(git ls-files exited {result.returncode}); NOTHING WAS CHECKED "
+            f"-- this is not a pass"
+        )
+        raise CannotCheckStowaways(
+            f"git ls-files exited {result.returncode} for {vendor_dir}"
+        )
+
+    # COMPARE AGAINST A SET OF PATHS, NOT `Path.exists()`. `exists()` asks the
+    # FILESYSTEM, and on Windows and macOS that question is case-insensitive:
+    # a tracked `rules/LWB_VERSION.PY` matched the built `rules/lwb_version.py`
+    # and was reported as expected, so a stowaway differing only in case
+    # shipped unnoticed on exactly the platform most contributors use. Found by
+    # the independent reviewer of PR #25 and reproduced: the case variant
+    # returned [] where it should have been reported. Git itself is
+    # case-sensitive, so a set comparison on the relative path is the honest
+    # test and behaves identically on every OS.
+    produced = {
+        path.relative_to(staging).as_posix()
+        for path in staging.rglob("*")
+        if path.is_file()
+    }
+
+    unexpected: list[str] = []
+    for raw in result.stdout.split(chr(0)):
+        rel = raw.strip()
+        if not rel:
+            continue
+        tracked = REPO_ROOT / rel
+        try:
+            inside = tracked.relative_to(vendor_dir)
+        except ValueError:
+            continue
+        if inside.as_posix() not in produced:
+            unexpected.append(rel)
+    return sorted(unexpected)
 
 
 def main() -> int:
@@ -140,6 +256,25 @@ def main() -> int:
                     drift_found = True
                 else:
                     print(f"OK: {vendor_dir} matches source")
+
+                # Separate from drift, and reported separately: a tracked
+                # file the build does not produce is not "stale", it is
+                # something that should not be in the shipped plugin at all.
+                try:
+                    stowaways = tracked_files_the_build_does_not_produce(vendor_dir, staging)
+                except CannotCheckStowaways:
+                    # The notice has already been printed by the function.
+                    # Exit non-zero so the words and the exit code agree.
+                    drift_found = True
+                    stowaways = []
+                if stowaways:
+                    print(
+                        f"STOWAWAY: {len(stowaways)} git-tracked file(s) under {vendor_dir} "
+                        f"are NOT produced by the build and would ship anyway:"
+                    )
+                    for rel in stowaways:
+                        print(f"    {rel}")
+                    drift_found = True
             else:
                 if vendor_dir.exists():
                     shutil.rmtree(vendor_dir)
