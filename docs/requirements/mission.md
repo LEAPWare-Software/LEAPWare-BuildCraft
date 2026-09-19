@@ -74,9 +74,9 @@ rot; the four items above are named only to keep this readable, and
 
 The floor governs **how this project delivers**: it applies to every
 deliverable here, today. It is not the same thing as what the shipped
-plugin enforces for its users, which decision D1 sets to warn-only in 1.0.
-Warn-only concerns the product's behaviour toward others; the floor
-concerns ours.
+plugin enforces for its users, which D9 splits by rule class: facts may
+block, judgements may only warn. That split concerns the product's
+behaviour toward others; the floor concerns ours.
 
 The floor is built from signals this repository already produces, so
 applying it costs almost nothing. Items 3 and 4 are enforced mechanically
@@ -152,8 +152,13 @@ not yet written.
 
 ### Rule families -- the product itself
 
-Per D1, all three families ship in 1.0 **warn-only**; deny modes follow in
-1.1 from ledger evidence.
+Per D9, which amended D1: rules whose signal is a FACT ship **deny-capable
+in 1.0** -- `proof_required` and `no_unauthorised_destructive_action`.
+Rules whose signal is a JUDGEMENT stay **warn-only** in 1.0 --
+`stage_order` and `independence` -- until ledger evidence justifies more.
+The earlier "all three families warn-only in 1.0" text was D1's original
+position and was amended on 2026-09-18; it is corrected here rather than
+left to contradict the decision log.
 
 | Family | Rules | State |
 |---|---|---|
@@ -164,25 +169,35 @@ Per D1, all three families ship in 1.0 **warn-only**; deny modes follow in
 
 ### Stages and roles
 
-Per D2: `design -> qa -> review -> security -> delivery -> release ->
-operations`.
+**D2's seven stages are SUPERSEDED by D15** and this section is not yet
+rewritten -- required-work item 8. D15 derives stages from D12's map of
+fifteen SDLC responsibilities, each named for the component that covers
+it. Until that rewrite lands, the old list is recorded here as history,
+not as the vocabulary: `design -> qa -> review -> security -> delivery ->
+release -> operations`.
 
-Per D3, independence is the role rule: a `qa`, `review` or `security`
-actor may not have authored any earlier stage of the same deliverable. A
-project policy may tighten this, never loosen it.
+Per D3 as settled by D16, independence is the role rule: a `qa`, `review`
+or `security` actor may not have authored any earlier stage of the same
+deliverable. A project policy may tighten this, never loosen it. D16
+records why this stayed lwb's own rule rather than adopting GitHub's
+last-push-approval control, and records the limit honestly: the identity
+strings are self-attested, so these records are an audit trail, not proof
+of independence.
 
 ### Plugins and skills
 
 | Component | State |
 |---|---|
 | `plugins/claude/lwb` -- PreToolUse hook plus skills | EXISTS |
-| `plugins/codex/lwb` -- PreToolUse hook plus skills, same engine | EXISTS |
+| `plugins/codex/lwb` -- PreToolUse hook plus skills, same engine | EXISTS BUT DEFERRED (D11) -- present in the tree, not developed further |
 | Skills `lwb-status`, `lwb-config`, `lwb-report`, `lwb-handoff` | EXISTS |
 | Skills `lwb-prove`, `lwb-stage`, `lwb-review`, `lwb-doctor` | PROPOSED |
 
 ### Tools
 
-Fifteen exist under `scripts/`: `lwb_check_proof`, `lwb_lanes`,
+These exist under `scripts/` (the list is illustrative; the count is
+deliberately not written here, because a hand-typed artifact count is the
+same defect class the state-claim gate exists to close): `lwb_check_proof`, `lwb_lanes`,
 `lwb_check_env_leak`, `lwb_check_commit_identity`,
 `lwb_check_no_instruction_dep`, `lwb_check_prefix`,
 `lwb_check_hook_launch`, `lwb_check_hosted_runners`,

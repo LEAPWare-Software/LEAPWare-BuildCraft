@@ -134,6 +134,15 @@ TOKEN_FIELDS = (
     "source",
 )
 ZERO_FORBIDDEN_FIELDS = ("total_input", "output")
+# The only two ORIGINS a FRESH CLONE -- on a machine that never had any
+# particular plugin installed -- can re-derive. tokens.source must START
+# WITH one of these (anchored at position 0, no leading whitespace); detail
+# after the origin -- a colon, a parenthetical, derivation notes -- is
+# allowed and expected, it is honest provenance, not noise. "spend-ledger"
+# and similar named scripts belonged to a plugin the owner is removing: a
+# record citing one is unreproducible and unreviewable by anyone else. See
+# proof/schema.json's tokens.source description.
+ALLOWED_TOKEN_SOURCE_PREFIXES = ("transcript message.usage", "unknown")
 
 
 def _validate_acceptance_criteria(rel, criteria) -> list[str]:
@@ -168,8 +177,11 @@ def _validate_tokens(rel, tokens) -> list[str]:
             continue
         value = tokens[field]
         if field == "source":
-            if not isinstance(value, str) or not value:
-                errors.append(f"{rel}: tokens.source must be a non-empty string")
+            if not isinstance(value, str) or not value.startswith(ALLOWED_TOKEN_SOURCE_PREFIXES):
+                errors.append(
+                    f"{rel}: tokens.source {value!r} does not begin with a re-derivable origin -- "
+                    f"must start with one of {ALLOWED_TOKEN_SOURCE_PREFIXES!r} (detail may follow)"
+                )
             continue
         is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
         is_unknown = value == "unknown"

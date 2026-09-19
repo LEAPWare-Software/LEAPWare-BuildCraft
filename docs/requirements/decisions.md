@@ -40,6 +40,14 @@ The seven roles from the legacy repo become the ordered stages:
 This collapses stage and role onto one vocabulary. Consequence accepted:
 `operations` has no natural gate in a plugin repo.
 
+**SUPERSEDED 2026-09-18 by D15.** These seven were ported from the legacy
+repo's roles and never passed the adoption check the mission's fourth
+principle requires. D15 derives the stage vocabulary from D12's map of
+fifteen SDLC responsibilities instead. D15 claimed to supersede this
+decision but D2 carried no annotation, so a reader stopping here saw a
+superseded rule stated as current -- found by an independent audit, and
+the same omission D5 and D10 were each given an annotation to prevent.
+
 ## D3 — Role separation · 2026-09-17
 
 **Reviewer-independence only.** For a proof record whose stage is `qa`,

@@ -8,42 +8,42 @@ next step. Session start, re-derive commands, hard rules and traps live in
 
 In order. Do not start step *n+1* before step *n* is done and proven.
 
-1. **DONE.** SDLC scaffold (`lwb`) up; PR #1 merged, 16/16 green. Repo is
-   **PUBLIC** (Apache-2.0). Detail: `docs/requirements/decisions.md`.
-2. **DONE; GitHub Apps DEFERRED.** Ruleset `main` (id 23627212) active.
-   Apps (`lwb-claude`, `lwb-codex`) not created — no App API, no browser
-   session; `gh auth` covers it. Detail: `docs/requirements/decisions.md`.
-3. **Mission settled; landing from `lwb-mission-final`.**
-   `docs/requirements/mission.md` carries the owner-approved mission: full
-   SDLC coverage at the lowest measured token cost that clears a quality
-   floor. The numbered decisions and the open-items list are in
-   `docs/requirements/decisions.md` -- READ IT FIRST and do not re-decide
-   settled questions. PR #13 was against the OLD branch
-   `lwb-mission-clean`, which carries a leaked username; it is closed and
-   that remote is deleted. Branch tips, commit counts and PR state are
-   NOT written here -- they rot in minutes. Re-derive per
-   `docs/handoff-protocol.md`; the generated block below is a timestamped
-   snapshot, not the truth.
-   Environment changed this session: RTK removed (hook, binary, and the
-   `@RTK.md` import), Ponytail skill deleted, caveman enabled for output
-   compression only. Backup paths: `docs/requirements/decisions.md` (D14).
-4. Every deliverable: proof record, pushed, CI green, announced
+1. **DONE.** SDLC scaffold (`lwb`) up. Repo is **PUBLIC** (Apache-2.0):
+   everything committed is world-readable, history included.
+2. **DONE; GitHub Apps DEFERRED.** Ruleset `main` (23627212) active. See
+   `docs/requirements/decisions.md` for both.
+3. **DONE. Mission landed.** `docs/requirements/mission.md` carries the
+   owner-approved mission. The numbered decisions and the open-items list
+   are in `docs/requirements/decisions.md` -- READ IT FIRST; do not
+   re-decide settled questions. Environment changes this session: D14.
+   Branch tips, counts and PR state are NOT written here -- they rot in
+   minutes. Re-derive per `docs/handoff-protocol.md`; the block below is
+   a timestamped snapshot, not the truth.
+4. **IN FLIGHT. Proof of completion made mechanical**, in five small PRs
+   -- one big one is what killed #13 and #14. Two adversarial audit
+   rounds found 13 blockers; the open ones, the five-PR split and the
+   list of what this will NOT cover are in
+   `docs/maintainers/proof-of-completion-plan.md`. Read it before
+   touching any gate.
+5. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-18 22:35 UTC
-main SHA: c33b56059ac99e8d30467bd3ffdd8adcd7886760
+Generated: 2026-09-19 00:26 UTC
+main SHA: 7d9a0b79ac0e53415c84307018619a54587061aa
 CLI: claude
-Session: assessment-2026-09-18
+Session: goal-1.0.0
 
 Open PRs:
-#14 Settle the mission, make its floor testable, bind reviews to commits (lwb-mission-final)
+(unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
 - traps-no-left-behinds: PROVEN (commit 9463214739b90a6de1ae0b384fdc8ac2b1e6e40c)
 - mission-rename: PROVEN (commit 3ae781f12c85da8e133d0138188a65d7e655ea03)
 - mission-settled-and-review-binding: PROVEN (commit d3eb1d6a55c00d86e907d6da8eea7e89a5f6e708)
+- mission-stages-architecture-and-trailer-gate: PROVEN (commit 229bd30945241adfa666807cbfe7447f8ef52d78)
+- authority-model-trial-protocol-and-claim-directive: PROVEN (commit 23e1c58ccc5af7c1c3bf16cbe04939f498da0998)
 - lwb-gates-enforceable: PROVEN (commit bbb07b950d0f0c37a9edc896d2073aa359cf475f)
 - lwb-vision: PROVEN (commit 9df414f6f0ab2a86e3b2c0e1bdd2d42fbf949a59)
 - handoff-vision-landed: PROVEN (commit 77896a94967d23d52fb0744d78a2cfdd6e593ee5)
@@ -54,7 +54,8 @@ Deliverable proof state (from proof/):
 
 - Session start, re-derive commands, hard rules, traps →
   `docs/handoff-protocol.md`
-- Pure core, adapters, lanes, fail-open layers → `docs/architecture.md`
-- Policy file format and mode semantics → `docs/policy.md`
-- Full session detail, gates that failed, environment changes →
+- Architecture, policy format → `docs/architecture.md`, `docs/policy.md`
+- Session detail, gates that failed, environment changes →
   `docs/maintainers/session-handoff-2026-09-18.md`
+- Proof-of-completion plan, open blockers, what it will NOT cover →
+  `docs/maintainers/proof-of-completion-plan.md`

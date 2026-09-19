@@ -14,8 +14,8 @@ Shipped as two plugins sharing one policy engine:
 
 | Host | Package | What it does |
 |---|---|---|
-| Claude Code | `plugins/claude/lwb/` | Registers an enforcing `PreToolUse` hook. |
-| Codex CLI | `plugins/codex/lwb/` | Registers an enforcing `PreToolUse` hook, same engine as Claude Code. See [docs/install-codex.md](docs/install-codex.md). |
+| Claude Code | `plugins/claude/lwb/` | Registers a `PreToolUse` hook. The hook's deny path is implemented and tested, but the only rule shipped today is `lwb_version`, a deliberate no-op -- so nothing is enforced for a user yet. See "The walking skeleton" below. |
+| Codex CLI | `plugins/codex/lwb/` | Registers a `PreToolUse` hook, same engine as Claude Code. **Deferred under D11**: present in the tree and tested, not developed further until the owner undefers it. See [docs/install-codex.md](docs/install-codex.md). |
 
 Runtime dependency policy: **Python 3.10+ standard library only.** No
 third-party package is imported by `core/`, `adapters/`, or any shipped
