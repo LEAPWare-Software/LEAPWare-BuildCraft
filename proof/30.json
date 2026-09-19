@@ -1,0 +1,163 @@
+{
+  "deliverable": "the-plan-and-decisions-the-routines-read",
+  "pr": 30,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "2613df2",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 14%]",
+        "........................................................................ [ 29%]",
+        "........................................................................ [ 44%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 73%]",
+        "........................................................................ [ 88%]",
+        ".......................................................                  [100%]",
+        "487 passed in 41.23s"
+      ],
+      "sha256": "30372a85ec9400e19ff6bc82f8958219c12d435faa47b9fb9c3353ef69795a8e",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_state_claims.py",
+        "--repo",
+        "."
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:42: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 14:20 UTC",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "7f1b7181110e8bfa081dc0e732cc713aa3bb9c22af8af6a55dee220810c77be0",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (18 record(s))"
+      ],
+      "sha256": "7b40ad619acafa3181811db67ca95724aeb7ffe245300e82f2026d4d631ddd08",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "THE CONDUCTOR ROUTINE HAS NO PLAN WITHOUT THIS. Its prompt names docs/requirements/build-plan.md as the seven-phase owner-approved plan it must work, and cites D27 by name. It checks out the default branch. Neither file was on main: `git ls-tree -r --name-only origin/main | grep build-plan` returned nothing and `git show origin/main:docs/requirements/decisions.md | grep -c '^## D27'` returned 0. A routine that cannot read its plan either stops or improvises, and improvising is worse.",
+      "met": true
+    },
+    {
+      "criterion": "D21 adopt-before-build and D22 the real 1.0.0 bar are recorded, including the owner's ruling that 1.0.0 is not cut until the plugin has driven an SDLC in another repo.",
+      "met": true
+    },
+    {
+      "criterion": "D23 the stage vocabulary and D24 acceptance criteria anchored to GitHub's clock are recorded.",
+      "met": true
+    },
+    {
+      "criterion": "D27 records the three rulings that make cloud-only operation possible: Actions performs the enqueue because GraphQL is blocked at the cloud proxy; independence is dispatch plus context, which a cron entry satisfies structurally; and parallel work-streams are TRACKS because 'lane' is already load-bearing as a file-ownership boundary.",
+      "met": true
+    },
+    {
+      "criterion": "The handoff audit correction is included: an earlier version of docs/maintainers/session-handoff-2026-09-19.md pinned two SHAs in prose that no gate protects, and both were stale within minutes. That is this repository's signature defect written into the document that warns about it.",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md is regenerated and under its 3000-byte cap: `python scripts/lwb_handoff.py --check` reports 2941 bytes, and `python scripts/lwb_check_state_claims.py --repo .` passes. The generated block had recorded main at 55f38ae while live main was f9b4dea; the state-claims gate caught it rather than a human.",
+      "met": true
+    },
+    {
+      "criterion": "Documentation only. `git diff --name-only origin/main...HEAD` touches only HANDOFF.md and docs/. No code path changes, and `python -m pytest tests/ -q` is 487 passed.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- this record was written mid-session and no per-PR token accounting was taken. Recorded as unknown rather than copied from an earlier record or estimated, because a borrowed number is a manufactured one."
+  },
+  "mutations": [
+    "docs/requirements/build-plan.md: the consolidated seven-phase plan, walked with the owner phase by phase and approved",
+    "docs/requirements/decisions.md: D21, D22, D23, D24, D27",
+    "docs/maintainers/session-handoff-2026-09-19.md: the session handoff, corrected after an audit found it had pinned stale SHAs in ungated prose",
+    "HANDOFF.md: in-flight section rewritten for the post-#27 state and the live cloud loop; generated block regenerated"
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. `checked_by` is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, because inventing or borrowing one is the exact dishonesty this system exists to catch. The independent review record under reviews/30/ is what makes this record complete, and until it exists this PR must not land.",
+    "THE COMMANDS RAN ON WINDOWS ONLY (win32, CPython 3.12). CI runs the same gates on ubuntu, macos and windows across 3.10 and 3.12; I did not run the other five legs.",
+    "THE PLAN'S CONTENT IS NOT PROVEN BY ANY COMMAND. These commands prove the documents are well-formed, the caps hold and the gates pass. Whether the seven phases are the RIGHT phases is an owner judgement recorded in a conversation, not a fact a script can check. The only evidence is that the owner walked it phase by phase and approved each one.",
+    "THE CONDUCTOR'S FALLBACK IS UNTESTED IN THE FAILING DIRECTION. Its prompt now reads the plan from this branch when the file is absent from main. The run at 14:11Z read the plan successfully, but I did not test what it does when BOTH sources are unreachable -- the path where it is supposed to comment and stop rather than improvise."
+  ]
+}
