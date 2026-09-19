@@ -2,8 +2,8 @@
   "deliverable": "state-claim-gate",
   "pr": 18,
   "author": "claude-code-opus5-session-f8da3f9e-2026-09-18",
-  "checked_by": "lw-verifier-state-claim-gate-5ec2955",
-  "commit": "5ec29558c976e31387822705c4e45eecd3179d47",
+  "checked_by": "lw-verifier-state-claim-gate-6ad9151",
+  "commit": "6ad9151377c9e1478fb3ee923e1811a73115b317",
   "commands": [
     {
       "argv": [
@@ -160,6 +160,10 @@
     {
       "criterion": "The gate's honest scope is stated in its own docstring: it makes DOCUMENTS honest, not STATEMENTS, and cannot see a PR body, a commit message, or anything said to the owner",
       "met": true
+    },
+    {
+      "criterion": "The generated HANDOFF block no longer grows per proof record against a fixed byte cap, and the gate that re-derives it shares the generator's own function so the two cannot drift",
+      "met": true
     }
   ],
   "tokens": {
@@ -181,17 +185,20 @@
     "proof/18.json",
     "reviews/18/independent-verifier.json",
     "scripts/lwb_check_state_claims.py",
+    "scripts/lwb_handoff.py",
+    "tests/core/test_lwb_handoff.py",
     "tests/test_lwb_check_state_claims.py"
   ],
   "unproven": [
     "Command tails and sha256 values are SANITIZED before hashing, by a per-session throwaway script rather than committed code. That remains the first open blocker in docs/maintainers/proof-of-completion-plan.md and the reason no historical digest here is independently reproducible.",
-    "'commit' names 5ec2955, the substantive head, not the squash-merge commit GitHub creates at merge time.",
+    "'commit' names 6ad9151, the substantive head, not the squash-merge commit GitHub creates at merge time.",
     "The env-leak history scan is the AUTHOR's result; the reviewer cannot reproduce it without the repository secret and was instructed not to guess private-name values. CI's own run is the only independent check.",
     "THE SHIPPED INTERACTION TEST DOES NOT EXERCISE WHAT ITS DOCSTRING DESCRIBES. It uses U+FF1A, which NFKC maps one-to-one, so no string length actually changes. The reviewer proved the production code correct by building its own battery with U+FB01, a genuine one-to-two expansion, and separately showed the shipped suite does NOT catch a naive normalise-after-join implementation. The fix is verified sound; its regression test is weaker than claimed, and that is recorded here rather than left in a commit message that reads as if it were stronger.",
     "Three evasions are deliberately open and documented, not fixed: a claim split across a table row and the following line, an en dash standing in for the colon, and a Cyrillic homoglyph in 'main'.",
     "A FOURTH class survives, found in the final review pass: the zero-width strip covers U+200B, U+200C, U+200D and U+FEFF, so U+2060, U+00AD and U+180E still evade the label pattern exactly as U+200B used to. Narrower than the fix's phrasing implies. Not fixed in this PR; it lands in the follow-up alongside the interaction-test correction.",
     "All CI reasoning is static analysis of the workflow file. No reviewer observed a real GitHub Actions run of the reordered steps.",
     "reviewer_id and commit_author_id both embed the same session token. On the evidence this is a SELF-REVIEW: the reviewer is a subagent of the author, and the gate that should prevent that checks only that two strings differ.",
-    "This record was written by the author of the work it proves."
+    "This record was written by the author of the work it proves.",
+    "A FIFTH Unicode class survives and is carried forward from the final review: U+2060, U+00AD and U+180E evade the label pattern exactly as U+200B used to, because the strip set names four code points rather than the category. Not fixed here; it lands with the interaction-test correction in the follow-up."
   ]
 }
