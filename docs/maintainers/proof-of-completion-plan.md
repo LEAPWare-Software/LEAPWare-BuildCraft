@@ -532,6 +532,62 @@ change to `scripts/lwb_lanes.py`, a shared path, so it needs its own PR
 and its own independent review. Four occurrences and one documented
 prediction are enough evidence that ordering discipline is not holding.
 
+### The second instance of the same post-merge class — predicted, then live on `main`
+
+`lwb_check_state_claims.py`'s `Open PRs:` listing has the identical
+structural defect the `main SHA:` field had (above), one field further
+down the same generated block: the PR whose merge publishes the block is,
+by definition, listed as open in the very snapshot that merge produces.
+An independent reviewer of PR #22 — the PR that fixed the `main SHA:`
+defect — predicted exactly this, out of scope for that PR, as finding 4 of
+`reviews/22/independent-verifier.json`, verbatim: *"With gh available,
+main's HANDOFF.md fails with #21 listed as open but gh reports MERGED. CI
+does not see it because gh is not authenticated there. A second post-merge
+trap of the same class, recorded rather than fixed here."*
+
+That prediction was confirmed live on `main` at `ae05882` (PR #22's own
+merge commit): with `gh` authenticated, the gate failed —
+
+    FAIL: HANDOFF.md:49: [stale open-PR listing in generated block] #22
+    listed as open but gh reports MERGED: #22 The state-claim gate could
+    never pass after a merge -- main has been red for four merges (#22)
+
+— and CI stayed green only because the runner's `gh` is unauthenticated,
+so `_pr_state` returned `None` and the line degraded to an
+`UNVERIFIABLE` info instead of a finding, masking the same class of bug
+the `main SHA:` fix had already closed one field above it. The moment CI
+authenticates `gh`, `main` would have gone red on its own push run, the
+same way it did for four consecutive merges before PR #22 (see above).
+
+**The rule, mirrored from `main SHA:` exactly, per the independent
+reviewer's prescription for that field, reusing `_sha_matches` rather than
+a second comparison:**
+
+1. A listed PR that `gh` reports `MERGED` is the EXPECTED post-merge
+   state — not stale — when its merge commit is live `main` itself, or
+   live `main`'s first parent (`main^1`). Reported as `INFO
+   (git-verified)`, not `UNVERIFIABLE` — git proved it.
+2. `MERGED` with a merge commit that is neither live `main` nor `main^1`
+   (merged several commits back) is genuinely stale — `FAIL`, unchanged.
+3. `CLOSED` (not merged) is stale regardless of any commit comparison —
+   `FAIL`, unchanged.
+4. When the merge commit cannot be resolved at all (`gh` gives no
+   `mergeCommit`, or live `main` itself cannot be resolved), that is a
+   DISTINCT finding — `merge commit for listed PR could not be
+   determined` — that still exits non-zero but does not accuse the
+   listing of being stale, mirroring the `main SHA:` shallow-clone
+   asymmetry (an unproven accusation is exactly as dishonest as a
+   silently-passed lie).
+5. `gh` unavailable/unauthenticated (`_pr_state` returns `None`) is
+   unchanged: `UNVERIFIABLE` info, not a failure — this is the path that
+   masked the bug in CI and must keep passing there.
+
+See `scripts/lwb_check_state_claims.py` (`_pr_merge_commit`, and the
+`MERGED` branch of the `Open PRs:` loop inside `_scan_generated_block`)
+and `tests/test_lwb_check_state_claims.py` (the `test_pr_merged_*` and
+`test_pr_closed_*`/`test_pr_gh_unauthenticated_*` group) for the
+mechanics and the six cases each covers.
+
 ## How this document should be read
 
 Everything above is a claim. Two audit rounds found thirteen blockers in

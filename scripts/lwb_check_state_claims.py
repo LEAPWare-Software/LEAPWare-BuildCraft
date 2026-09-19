@@ -538,6 +538,33 @@ def _pr_state(repo: Path, pr_number: int) -> str | None:
     return state or None
 
 
+def _pr_merge_commit(repo: Path, pr_number: int) -> str | None:
+    """Live merge-commit sha for PR `pr_number` via `gh`, or None if it
+    cannot be determined (no `gh`, no auth, no network, timeout, or `gh`
+    has no merge commit to report). Mirrors `_pr_state`'s degraded-path
+    convention exactly: None means "cannot tell", and the caller must
+    treat that as its own outcome -- never a silent pass (it might be
+    stale) and never a silent fail (it might be the expected post-merge
+    state). Run with cwd=repo for the same reason `_pr_state` does."""
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", str(pr_number), "--json", "mergeCommit", "--jq", ".mergeCommit.oid"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=20,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
 def _derive_proof_state_lines(repo: Path) -> list[str]:
     """Re-derive the "Deliverable proof state" content lines by calling
     scripts/lwb_handoff.py's OWN `_proof_state_lines()` directly, rather
@@ -920,7 +947,92 @@ def _scan_generated_block(
                     state = _pr_state(repo, number)
                     if state is None:
                         any_unverifiable = True
-                    elif state != "OPEN":
+                    elif state == "OPEN":
+                        pass
+                    elif state == "MERGED":
+                        # A merged PR listed as open is the EXPECTED state
+                        # exactly when it is the merge that published this
+                        # very document -- the same structural bug the
+                        # `main SHA:` field has, one field further down the
+                        # same generated block (see
+                        # docs/maintainers/proof-of-completion-plan.md).
+                        # Mirror that field's rule precisely: pass with a
+                        # git-verified INFO when this PR's merge commit is
+                        # live main OR live main's first parent (a squash
+                        # merge advances main by exactly one commit); FAIL
+                        # as stale when it demonstrably is neither; and
+                        # when the comparison cannot be made at all --
+                        # `gh` gave no merge commit, or live main itself
+                        # cannot be resolved -- report a DISTINCT finding
+                        # that exits non-zero without accusing the listing
+                        # of being wrong, the same asymmetry the `main
+                        # SHA:` shallow-clone branch already enforces.
+                        merge_commit = _pr_merge_commit(repo, number)
+                        if merge_commit is None or not _looks_like_sha(merge_commit):
+                            findings.append(
+                                Finding(
+                                    rel_path,
+                                    pr_lineno,
+                                    "merge commit for listed PR could not be determined",
+                                    f"#{number} listed as open, gh reports MERGED, but no "
+                                    f"resolvable merge commit was returned -- cannot confirm "
+                                    f"this is the expected post-merge state, and cannot prove "
+                                    f"it stale either: {pr_text}",
+                                )
+                            )
+                        else:
+                            live = _live_main_sha(repo)
+                            if live is None:
+                                findings.append(
+                                    Finding(
+                                        rel_path,
+                                        pr_lineno,
+                                        "merge commit for listed PR could not be determined",
+                                        f"#{number} listed as open, gh reports MERGED at "
+                                        f"{merge_commit}, but live main's own sha could not be "
+                                        f"resolved here to compare against: {pr_text}",
+                                    )
+                                )
+                            else:
+                                live_parent = _rev_parse(repo, live + "^1")
+                                if _sha_matches(merge_commit, live):
+                                    infos.append(
+                                        Info(
+                                            rel_path,
+                                            pr_lineno,
+                                            f"#{number} listed as open but gh reports MERGED -- "
+                                            f"its merge commit {merge_commit} is live main "
+                                            f"itself ({live}); this is the expected "
+                                            f"post-merge state, not a stale listing",
+                                            prefix="INFO (git-verified)",
+                                        )
+                                    )
+                                elif live_parent is not None and _sha_matches(merge_commit, live_parent):
+                                    infos.append(
+                                        Info(
+                                            rel_path,
+                                            pr_lineno,
+                                            f"#{number} listed as open but gh reports MERGED -- "
+                                            f"its merge commit {merge_commit} is live main's "
+                                            f"first parent {live_parent} (live main is now "
+                                            f"{live}); this is the expected post-merge state, "
+                                            f"not a stale listing",
+                                            prefix="INFO (git-verified)",
+                                        )
+                                    )
+                                else:
+                                    findings.append(
+                                        Finding(
+                                            rel_path,
+                                            pr_lineno,
+                                            "stale open-PR listing in generated block",
+                                            f"#{number} listed as open but gh reports MERGED, "
+                                            f"and its merge commit {merge_commit} is neither "
+                                            f"live main ({live}) nor live main's first parent "
+                                            f"({live_parent!r}): {pr_text}",
+                                        )
+                                    )
+                    else:
                         findings.append(
                             Finding(
                                 rel_path,
