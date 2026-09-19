@@ -801,6 +801,51 @@ The pattern worth naming: **every time this repo adds a check that says
 "X is wrong", the case where X cannot be evaluated gets handled last and
 wrongly.** Three occurrences in two adjacent lines of one file.
 
+### The lane rule was holding the shared core closed
+
+Found while building the first rule intended to actually ship. It is the
+most consequential defect recorded in this document, because it explains
+the state the "1.0.0 readiness" section above measures.
+
+`scripts/lwb_build.py` vendors `core/` and `adapters/` into
+`plugins/claude/lwb/vendor/` **and** `plugins/codex/lwb/vendor/`, and
+`lwb_build.py --check` fails CI whenever either copy drifts from its
+source. But `classify_path` returned `codex` for anything under
+`plugins/codex/`, vendor output included, and a claude-authored commit may
+not touch the codex lane.
+
+**So any change to `core/` was unlandable by a claude session.** Re-vendor
+into both and the lane gate fails; re-vendor into one and
+`lwb_build.py --check` fails. There was no third option. Measured, with the
+real gate, on a real commit adding one rule to `core/`:
+
+```
+FAIL: <sha> (LWB-Agent: claude): touches
+  'plugins/codex/lwb/vendor/lwb_core/rules/lwb_proof_required.py',
+  outside the claude lane and not a shared path
+```
+
+This was never hypothetical and had simply never been exercised.
+`core/lwb_core/rules/` contained exactly one rule — the no-op walking
+skeleton — and **the only commit in this repository's history to touch
+`plugins/codex/lwb/vendor/` is the bootstrap commit.** The lane rule, whose
+purpose is to keep two agents from overwriting each other's work, was
+silently holding the shared core closed against the only CLI in operation.
+Every "why is there still only one rule" question in the readiness section
+above has this as at least part of its answer.
+
+**The fix:** `plugins/*/lwb/vendor/` classifies as `shared`. That is the
+honest classification rather than a loophole — the bytes are machine-written
+from shared sources by a shared script, they are reviewed wherever those
+sources are reviewed, and `shared` still requires independent review before
+anything lands. The exception is exactly `vendor/`: every authored path
+under a lane (`hooks/`, `bin/`, `skills/`, the plugin manifest) still
+classifies as that lane, which
+`test_the_vendor_exception_does_not_leak_into_authored_lane_paths` locks
+down. A loophole here would be worse than the deadlock, because it would
+let either agent rewrite the other's real plugin code while the gate
+reported success.
+
 ## 1.0.0 readiness — what the goal asks for, and what exists
 
 The stated goal is "BuildCraft 1.0.0 fully built and ready to be used by
