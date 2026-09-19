@@ -94,7 +94,26 @@ def load_policy_dict(data: Any) -> Policy:
             degraded = True
             degraded_reason = degraded_reason or f"rule '{rule_id}' config is not an object"
             continue
-        mode = RuleMode.coerce(raw_cfg.get("mode"))
+        mode_value = raw_cfg.get("mode")
+        mode = RuleMode.coerce(mode_value)
+        # RuleMode.coerce() folds ANY unrecognized mode -- a typo'd string,
+        # a number, a bool -- down to OFF, indistinguishable from a rule
+        # deliberately configured off. An independent reviewer found this
+        # meant a one-character typo (`"mode": "denied"` instead of
+        # `"deny"`) silently disarmed a rule with no trace anywhere: not in
+        # the ledger, not in `permissionDecisionReason`. `mode` unset
+        # entirely is the ordinary, non-degraded case (an unmentioned rule
+        # is off); anything ELSE present that did not coerce to a
+        # recognized string is a policy-authoring mistake and must degrade
+        # the whole policy so an adapter can surface it -- see
+        # `bin/lwb_hook.py`'s `policy.degraded` handling.
+        if mode_value is not None and not (
+            isinstance(mode_value, str) and mode_value.lower() in ("off", "warn", "deny")
+        ):
+            degraded = True
+            degraded_reason = degraded_reason or (
+                f"rule '{rule_id}' has an unrecognized mode {mode_value!r}"
+            )
         options = raw_cfg.get("options")
         if not isinstance(options, Mapping):
             options = {}

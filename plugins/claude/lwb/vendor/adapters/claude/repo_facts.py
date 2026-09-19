@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from lwb_core.events import RepoFacts
 
@@ -112,27 +112,50 @@ def _git_dir(repo_root: Path) -> Optional[Path]:
         return None
 
 
-def read_branch(repo_root: Path) -> Optional[str]:
-    """The checked-out branch name, or None.
+def read_branch_ex(repo_root: Path) -> "Tuple[Optional[str], Optional[str]]":
+    """`(branch, incomplete_reason)`.
 
-    None for a detached HEAD (HEAD holds a raw object id, not a ref), for
-    a symbolic ref outside `refs/heads/`, and for any read failure. The
-    rule treats None as "cannot identify the claim" and stays silent, so
-    None is always a safe answer here.
+    `branch` is None for a detached HEAD (HEAD holds a raw object id, not
+    a ref), for a symbolic ref outside `refs/heads/`, for a repo with no
+    `.git` this function could locate, AND for `.git/HEAD` legitimately
+    not existing (`FileNotFoundError`) -- all of those are "there is
+    nothing to report", the safe, ordinary None this module has always
+    returned.
+
+    `incomplete_reason` is set ONLY when `.git/HEAD` exists but a read of
+    it failed for some OTHER reason (permission denied, an I/O error) --
+    "could not check", not "checked, nothing there". An independent
+    reviewer measured this conflation directly: `chmod 000 .git/HEAD` on a
+    branch WITH a real proof-required violation still produced a bare
+    `{"permissionDecision":"allow"}`, byte for byte the same shape as a
+    clean, quiet pass -- reached without ever touching either of the two
+    silent-failure markers this PR already fixed. See `RepoFacts.facts_incomplete`.
     """
     git_dir = _git_dir(repo_root)
     if git_dir is None:
-        return None
+        return None, None
+    head_path = git_dir / "HEAD"
     try:
-        head = (git_dir / "HEAD").read_text(encoding="utf-8", errors="replace").strip()
-    except OSError:
-        return None
+        head = head_path.read_text(encoding="utf-8", errors="replace").strip()
+    except FileNotFoundError:
+        return None, None
+    except OSError as exc:
+        return None, f"could not read {head_path}: {exc.__class__.__name__}: {exc}"
 
     marker = "ref: refs/heads/"
     if not head.startswith(marker):
-        return None
+        return None, None
     branch = head[len(marker) :].strip()
-    return branch or None
+    return branch or None, None
+
+
+def read_branch(repo_root: Path) -> Optional[str]:
+    """The checked-out branch name, or None. See `read_branch_ex` for the
+    version that also reports WHY, when the None is because a read
+    failed rather than because there is nothing to report.
+    """
+    branch, _ = read_branch_ex(repo_root)
+    return branch
 
 
 def collect_proof_ids(repo_root: Path) -> List[str]:
@@ -161,17 +184,40 @@ def collect_proof_ids(repo_root: Path) -> List[str]:
     call, so it does the cheapest thing that answers the rule's question
     -- does a record for this claim exist at all.
     """
+    ids, _ = collect_proof_ids_ex(repo_root)
+    return ids
+
+
+def collect_proof_ids_ex(repo_root: Path) -> "Tuple[List[str], Optional[str]]":
+    """`(ids, incomplete_reason)` -- see `collect_proof_ids` for `ids`.
+
+    `directory.rglob(...)` does not raise for a directory that simply does
+    not exist (the ordinary case for a repo that has adopted only one of
+    the two `PROOF_DIRS`): it yields nothing, which is legitimately "no
+    records here", not an incompleteness. It DOES raise when the
+    directory exists but iterating it fails -- permission denied being
+    the case an independent reviewer measured: `chmod 000 proof/` with
+    the SAME record still on disk produced `"0 record(s) found ... none
+    matching"`, a false claim of a count this function never actually
+    obtained. `incomplete_reason` carries that distinction forward so the
+    rule can refuse to treat "could not read the directory" as "read it,
+    it was empty". See `RepoFacts.facts_incomplete`.
+    """
     ids: List[str] = []
     seen = set()
+    incomplete_reason: Optional[str] = None
     for relative in PROOF_DIRS:
         directory = repo_root.joinpath(*relative.split("/"))
         try:
             entries = sorted(directory.rglob("*.json"))
-        except OSError:
+        except OSError as exc:
+            incomplete_reason = incomplete_reason or (
+                f"could not read {directory}: {exc.__class__.__name__}: {exc}"
+            )
             continue
         for entry in entries:
             if len(ids) >= _MAX_RECORDS:
-                return ids
+                return ids, incomplete_reason
             try:
                 if not entry.is_file():
                     continue
@@ -183,7 +229,7 @@ def collect_proof_ids(repo_root: Path) -> List[str]:
             if record_id not in seen:
                 seen.add(record_id)
                 ids.append(record_id)
-    return ids
+    return ids, incomplete_reason
 
 
 def collect_repo_facts(cwd: Optional[str] = None) -> Optional[RepoFacts]:
@@ -193,8 +239,23 @@ def collect_repo_facts(cwd: Optional[str] = None) -> Optional[RepoFacts]:
     the rule reads as "no facts gathered" and answers with silence. That
     is the right answer: a Bash call made outside any repository is not a
     publish this protocol has anything to say about.
+
+    When the repo WAS found but a piece of it could not be fully read
+    (`.git/HEAD` or a proof directory existing but not readable), the
+    returned `RepoFacts.facts_incomplete` is True and `branch` /
+    `proof_ids` carry whatever partial answer was still obtained -- never
+    silently promoted to "gathered facts, found nothing". See
+    `RepoFacts` and `read_branch_ex` / `collect_proof_ids_ex`.
     """
     root = find_repo_root(cwd if cwd else os.getcwd())
     if root is None:
         return None
-    return RepoFacts(branch=read_branch(root), proof_ids=tuple(collect_proof_ids(root)))
+    branch, branch_incomplete = read_branch_ex(root)
+    proof_ids, proof_incomplete = collect_proof_ids_ex(root)
+    reasons = [r for r in (branch_incomplete, proof_incomplete) if r]
+    return RepoFacts(
+        branch=branch,
+        proof_ids=tuple(proof_ids),
+        facts_incomplete=bool(reasons),
+        facts_incomplete_reason="; ".join(reasons) if reasons else None,
+    )

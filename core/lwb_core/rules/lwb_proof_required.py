@@ -319,6 +319,21 @@ def evaluate(event: Event, config: RuleConfig):
         # evidence of absence -- say nothing.
         return None
 
+    if repo.facts_incomplete:
+        # The adapter looked but could not fully read what it found (a
+        # proof directory or .git/HEAD existed but was not READABLE) --
+        # "could not check", not "checked, found nothing". An independent
+        # reviewer's Attack C (`chmod 000 proof/` with a matching record
+        # still on disk, deny mode) turned this rule into a FALSE DENY:
+        # it reported "0 record(s) found ... none matching" when it had
+        # in fact been unable to count anything. Staying silent here
+        # keeps this rule's own documented UNDER-match posture -- a
+        # missed warning is preferred to a deny built on facts this rule
+        # does not actually have. See `RepoFacts.facts_incomplete` and
+        # `bin/lwb_hook.py`'s `repo.facts_incomplete` warning, which is
+        # what makes "could not check" visible instead of merely quiet.
+        return None
+
     if repo.branch is None and not pr_numbers:
         # Detached HEAD (or an unreadable HEAD) and no PR number on the
         # command line: there is no identifier for the claim being made,

@@ -40,16 +40,16 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 09:32 UTC
-main SHA: 55f38ae1c46b5e8fa06d25eb9ac6887fc98000cf
+Generated: 2026-09-19 11:34 UTC
+main SHA: 9b374b52a56e04e6b443f9aa9d86fa51a0d8a47c
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#26 lwb_proof_required — the first rule that ships, and the first that can deny (lwb-ship-proof-rule)
+#27 Prove the plugin works in a repo that is not this one (lwb-foreign-repo)
 
 Deliverable proof state (from proof/):
-18/18 proven
+19/19 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

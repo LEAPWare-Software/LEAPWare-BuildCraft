@@ -1,0 +1,154 @@
+{
+  "deliverable": "plugin-proven-in-a-repo-that-is-not-this-one",
+  "pr": 27,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-claude-3b64530b-2026-09-19",
+  "commit": "d85cc34",
+  "commands": [
+    {
+      "argv": ["python", "-m", "pytest", "tests/", "-q"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 14%]",
+        "........................................................................ [ 28%]",
+        "........................................................................ [ 42%]",
+        "........................................................................ [ 56%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 84%]",
+        "........................................................................ [ 98%]",
+        "........                                                                 [100%]",
+        "512 passed in 50.08s"
+      ],
+      "sha256": "3a08f80edf009216626b6eb6a0b6fbd585cba76f61bf34492e4129a0c6de3afc",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_foreign_repo.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "TOTAL: 8 of 8 cases exercised against a scratch repo OUTSIDE this checkout -- 3 expected a proof-required warning, 5 expected silence, all matched",
+        "    the command hooks.json registers for Bash was launched as a subprocess for every case, with CLAUDE_PLUGIN_ROOT set and cwd in the scratch repo -- not imported in-process, and not a hardcoded path",
+        "lwb-foreign-repo check passed"
+      ],
+      "sha256": "0515596848f9ccfc93555ee827b8310dfb9b54e60e17e86f227aacb582815174",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_hook_launch.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-portable check passed"],
+      "sha256": "b48fc74400ced6df61ac28ff5edec0a81eb23026b48768bb20d1e52c93f08d7d",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python", "scripts/lwb_build.py", "--check"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_prefix.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-prefix check passed"],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_no_instruction_dep.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-no-instruction-dep check passed"],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "A CI job drives the SHIPPED plugin against a scratch git repo created OUTSIDE this checkout, on windows, macos and ubuntu -- before this, nothing had ever proven the plugin works in a repo that is not this one",
+      "met": true
+    },
+    {
+      "criterion": "The seven-case matrix (now eight, see the .lwb/proof case) covers the slash-branch round trip end to end in a foreign repo",
+      "met": true
+    },
+    {
+      "criterion": "The check reports what it proved -- 8 of 8 cases with the warn/silent split",
+      "met": true
+    },
+    {
+      "criterion": "scripts/lwb_check_hook_launch.py (the lwb-portable job) enforces the DECLARED timeout from hooks.json for the Agent matcher, the same way lwb_check_foreign_repo.py already does for the Bash matcher, on all three OSes and for both plugins -- measured before/after: the original hardcoded timeout=30 passed a 12s hook against a declared 10s; the fix fails it naming '10s'",
+      "met": true
+    },
+    {
+      "criterion": "commandWindows is launched on Windows when hooks.json declares one, rather than always launching command",
+      "met": true
+    },
+    {
+      "criterion": "Every new behaviour this PR adds (declared-timeout enforcement, the policy-degraded marker, the repo-facts-incomplete marker) is covered by a test that FAILS when the fix is reverted -- mutation-verified via `git apply -R` on every source file this PR touches",
+      "met": true
+    },
+    {
+      "criterion": "Policy.degraded reaches permissionDecisionReason via bin/lwb_hook.py rather than being computed and discarded",
+      "met": true
+    },
+    {
+      "criterion": "A proof directory or .git/HEAD that exists but cannot be read no longer reads as 'checked, found nothing' -- lwb_proof_required stays silent instead of falsely denying, and bin/lwb_hook.py surfaces the incompleteness as its own warning so it is distinguishable from a clean pass",
+      "met": true
+    },
+    {
+      "criterion": "render_decision no longer drops decision.warnings on a deny",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- not measured this round; see proof/README.md's rule against a plausible-looking value that was not actually captured from transcript message.usage"
+  },
+  "mutations": [
+    "scripts/lwb_check_hook_launch.py: _agent_hook_entry reads the whole hook dict (timeout, commandWindows) instead of hardcoding timeout=30 and always launching 'command'; matcher matched via '|'-split membership instead of exact string equality",
+    "core/lwb_core/config.py: load_policy_dict degrades the policy on an unrecognized rule mode, not only on a structurally broken rules object",
+    "core/lwb_core/events.py: RepoFacts gained facts_incomplete / facts_incomplete_reason",
+    "adapters/claude/repo_facts.py: read_branch_ex and collect_proof_ids_ex distinguish 'legitimately absent' (FileNotFoundError) from 'present but unreadable' (any other OSError); collect_repo_facts merges both into RepoFacts",
+    "core/lwb_core/rules/lwb_proof_required.py: evaluate() stays silent when repo.facts_incomplete rather than treating an incomplete count as zero",
+    "plugins/claude/lwb/bin/lwb_hook.py: appends 'lwb: policy degraded (...)' and 'lwb: repo facts incomplete (...)' warnings alongside the existing policy-unreadable / repo-facts-unavailable markers",
+    "adapters/claude/hook_io.py: render_decision appends decision.warnings to a deny's permissionDecisionReason instead of dropping them",
+    "plugins/*/lwb/vendor/*: regenerated -- the shipped hook reads vendor/, not core/ or adapters/, so every fix above was inert until rebuilt",
+    "tests/test_lwb_check_hook_launch.py: new -- declared-timeout enforcement, non-numeric-timeout failure, '|' matcher widening, both hooks.json declare a numeric timeout",
+    "tests/core/test_config_degraded_mode.py: new -- unrecognized-mode and non-string-mode degrade the policy; explicit off and unconfigured do not",
+    "tests/adapters/test_claude_repo_facts_incomplete.py: new -- read_branch_ex / collect_proof_ids_ex / collect_repo_facts data-level behaviour, the false-deny fix (Attack C, at the Event/Decision layer), and the unreadable-.git/HEAD fix (Attack D, end to end through the shipped hook subprocess) with a clean-pass control",
+    "tests/adapters/test_claude_hook_io_deny_warnings.py: new -- a deny still carries warnings collected before it"
+  ],
+  "unproven": [
+    "THIS HEAD HAS NOT YET BEEN INDEPENDENTLY RE-REVIEWED. checked_by names the identity whose findings this commit responds to, not a fresh check of d85cc34 -- the repository's own hourly cloud reviewer is what performs that check, triggered by this push. lwb-lanes / REQUIRED_INDEPENDENT_REVIEWS is therefore still unsatisfied at this head, same as the review that preceded this commit noted.",
+    "Attack C (an unreadable proof/ directory) does not reproduce as a real OSError on this Windows/Python 3.13 checkout: Path.rglob on a plain file (rather than a permission-denied directory) silently yields nothing instead of raising. The unit tests for this path use monkeypatch to inject the exact PermissionError shape the reviewer's chmod 000 produced, and the false-deny fix is proven at the Event/Decision layer (test_incomplete_facts_do_not_produce_a_false_deny) rather than end-to-end through a genuinely unreadable directory on disk. Attack D (.git/HEAD as a directory) DOES reproduce for real on this platform and IS proven end-to-end through the shipped hook subprocess.",
+    "The reviewer's exact reproduction (chmod 000 on POSIX) was not re-run on POSIX by me -- only the Windows-portable equivalents above.",
+    "CLAUDE CODE ITSELF DISPATCHING THE MATCHER IS STILL NOT TESTED (carried forward from the previous round): both lwb_check_foreign_repo.py and lwb_check_hook_launch.py invoke the declared command directly rather than through a live Claude Code session matching a tool event.",
+    "The check drives plugins/claude only for the foreign-repo matrix; lwb_check_hook_launch.py now also drives plugins/codex's Agent entry, but lwb_proof_required is still inert on the Codex adapter (adapters/codex/hook_io.py supplies no RepoFacts) -- unchanged by this PR, out of my lane per CLAUDE.md.",
+    "LOW items named in this commit's message and not fixed: bin/lwb_hook.py's ledger write (`except OSError: pass`) still hides a failed ledger write; _bash_hook_entry (lwb_check_foreign_repo.py) still returns only the first hook of the first matching entry; lwb_proof_required's message still hardcodes 'proof/ or .lwb/proof/' in prose instead of building it from PROOF_DIRS; RuleConfig.options is still parsed, carried and read by no rule.",
+    "Windows-only measurement for the before/after timing reproduction of BLOCKER 1 (the sleep(12)/declared-10s probe) -- not independently re-run on macOS/Ubuntu by me; the CI matrix itself runs on all three.",
+    "Token accounting omitted from this record rather than carried forward inaccurately or fabricated -- see proof/README.md's rule against a plausible-looking value that was not actually measured this round."
+  ]
+}

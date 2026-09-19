@@ -51,17 +51,23 @@ def _resolve_policy_path() -> Path:
 
 
 def _load_policy_dict(path: Path):
-    """Read and parse the policy file. Fail-open: any error -> None.
+    """Read and parse the policy file. Fail-open: any error -> (None, reason).
 
-    None is passed through to `load_policy` as-is; `config.load_policy_dict`
-    treats a non-mapping as a degraded, all-OFF policy. This function's job
-    is only to turn "file missing" / "bad JSON" into that same shape rather
-    than raising, per the fail-open contract in lwb_core/config.py.
+    `None` (the first element) is passed through to `load_policy` as
+    before; `config.load_policy_dict` treats a non-mapping as a degraded,
+    all-OFF policy. This function's job is only to turn "file missing" /
+    "bad JSON" into that same shape rather than raising, per the
+    fail-open contract in lwb_core/config.py -- but it now also returns
+    WHY, as the second element, rather than dropping it. An independent
+    reviewer found this used to fail SILENTLY: an unreadable bundled
+    policy produced `{"permissionDecision":"allow"}` with no reason at
+    all, indistinguishable from a clean event with nothing to say. Fail
+    open, never fail silent -- see main()'s `policy_error` handling.
     """
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
+        return json.loads(path.read_text(encoding="utf-8")), None
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, f"{exc.__class__.__name__}: {exc}"
 
 
 def _ledger_path() -> Path:
@@ -90,15 +96,79 @@ def main() -> int:
     # the Event -- lwb_core is pure and cannot look for itself. See
     # adapters/claude/repo_facts.py. Claude Code sends the project
     # directory as `cwd`; fall back to this process's own cwd if absent.
+    #
+    # Fail-open, never fail SILENT: an independent reviewer found that a
+    # `collect_repo_facts` crash here used to disappear into `repo = None`
+    # with nothing recorded -- indistinguishable from "gathered facts, no
+    # repo found" (the ordinary, expected None). The decision must still
+    # stay `allow` (a broken collector must not block a dispatch), but the
+    # crash now has to say so in `permissionDecisionReason`. See
+    # `repo_error` below and its use after `evaluate`.
     cwd = raw_event.get("cwd") if isinstance(raw_event, dict) else None
+    repo = None
+    repo_error = None
     try:
         repo = collect_repo_facts(cwd if isinstance(cwd, str) else None)
-    except Exception:  # noqa: BLE001 - fail-quiet, same contract as the ledger write
-        repo = None
+    except Exception as exc:  # noqa: BLE001 - fail-quiet, same contract as the ledger write
+        repo_error = f"{exc.__class__.__name__}: {exc}"
 
     event = parse_event(raw_event, repo=repo)
-    policy = load_policy(_load_policy_dict(_resolve_policy_path()))
+    policy_path = _resolve_policy_path()
+    policy_dict, policy_error = _load_policy_dict(policy_path)
+    policy = load_policy(policy_dict)
     decision = evaluate(event, policy)
+
+    # Same principle as the repo-facts crash above, for the other silent
+    # path the same reviewer found: a bundled policy that cannot be read
+    # used to render as `{"permissionDecision":"allow"}` with NO reason at
+    # all. "I checked and found nothing" and "I could not check" must
+    # never share a representation -- so a collector or policy failure is
+    # appended to the decision's warnings, exactly like a crashing rule
+    # (core/lwb_core/engine.py) already surfaces there.
+    extra_warnings = []
+    if repo_error:
+        extra_warnings.append(
+            f"lwb: repo facts unavailable ({repo_error}) -- rules that need "
+            "repository facts (e.g. lwb_proof_required) could not run for this event"
+        )
+    elif repo is not None and repo.facts_incomplete:
+        # One layer below a collector crash: the collector ran and
+        # returned data, but part of what it read (a proof directory or
+        # .git/HEAD) existed and could not be READ -- e.g. permission
+        # denied. lwb_proof_required.evaluate() already refuses to treat
+        # that as "checked, found nothing" and stays silent; this is what
+        # makes the fact that it COULD NOT CHECK visible in the output
+        # instead of merely quiet. Independent reviewer's Attacks C/D
+        # (proof/ and .git/HEAD made unreadable) found both a false deny
+        # and a silent allow reachable here before this branch existed.
+        extra_warnings.append(
+            f"lwb: repo facts incomplete ({repo.facts_incomplete_reason}) -- "
+            "rules that need repository facts (e.g. lwb_proof_required) may "
+            "have stayed silent for this event rather than risk acting on "
+            "facts they could not fully gather"
+        )
+    if policy_error:
+        extra_warnings.append(
+            f"lwb: policy unreadable at {policy_path} ({policy_error}) -- "
+            "falling back to a policy with every rule off"
+        )
+    elif policy.degraded:
+        # Same principle, one layer lower again: the policy file WAS read
+        # and parsed, but its shape or a rule's mode was malformed (e.g.
+        # a typo'd mode string) -- `lwb_core/config.py`'s own docstring
+        # says this condition "is recorded so an adapter can log it", and
+        # until now nothing did: `degraded`/`degraded_reason` were set by
+        # `load_policy_dict` and read by no adapter, no hook, no script.
+        # A typo that silently disarms an armed rule must not render the
+        # same as a clean policy with nothing to say.
+        extra_warnings.append(
+            f"lwb: policy degraded ({policy.degraded_reason}) -- one or more "
+            "rules may have resolved to off because of a malformed policy entry"
+        )
+    if extra_warnings:
+        from dataclasses import replace
+
+        decision = replace(decision, warnings=[*decision.warnings, *extra_warnings])
 
     record = ledger_record(
         timestamp=datetime.now(timezone.utc).isoformat(),
