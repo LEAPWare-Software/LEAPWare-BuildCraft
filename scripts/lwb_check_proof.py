@@ -603,9 +603,45 @@ def _new_or_changed_proof_paths(rev_range: str):
     genuinely nothing changed" apart from "could not compute at all" and
     must not treat the latter as if it were the former.
     """
+    statuses = _proof_path_statuses(rev_range)
+    if statuses is None:
+        return None
+    return set(statuses)
+
+
+def _proof_path_statuses(rev_range: str):
+    """Like `_new_or_changed_proof_paths`, but keeps the ADDED-vs-MODIFIED
+    distinction `check_new_proof_records_declare_pr` needs: an ADDED
+    record must declare THIS PR's number, but a MODIFIED one already
+    existed on the base branch and is allowed to keep its own -- only
+    forbidden from CHANGING it. A plain path set can't carry that
+    distinction, hence this separate dict-returning helper alongside the
+    older set-returning one (kept for its own direct callers/tests).
+
+    Returns `{relname: status}` where `status` is one of 'A' (added),
+    'M' (modified) or 'R' (renamed -- see below), or `None` under the same
+    "could not compute at all" conditions as `_new_or_changed_proof_paths`.
+
+    A RENAME is reported by git as a single R-status entry naming both the
+    old and new path (`git diff --name-status` prints `R100\told\tnew`
+    rather than a separate delete+add). Renaming a proof record does not
+    change its content, so on principle a rename+content-preserving-move
+    should be free -- but a rename is also the cheapest way to make an old
+    record's `pr` value LOOK freshly declared next to unrelated new
+    content, and unlike a true MODIFY there is no "base version of this
+    exact path" to diff the `pr` field against (the old path is gone).
+    Treating it as ADDED is the conservative choice: it costs nothing to a
+    legitimate rename (just re-declare the same `pr`, which is what ADDED
+    already requires) and it closes the same kind of self-consistent-
+    filename bypass `check_new_proof_records_declare_pr`'s docstring
+    already documents for brand-new files.
+    """
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-only", "--diff-filter=ACMR", rev_range, "--", "proof"],
+            [
+                "git", "diff", "-M", "--name-status", "--diff-filter=ACMR",
+                rev_range, "--", "proof",
+            ],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -616,7 +652,61 @@ def _new_or_changed_proof_paths(rev_range: str):
         return None
     if result.returncode != 0:
         return None
-    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    statuses: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        line = line.strip("\n")
+        if not line:
+            continue
+        fields = line.split("\t")
+        status = fields[0][:1]  # 'A', 'M', or 'R100' -> 'R' (--diff-filter=ACMR: no 'C')
+        relname = fields[-1]  # for R this is the NEW path; the old path is fields[1]
+        statuses[relname.strip()] = status
+    return statuses
+
+
+def _base_ref(rev_range: str) -> str:
+    """The base side of a two-dot `rev_range` ('base..head'), e.g.
+    'origin/main' from 'origin/main..HEAD'. `rev_range` is always
+    constructed this way by this script's own callers (the
+    'origin/main..HEAD' default, or f"{base}..{head}" from --base/--head),
+    so a plain split is sufficient -- this is not a general revision-range
+    parser.
+    """
+    base, _, _ = rev_range.partition("..")
+    return base
+
+
+def _read_pr_field_at_ref(ref: str, relname: str):
+    """The `pr` field of `proof/<relname>` as it reads at git ref `ref`,
+    or `_MISSING` (a sentinel distinct from `None`, which is itself a
+    legal-if-wrong value for a JSON field) if the file can't be read at
+    that ref at all -- missing from that ref, unreadable git object, not
+    valid JSON, or not a JSON object. A caller must fail closed on
+    `_MISSING`, never treat it as "the base agrees".
+    """
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{relname}"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError:
+        return _MISSING
+    if result.returncode != 0:
+        return _MISSING
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return _MISSING
+    if not isinstance(data, dict):
+        return _MISSING
+    return data.get("pr")
+
+
+_MISSING = object()
 
 
 def check_new_proof_records_declare_pr(
@@ -635,18 +725,36 @@ def check_new_proof_records_declare_pr(
     content is CI, on a `pull_request` run: `.github/workflows/ci.yml`'s
     `lwb-proof-pr` step already knows `github.event.pull_request.number`
     and passes it as `--pr N` -- no workflow change needed, the number is
-    already threaded this far. This function uses that number to check
-    every `proof/*.json` file that is NEW or CHANGED in this PR's diff
-    against `rev_range` (default `origin/main..HEAD`, resolvable in this
-    repo's CI checkout, which fetches full history): each such file must
-    self-declare `pr` == `pr_number`, independent of what its filename
-    says. A file unchanged since before this PR is never flagged just
-    because its own (historical) `pr` differs from the PR currently under
-    CI.
+    already threaded this far. This function uses that number against
+    `rev_range` (default `origin/main..HEAD`, resolvable in this repo's CI
+    checkout, which fetches full history), and the two DIFFER by how the
+    file changed:
+
+    - ADDED (or RENAMED -- see `_proof_path_statuses`'s docstring for why
+      a rename is treated as an add): the record is new, so it must
+      self-declare `pr` == `pr_number`. This is the original rule and the
+      one that closes the two disclosed bypasses above -- a NEW record's
+      filename and `pr` field are both entirely attacker-controlled in
+      the same PR, so nothing about the file itself can be trusted.
+    - MODIFIED: the record already existed on the base branch (it proves
+      SOME earlier PR, not this one) and PR #21's own history is the
+      motivating case -- correcting a wrongly-set `verifiable` flag on
+      `proof/20.json` without pretending record 20 suddenly proves PR 21.
+      Such a record is allowed to keep declaring its original `pr`; what
+      it may never do is CHANGE that field, which is checked by reading
+      the base version of the same path with `git show <base>:<path>`
+      and comparing `pr` fields. If the base version can't be read at all
+      (deleted from base, unusual ref, not valid JSON there), this fails
+      CLOSED with an explicit error -- never a silent pass, because
+      "can't prove it didn't change" is not the same claim as "provably
+      unchanged".
+
+    A file unchanged since before this PR is never flagged at all --
+    `rev_range` itself excludes it, regardless of what its `pr` says.
 
     Degrades rather than crashing the whole gate when the diff itself
-    cannot be computed (`_new_or_changed_proof_paths` returns `None`, e.g.
-    no such ref in an unusual checkout): appends a NOTICE to `notices`
+    cannot be computed (`_proof_path_statuses` returns `None`, e.g. no
+    such ref in an unusual checkout): appends a NOTICE to `notices`
     (never silently treated as all-clear) saying every record's `pr` field
     in this run is self-declared and UNVERIFIED against the real PR
     number, and returns no errors -- this is the fail-open case, and it is
@@ -654,8 +762,8 @@ def check_new_proof_records_declare_pr(
     """
     if notices is None:
         notices = []
-    changed = _new_or_changed_proof_paths(rev_range)
-    if changed is None:
+    statuses = _proof_path_statuses(rev_range)
+    if statuses is None:
         notices.append(
             f"pr-authority: could not compute '{rev_range}' to find proof/*.json files "
             "new or changed in this PR (no such ref in this checkout?) -- every record's "
@@ -664,8 +772,9 @@ def check_new_proof_records_declare_pr(
         )
         return []
 
+    base_ref = _base_ref(rev_range)
     errors: list[str] = []
-    for relname in sorted(changed):
+    for relname in sorted(statuses):
         rel_path = Path(relname)
         if rel_path.name in ("schema.json", "exempt.json"):
             continue
@@ -692,13 +801,42 @@ def check_new_proof_records_declare_pr(
         if not isinstance(data, dict):
             continue
         record_pr = data.get("pr")
-        if record_pr != pr_number:
+        status = statuses[relname]
+        if status in ("A", "R"):
+            if record_pr != pr_number:
+                errors.append(
+                    f"{relname}: is new in this PR but self-declares 'pr' "
+                    f"({record_pr!r}) instead of {pr_number} (this PR's actual number, "
+                    "known to CI independent of anything the record or its filename "
+                    "claims) -- a NEW record added by a PR must declare that PR's own "
+                    "number"
+                )
+            continue
+        # status == "M": the record already existed on the base branch, so
+        # it is allowed to keep declaring whatever PR it originally proved
+        # -- the motivating case is exactly this: correcting a wrongly-set
+        # classification (e.g. `verifiable`) on an existing record without
+        # that correction silently reassigning which PR the record proves.
+        # What it may NOT do is CHANGE its own `pr` field; check that
+        # against the base branch's version of the same path, which is the
+        # one place genuinely external to this PR's own content.
+        base_pr = _read_pr_field_at_ref(base_ref, relname)
+        if base_pr is _MISSING:
             errors.append(
-                f"{relname}: is new or changed in this PR but self-declares 'pr' "
-                f"({record_pr!r}) instead of {pr_number} (this PR's actual number, "
-                "known to CI independent of anything the record or its filename "
-                "claims) -- a record added or modified by a PR must declare that "
-                "PR's own number"
+                f"{relname}: modified in this PR but its base version "
+                f"('{base_ref}:{relname}') could not be read to verify its 'pr' field "
+                "was not changed -- deleted from the base branch, an unreadable git "
+                "object, or not valid JSON there; failing closed rather than assuming "
+                "it is unchanged"
+            )
+            continue
+        if record_pr != base_pr:
+            errors.append(
+                f"{relname}: modified in this PR and its 'pr' field changed from "
+                f"{base_pr!r} (on '{base_ref}') to {record_pr!r} -- an existing record "
+                "may be corrected, but it must keep declaring the PR it originally "
+                "proved; a PR that wants to add a NEW record for itself must do so "
+                "under a new filename, not by repointing an old one"
             )
     return errors
 

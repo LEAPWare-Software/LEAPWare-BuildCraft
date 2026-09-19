@@ -54,6 +54,41 @@ a proof record exists to prevent. A test asserts every exempt sha is a real
 commit in this repo's history, so the list cannot be used to excuse a
 future merge. **Adding an entry is not a substitute for writing a record.**
 
+## PR-authority: a NEW record must declare itself; a CORRECTED one must not reassign itself
+
+`--pr <N>` above checks that a record *for N* exists — it does not, by
+itself, stop a record from lying about *which* PR it is for. PR #20's
+review disclosed two bypasses: a slug-named record self-declaring a stale
+`pr`, and a self-consistent fabricated digit filename (`007.json`
+declaring `"pr": 7`) — neither trips a filename-vs-field mismatch, because
+there is nothing to disagree with when both the filename and the field are
+written for the first time in the same PR. `check_new_proof_records_declare_pr`
+(run from CI's own `--pr N`, independent of anything a record or its
+filename claims) closes this, and it treats an ADDED record differently
+from a MODIFIED one:
+
+- **A record ADDED or RENAMED in a PR** must self-declare `"pr"` equal to
+  that PR's own number. This is the unchanged rule that closes both
+  disclosed bypasses. A rename is treated as an add — once the old
+  filename is gone there is no base version of the same path to diff
+  against, so re-declaring the same `pr` under the new name is the
+  conservative requirement.
+- **A record MODIFIED in a PR** already existed on the base branch, so it
+  proves whichever earlier PR it always proved — modifying it must not
+  reassign that. Its `pr` field is checked against the base branch's own
+  version of the same path and must be unchanged; only the base version
+  being unreadable there (deleted, corrupt, not JSON) fails the check
+  closed, never silently open.
+
+`proof/20.json`'s own correction (below) is the motivating case: PR #21
+fixes a wrongly-set `verifiable` flag in a record PR #20 wrote, and that
+record must keep declaring `"pr": 20` — 20 is the PR it proves, not 21,
+the PR that corrected it. This is the same boundary the re-execution
+section below states for content: **an existing record may be corrected,
+but only a CLASSIFICATION may change — never the captured evidence, and
+now, never the `pr` it declares either.** A PR that wants a new record for
+itself adds one under a new filename; it does not repoint an old one.
+
 ## Record shape
 
 See `schema.json` for the enforced shape. In prose:
@@ -237,7 +272,9 @@ its `unproven[]`, with the captured evidence -- `argv`, `exit`, `tail`,
 edit to a proof record after the fact: correcting the AUTHOR'S OWN
 CLASSIFICATION of a command, never the captured result.** Rewriting
 `sha256`/`tail`/`exit` instead would be exactly the fabrication this
-mechanism exists to prevent.
+mechanism exists to prevent. The record's `"pr": 20` was left untouched by
+this correction, as `check_new_proof_records_declare_pr` (above) requires
+of any modified-not-added record.
 
 **Landed report-only.** `.github/workflows/ci.yml`'s `lwb-proof-reexecute`
 step runs `--reexecute` with `continue-on-error: true` and `if: always()`

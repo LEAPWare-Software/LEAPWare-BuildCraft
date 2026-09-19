@@ -257,3 +257,126 @@ def test_deleted_proof_file_is_not_flagged(tmp_path):
         f"{base}..HEAD",
     )
     assert errors == []
+
+
+def test_modified_record_that_keeps_its_original_pr_is_accepted(tmp_path):
+    """The false-failure case PR #21 hit: #21 legitimately corrects a
+    wrongly-set classification in #20's own record. proof/20.json must
+    keep declaring pr: 20 (the PR it proves), not 21 (the PR correcting
+    it) -- correcting a record must not require reassigning which PR it
+    proves."""
+    repo = _init_repo(tmp_path)
+    _write_record(repo, "20.json", {"pr": 20, "verifiable": True})
+    _commit_all(repo, "add record 20")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    _write_record(repo, "20.json", {"pr": 20, "verifiable": False})
+    _commit_all(repo, "correct record 20's verifiable flag")
+
+    errors = _with_repo_root(
+        repo,
+        lwb_check_proof.check_new_proof_records_declare_pr,
+        21,
+        f"{base}..HEAD",
+    )
+    assert errors == []
+
+
+def test_modified_record_that_changes_its_pr_is_rejected(tmp_path):
+    """A MODIFY is not a licence to reassign which PR a record proves --
+    only an ADD may declare a fresh 'pr'. Rejection must name both the old
+    and new values."""
+    repo = _init_repo(tmp_path)
+    _write_record(repo, "20.json", {"pr": 20, "verifiable": True})
+    _commit_all(repo, "add record 20")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    _write_record(repo, "20.json", {"pr": 21, "verifiable": True})
+    _commit_all(repo, "sneakily repoint record 20 to pr 21")
+
+    errors = _with_repo_root(
+        repo,
+        lwb_check_proof.check_new_proof_records_declare_pr,
+        21,
+        f"{base}..HEAD",
+    )
+    assert any("20.json" in e and "20" in e and "21" in e for e in errors), errors
+
+
+def test_modified_record_whose_base_version_cannot_be_read_fails_closed(tmp_path):
+    """If the base version of a modified path can't be read as a valid
+    record at all -- here, the base commit's copy is not valid JSON --
+    this must be an explicit error, not a silent pass. Deleting the field
+    or the file entirely is not required to prove this: any base version
+    this function cannot parse a 'pr' out of must fail closed the same
+    way."""
+    repo = _init_repo(tmp_path)
+    (repo / "proof" / "20.json").write_text("not json at all", encoding="utf-8")
+    _commit_all(repo, "base has a malformed record")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    _write_record(repo, "20.json", {"pr": 20, "verifiable": True})
+    _commit_all(repo, "modify the record, making it valid JSON")
+
+    errors = _with_repo_root(
+        repo,
+        lwb_check_proof.check_new_proof_records_declare_pr,
+        21,
+        f"{base}..HEAD",
+    )
+    assert any(
+        "20.json" in e and "could not be read" in e for e in errors
+    ), errors
+
+
+def test_end_to_end_correction_pr_plus_new_record_both_accepted(tmp_path):
+    """The real PR #21 scenario: base has proof/20.json with pr: 20; the
+    branch both corrects that record (kept at pr: 20) and adds
+    proof/21.json declaring pr: 21; the authoritative PR number is 21.
+    Both files must pass."""
+    repo = _init_repo(tmp_path)
+    _write_record(repo, "20.json", {"pr": 20, "verifiable": True})
+    _commit_all(repo, "add record 20")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    _write_record(repo, "20.json", {"pr": 20, "verifiable": False})
+    _write_record(repo, "21.json", {"pr": 21, "verifiable": True})
+    _commit_all(repo, "correct record 20 and add record 21")
+
+    errors = _with_repo_root(
+        repo,
+        lwb_check_proof.check_new_proof_records_declare_pr,
+        21,
+        f"{base}..HEAD",
+    )
+    assert errors == []
+
+
+def test_renamed_record_is_treated_as_added(tmp_path):
+    """A rename is close enough to an add that it must declare THIS PR's
+    number under its new name -- there is no 'base version of this exact
+    path' to diff a MODIFY against once the old path is gone, so treating
+    it as ADDED (re-declare the same pr under the new name) is the
+    conservative, bypass-resistant choice."""
+    repo = _init_repo(tmp_path)
+    _write_record(
+        repo, "old-name.json", {"pr": 20, "verifiable": True, "padding": "x" * 200}
+    )
+    _commit_all(repo, "add record under old name")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    _run("git", "mv", "proof/old-name.json", "proof/20.json", cwd=repo)
+    _commit_all(repo, "rename record, keep stale pr")
+
+    errors = _with_repo_root(
+        repo,
+        lwb_check_proof.check_new_proof_records_declare_pr,
+        21,
+        f"{base}..HEAD",
+    )
+    assert any("20.json" in e and "21" in e and "20" in e for e in errors), errors
