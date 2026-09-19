@@ -8,48 +8,49 @@ next step. Session start, re-derive commands, hard rules and traps live in
 
 In order. Do not start step *n+1* before step *n* is done and proven.
 
-1. **DONE.** SDLC scaffold (`lwb`) up. Repo is **PUBLIC** (Apache-2.0):
-   everything committed is world-readable, history included.
-2. **DONE; GitHub Apps DEFERRED.** Ruleset `main` (23627212) active. See
-   `docs/requirements/decisions.md` for both.
-3. **DONE. Mission landed.** Decisions and open items:
-   `docs/requirements/decisions.md` -- READ IT FIRST, do not re-decide.
-   Branch tips, counts and PR state are NOT written here; they rot in
-   minutes. Re-derive per `docs/handoff-protocol.md`.
-4. **Proof of completion: five PRs landed (#17-#21).** Digests are
-   re-executed and compared in CI, report-only. Read
-   `docs/maintainers/proof-of-completion-plan.md` before touching a gate.
-5. **IN FLIGHT: PR #22**, the state-claim gate. It is the ONLY red step on
-   `main`, on all six runners, since #18. Its first fix made the gate pass
-   on garbage; an independent reviewer returned DISAGREE, then AGREE after
-   the rewrite. D20 is SUPERSEDED IN PRACTICE: two genuinely independent
-   reviews now exist (`reviews/21/`, `reviews/22/`), both from a separate
-   peer session. Do NOT relabel an identifier to manufacture a third.
-6. **AT SESSION START, before anything: verify the shipped hook fires.**
-   `hooks.json` uses `"matcher": "Agent"`, never confirmed against a live
-   tool name. Register a marker hook, START A NEW SESSION, dispatch a
-   subagent, check the marker; repeat for `"Task"`. A mid-session edit is
-   never read -- measured. If neither fires, the only hook this product
-   ships has never run.
-7. **Then:** make re-execution blocking (only after a Linux runner shows
-   digests reproducing); close the fork gap (no secrets on a fork, so no
-   outside PR can go green while `CONTRIBUTING.md` says otherwise);
-   install the plugin in this repo.
-8. Every deliverable: proof record, pushed, CI green, announced
+Detail for every item: `docs/maintainers/proof-of-completion-plan.md`.
+Read it before touching a gate.
+
+1. **DONE.** Scaffold, ruleset, mission. Repo is **PUBLIC** (Apache-2.0):
+   all commits world-readable. Decisions:
+   `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
+   Branch tips and PR state are not written here; re-derive per
+   `docs/handoff-protocol.md`.
+2. **DONE. Proof of completion in CI: #17-#22.** `main` green.
+3. **IN FLIGHT:** #23 re-execute hardening, #24 open-PR post-merge. Both
+   carry an independent AGREE.
+4. **WHAT ACTUALLY BLOCKS 1.0.0 -- not a gate fix.** Version **0.1.0**,
+   zero tags, no release ever run; `core/lwb_core/rules/` holds ONE
+   rule, a self-declared no-op; every gate is a `scripts/` file wired to
+   THIS repo's CI. **A consuming repo installs `lwb` and gets a no-op.**
+   Plan doc, "1.0.0 readiness".
+5. **SETTLE FIRST -- touches the owner's permission prompts.** The lane
+   hook returns explicit `"permissionDecision": "allow"` for every edit
+   it does not deny, which may suppress the normal prompt. PLAUSIBLE.
+6. **Lane guard is a NUDGE by design**, so the ungated `Bash` path is
+   not a broken premise. Two real defects: a worktree inside the
+   checkout is denied wrongly, one outside is never checked.
+7. **The shipped hook has never been seen to fire** (`"matcher":
+   "Agent"`). Needs a NEW session, marker registered BEFORE start.
+   The *lane* hook does fire and deny, so the mechanism works.
+8. **Then:** re-execution blocking; the fork gap; install the plugin
+   here.
+9. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 06:48 UTC
-main SHA: 539ee659ce3473f5a8f7af6e30074b90e2ccd73c
+Generated: 2026-09-19 07:51 UTC
+main SHA: ae058820757801a4332db33b782767924bd0cb7b
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#22 The state-claim gate could never pass after a merge — main has been red for four merges (lwb-postmerge-gate)
+#24 The same post-merge trap, one line down the same block — live on main (lwb-openpr-postmerge)
+#23 Close the three defects blocking a blocking re-execute gate (lwb-reexecute-blockable)
 
 Deliverable proof state (from proof/):
-14/14 proven
+15/15 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

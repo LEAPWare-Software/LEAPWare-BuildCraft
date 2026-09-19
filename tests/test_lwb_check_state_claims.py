@@ -1119,3 +1119,252 @@ def test_table_row_split_across_two_lines_remains_undetected(tmp_path):
         "| main SHA |\n9463214739b90a6de1ae0b384fdc8ac2b1e6e40c |\n",
     )
     assert m.check(repo) == []
+
+
+# ---------------------------------------------------------------------------
+# Open-PR post-merge class: the SECOND instance of the same structural bug
+# the `main SHA:` field already fixed (reviews/22/independent-verifier.json
+# finding 4). A PR listed as open in the generated block is the EXPECTED
+# state, not a lie, exactly when that PR's own merge is what published the
+# document -- i.e. its merge commit is live main or live main's first
+# parent. Mirrors the `main SHA:` branch's rule precisely, via the same
+# `_sha_matches` helper, rather than a second looser comparison.
+# ---------------------------------------------------------------------------
+
+
+def _handoff_text_with_pr(recorded_main_sha: str, pr_number: int, pr_desc: str) -> str:
+    return (
+        "# HANDOFF\n\n## In flight\n\n1. Work.\n\n"
+        f"{m.BEGIN_MARKER}\n\n"
+        "Generated: 2026-09-18 22:35 UTC\n"
+        f"main SHA: {recorded_main_sha}\n\n"
+        "Open PRs:\n"
+        f"#{pr_number} {pr_desc}\n\n"
+        "Deliverable proof state (from proof/):\n0/0 proven\n(none yet)\n\n"
+        f"{m.END_MARKER}\n\n## Where to look\n\n- nowhere yet\n"
+    )
+
+
+def test_pr_merged_at_live_main_passes_with_git_verified_info(tmp_path, monkeypatch):
+    """The exact bug reproduced on main right now: PR #22's own merge is
+    what published this HANDOFF.md, so its merge commit IS live main.
+    That must pass with a git-verified INFO, not fail as stale."""
+    repo = _kstmp_repo("pr-merged-at-live-main")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha, 22, "The state-claim gate could never pass after a merge (lwb-postmerge-gate)"),
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: "MERGED")
+        monkeypatch.setattr(m, "_pr_merge_commit", lambda repo, n: sha)
+
+        findings, infos, errors = m._check_all(repo)
+        assert findings == [], findings
+        assert any(
+            "22" in i.text and "live main itself" in i.text and i.prefix == "INFO (git-verified)"
+            for i in infos
+        ), infos
+    finally:
+        _force_rmtree(repo)
+
+
+def test_pr_merged_at_live_main_first_parent_passes_with_git_verified_info(tmp_path, monkeypatch):
+    """A squash merge of some OTHER PR landed after this PR's merge, so
+    live main has advanced one commit past this PR's merge commit -- the
+    merge commit is live main's first parent, not live main itself. Still
+    the expected post-merge state, still an INFO, not a FAIL."""
+    repo = _kstmp_repo("pr-merged-at-live-parent")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha_a = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha_a, 22, "Some PR (some-branch)"), encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+        subprocess.run(["git", "checkout", "main"], cwd=repo, check=True)
+        _commit_file(repo, "b.txt", "b\n")
+        subprocess.run(["git", "checkout", "work"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: "MERGED")
+        monkeypatch.setattr(m, "_pr_merge_commit", lambda repo, n: sha_a)
+
+        findings, infos, errors = m._check_all(repo)
+        assert findings == [], findings
+        assert any(
+            "22" in i.text and "first parent" in i.text and i.prefix == "INFO (git-verified)"
+            for i in infos
+        ), infos
+    finally:
+        _force_rmtree(repo)
+
+
+def test_pr_merged_several_commits_back_fails_as_stale(tmp_path, monkeypatch):
+    """A PR merged several commits before live main -- genuinely stale,
+    not the post-merge special case. Its merge commit is neither live
+    main nor live main's first parent, so it must still FAIL."""
+    repo = _kstmp_repo("pr-merged-several-back")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha_a = _commit_file(repo, "a.txt", "a\n")
+        sha_b = _commit_file(repo, "b.txt", "b\n")
+        sha_c = _commit_file(repo, "c.txt", "c\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha_c, 9, "An old PR (old-branch)"), encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: "MERGED")
+        monkeypatch.setattr(m, "_pr_merge_commit", lambda repo, n: sha_a)
+
+        findings, infos, errors = m._check_all(repo)
+        assert any(
+            "stale open-PR listing" in f.label and "9" in f.text and "MERGED" in f.text
+            for f in findings
+        ), findings
+    finally:
+        _force_rmtree(repo)
+
+
+def test_pr_closed_not_merged_fails_as_stale(tmp_path, monkeypatch):
+    """A CLOSED (not merged) PR is stale regardless of any commit
+    comparison -- unchanged behaviour, verified again under the new
+    MERGED-branch code path to guard against a regression there."""
+    repo = _kstmp_repo("pr-closed-not-merged")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha, 7, "A closed PR (dead-branch)"), encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: "CLOSED")
+
+        findings, infos, errors = m._check_all(repo)
+        assert any(
+            "stale open-PR listing" in f.label and "7" in f.text and "CLOSED" in f.text
+            for f in findings
+        ), findings
+    finally:
+        _force_rmtree(repo)
+
+
+def test_pr_merged_but_merge_commit_unresolvable_fails_distinctly_not_as_stale(tmp_path, monkeypatch):
+    """gh reports MERGED but gives no resolvable merge commit (shallow
+    clone, degraded gh output, etc). This must exit non-zero -- the
+    listing might genuinely be stale -- but must NOT be reported under
+    the "stale" label, because that label asserts a proven lie and this
+    case proves nothing either way. Mirrors the `main SHA:` shallow-clone
+    branch's asymmetry."""
+    repo = _kstmp_repo("pr-merge-commit-unresolvable")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha, 22, "The state-claim gate (lwb-postmerge-gate)"), encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: "MERGED")
+        monkeypatch.setattr(m, "_pr_merge_commit", lambda repo, n: None)
+
+        findings, infos, errors = m._check_all(repo)
+        assert any(
+            "merge commit for listed PR could not be determined" in f.label and "22" in f.text
+            for f in findings
+        ), findings
+        assert not any(
+            "stale open-PR listing" in f.label and "22" in f.text for f in findings
+        ), findings
+    finally:
+        _force_rmtree(repo)
+
+
+def test_pr_merged_at_parent_in_shallow_clone_is_undeterminable_not_stale(tmp_path, monkeypatch):
+    """THE THIRD OCCURRENCE OF THIS CLASS, caught by an independent
+    reviewer. A CORRECT listing -- the PR's merge commit genuinely is live
+    main's first parent -- must not be called "stale" merely because a
+    shallow clone truncated `main^1` out of the visible history.
+
+    The reviewer reproduced it in a real `--depth 1 --branch main` clone:
+    #21, whose merge commit IS `main^1`, was reported
+    `[stale open-PR listing in generated block] ... nor live main's first
+    parent (None)` -- with the literal `None` in the message as the tell.
+    The `main SHA:` branch already handles the same situation correctly;
+    only this branch fell through to the accusation.
+
+    Exit non-zero is CORRECT and must stay: a shallow clone may never
+    silently pass. Only the reason must change, so the gate stops
+    asserting what git has not established here.
+    """
+    repo = _kstmp_repo("pr-merged-parent-shallow")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha_a = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha_a, 21, "A correctly listed PR (b)"), encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+        subprocess.run(["git", "checkout", "main"], cwd=repo, check=True)
+        _commit_file(repo, "b.txt", "b\n")
+        subprocess.run(["git", "checkout", "work"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: "MERGED")
+        monkeypatch.setattr(m, "_pr_merge_commit", lambda repo, n: sha_a)
+        # main^1 unresolvable, exactly as at depth 1, plus a shallow repo.
+        real_rev_parse = m._rev_parse
+        monkeypatch.setattr(
+            m, "_rev_parse", lambda repo, rev: None if "^" in rev else real_rev_parse(repo, rev)
+        )
+        monkeypatch.setattr(m, "_is_shallow_repository", lambda repo: True)
+
+        findings, infos, errors = m._check_all(repo)
+        assert any(
+            "undeterminable in a shallow clone" in f.label and "21" in f.text for f in findings
+        ), findings
+        assert not any(
+            "stale open-PR listing" in f.label and "21" in f.text for f in findings
+        ), findings
+    finally:
+        _force_rmtree(repo)
+
+
+def test_pr_gh_unauthenticated_stays_info_and_passes(tmp_path, monkeypatch):
+    """No regression on the already-covered degraded path: `gh`
+    unavailable/unauthenticated (`_pr_state` returns None) must keep
+    producing an UNVERIFIABLE info, not a failure -- CI runs with no gh
+    auth today and must stay green on this path."""
+    repo = _kstmp_repo("pr-gh-unauthenticated")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha, 22, "The state-claim gate (lwb-postmerge-gate)"), encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: None)
+
+        findings, infos, errors = m._check_all(repo)
+        assert findings == [], findings
+        assert any("could not be fully re-derived" in i.text for i in infos), infos
+    finally:
+        _force_rmtree(repo)
