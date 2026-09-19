@@ -135,6 +135,45 @@ mid-flight and were unrepairable because force-push is denied here.
   this repo so it eats its own cooking, and verifying the matcher
   actually fires.
 
+## Cross-platform digest evidence — MEASURED 2026-09-19
+
+The re-execution gate landed report-only because the sanitiser's
+determinism was verified on Windows only, and a blocking gate would have
+failed every PR if a runner disagreed. That condition is now measured
+rather than feared.
+
+PR #21's final green CI run, all six `test` jobs, each reporting the same
+line:
+
+    TOTAL: 4 of 107 commands re-executed across 13 records
+           -- ALL RE-EXECUTED COMMANDS MATCHED
+
+| runner | python | result |
+|---|---|---|
+| ubuntu-latest | 3.10 | all matched |
+| ubuntu-latest | 3.12 | all matched |
+| macos-latest | 3.10 | all matched |
+| macos-latest | 3.12 | all matched |
+| windows-latest | 3.10 | all matched |
+| windows-latest | 3.12 | all matched |
+
+**Digests recorded on one machine reproduce on three operating systems
+and two Python versions.** That is the evidence the blocking PR needed.
+An earlier note in this document said "one ubuntu-3.12 job log"; an
+independent reviewer had read exactly one, and the author had written it
+up as "Linux" before being corrected. This supersedes it with all six
+read directly.
+
+**What this still does NOT license.** Four commands are re-executable, not
+107. The 103 that predate the verifiability fields will never be
+re-executed and are deliberately not back-filled. And the three defects
+the independent review found — UNCOMPARABLE commands counting toward
+neither failures nor the total, a recursion guard escaped by an uppercase
+filename or a wrapper, and a missing `argv` crashing the run — must be
+fixed BEFORE the gate blocks, because each becomes load-bearing the
+moment a green result gates a merge. Reproducibility was one
+precondition of three.
+
 ## Open blockers
 
 Nothing in (d) or (e) is built while these stand.
