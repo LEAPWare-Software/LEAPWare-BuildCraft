@@ -160,9 +160,29 @@ Nothing in (d) or (e) is built while these stand.
    tool name in the installed version, the only hook this product ships
    fires zero times — a seventh gate that cannot fail, and the one that
    would matter most to another repo installing this. It cannot be
-   settled by reading: install the plugin in a scratch project, dispatch
-   a subagent, and confirm a ledger line appears. Do that before 1.0.0
-   is tagged.
+   settled by reading, and — measured 2026-09-19 — it cannot be settled
+   from inside a running session either.
+
+   **What was tried, and why it proves nothing.** A probe hook was
+   registered on `"matcher": "Agent"` mid-session, writing a marker file;
+   a subagent was dispatched; no marker appeared. That looks like an
+   answer. It is not one. The control settles it: a second probe was
+   added to the matcher that HAD been present at session start
+   (`Edit|Write|MultiEdit|NotebookEdit`) and a Write was performed — that
+   marker did not appear either. So a mid-session edit to
+   `.claude/settings.json` is never read, both probes were dead on
+   arrival, and the first result carries no information about the matcher.
+   Written down because a negative result is tempting to report as a
+   finding, and reporting this one would have been precisely the kind of
+   false claim directive 7a exists to stop.
+
+   **How to settle it**, at the START of a session so the hook is loaded:
+   register a marker hook on `"Agent"` in `.claude/settings.json`, begin a
+   NEW session, dispatch any subagent, and check for the marker. Repeat
+   for `"Task"`. Whichever fires is the live tool name; if neither does,
+   the only hook this product ships has never run anywhere. Revert the
+   probe afterwards. This is a hard precondition for tagging 1.0.0 and the
+   first thing another repo installing BuildCraft would hit.
    Noted while there: the reference documents an `if` field alongside
    `matcher`, e.g. `"if": "Bash(git *)"`. That would let the HOST filter
    a publishing action without lwb parsing any shell string itself,

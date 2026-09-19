@@ -99,6 +99,15 @@ jobs:
       - name: HANDOFF.md shape check
         run: python scripts/lwb_handoff.py --check
 
+      - name: lwb-check-state-claims (no tracked doc hand-asserts volatile git/PR state)
+        # if: always() so an earlier failing step in this sequential job
+        # cannot mask this gate, and so this gate cannot mask a later one.
+        # See docs/maintainers/session-protocol.md, "Five gates that could
+        # not do their job" -- steps here run sequentially and a failure
+        # skips the rest, which has hidden gates before.
+        if: always()
+        run: python scripts/lwb_check_state_claims.py --repo .
+
       - name: lwb-commit-identity (LEAPWare or an allow-listed bot only)
         if: github.event_name == 'pull_request'
         # github.event.pull_request.*.sha, not origin/<base>..HEAD: a

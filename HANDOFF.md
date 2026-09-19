@@ -30,8 +30,8 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 00:26 UTC
-main SHA: 7d9a0b79ac0e53415c84307018619a54587061aa
+Generated: 2026-09-19 01:17 UTC
+main SHA: a65e2ef64fed2dc4ce328b7464b2bc0c9cdb3cad
 CLI: claude
 Session: goal-1.0.0
 
@@ -44,6 +44,7 @@ Deliverable proof state (from proof/):
 - mission-settled-and-review-binding: PROVEN (commit d3eb1d6a55c00d86e907d6da8eea7e89a5f6e708)
 - mission-stages-architecture-and-trailer-gate: PROVEN (commit 229bd30945241adfa666807cbfe7447f8ef52d78)
 - authority-model-trial-protocol-and-claim-directive: PROVEN (commit 23e1c58ccc5af7c1c3bf16cbe04939f498da0998)
+- honest-evidence-leak-and-build-integrity: PROVEN (commit 7baafd3012e850add76fce79922e6c1222de23d9)
 - lwb-gates-enforceable: PROVEN (commit bbb07b950d0f0c37a9edc896d2073aa359cf475f)
 - lwb-vision: PROVEN (commit 9df414f6f0ab2a86e3b2c0e1bdd2d42fbf949a59)
 - handoff-vision-landed: PROVEN (commit 77896a94967d23d52fb0744d78a2cfdd6e593ee5)
