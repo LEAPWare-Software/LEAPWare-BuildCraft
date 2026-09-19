@@ -29,6 +29,7 @@ if str(_VENDOR_DIR) not in sys.path:
     sys.path.insert(0, str(_VENDOR_DIR))
 
 from adapters.claude.hook_io import load_policy, parse_event, render_decision  # noqa: E402
+from adapters.claude.repo_facts import collect_repo_facts  # noqa: E402
 from lwb_core.engine import evaluate  # noqa: E402
 from lwb_core.ledger import ledger_record  # noqa: E402
 
@@ -85,7 +86,17 @@ def main() -> int:
     except json.JSONDecodeError:
         raw_event = {}
 
-    event = parse_event(raw_event)
+    # Repository facts are gathered HERE, in the I/O layer, and frozen into
+    # the Event -- lwb_core is pure and cannot look for itself. See
+    # adapters/claude/repo_facts.py. Claude Code sends the project
+    # directory as `cwd`; fall back to this process's own cwd if absent.
+    cwd = raw_event.get("cwd") if isinstance(raw_event, dict) else None
+    try:
+        repo = collect_repo_facts(cwd if isinstance(cwd, str) else None)
+    except Exception:  # noqa: BLE001 - fail-quiet, same contract as the ledger write
+        repo = None
+
+    event = parse_event(raw_event, repo=repo)
     policy = load_policy(_load_policy_dict(_resolve_policy_path()))
     decision = evaluate(event, policy)
 

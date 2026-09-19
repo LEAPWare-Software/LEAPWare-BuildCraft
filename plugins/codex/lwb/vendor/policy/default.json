@@ -4,6 +4,10 @@
     "lwb_version": {
       "mode": "warn",
       "options": {}
+    },
+    "lwb_proof_required": {
+      "mode": "warn",
+      "options": {}
     }
   }
 }

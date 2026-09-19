@@ -11,6 +11,17 @@
             "statusMessage": "lwb: checking dispatch against gate policy"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/lwb_hook.py\" || python \"${CLAUDE_PLUGIN_ROOT}/bin/lwb_hook.py\"",
+            "timeout": 10,
+            "statusMessage": "lwb: checking command against gate policy"
+          }
+        ]
       }
     ]
   }

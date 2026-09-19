@@ -1,0 +1,164 @@
+{
+  "deliverable": "first-shipping-rule-that-can-deny",
+  "pr": 26,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-claude-3b64530b-2026-09-19",
+  "commit": "967b652",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 15%]",
+        "........................................................................ [ 30%]",
+        "........................................................................ [ 45%]",
+        "........................................................................ [ 60%]",
+        "........................................................................ [ 75%]",
+        "........................................................................ [ 90%]",
+        "...............................................                          [100%]",
+        "479 passed in 49.81s"
+      ],
+      "sha256": "e5c431c5a2a987394d9b86ddaaa300c6c22ac48a94cd789dce45f8e4b9f8523f",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/core/test_lwb_proof_required.py",
+        "tests/adapters/test_claude_repo_facts.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...................................................................      [100%]",
+        "67 passed in 0.62s"
+      ],
+      "sha256": "cc5bdcddcf036d3663875b4360fb08125951d4755e70a0a6f48d867dba7057cd",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "THE FIRST RULE IN THIS PRODUCT WITH A JOB. Before it, core/lwb_core/rules/ held one rule whose own docstring calls it a safe no-op that never denies, and a consuming repo that installed lwb got exactly that",
+      "met": true
+    },
+    {
+      "criterion": "PURITY HELD, which was the design risk: the rule performs no I/O. The impure adapter collects branch and proof ids into a declared RepoFacts field; the pure rule decides from those alone. The reviewer proved it by BLOCKING open, os file and process calls, subprocess, socket and pathlib reads so they would raise, then running the rule's tests -- 35 passed",
+      "met": true
+    },
+    {
+      "criterion": "It honours config.mode, unlike lwb_version which hardcodes WARN: warn permits with a WARN finding, deny returns permit=False, off is silent, deny with a matching record permits. The first time anything in this product has denied anything",
+      "met": true
+    },
+    {
+      "criterion": "EXERCISED OUTSIDE THIS REPOSITORY, through the shipped bin/lwb_hook.py against a genuinely foreign git repo -- the first time any of this product has run anywhere but here",
+      "met": true
+    },
+    {
+      "criterion": "BLOCKER FIXED: a branch name containing a slash can now be cleared. The rule names proof/feat/x-12.json, creating exactly that path silences it -- verified end to end in a foreign repo on branch feat/x-12. Ids use forward slashes on every platform, so Windows does not reproduce the bug natively",
+      "met": true
+    },
+    {
+      "criterion": "Two parser under-matches fixed and reproduced first: a heredoc introducer inside quotes, and <<< treated as a heredoc when it is a herestring. All 20 parser cases behave -- 9 true negatives silent, 5 true positives caught, both fixes, and the gh-pr-create case",
+      "met": true
+    },
+    {
+      "criterion": "NO SHIPPED POLICY ARMS THE RULE TO DENY, and the lock covers the VENDORED copies that actually ship rather than only the source policy. Proved non-vacuous: arming a vendored policy makes the test fail",
+      "met": true
+    },
+    {
+      "criterion": "hooks.json gains a Bash matcher and keeps Agent. Bash is the matcher that makes the rule run; Agent has never been observed to fire",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 999073937,
+    "cached_input": 992179582,
+    "uncached_input": 6894355,
+    "output": 2645168,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 131312.446,
+    "source": "transcript message.usage summed across this session's 2445 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T09:30:46.034Z). Cumulative across PRs 12-26 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
+  },
+  "mutations": [
+    "core/lwb_core/events.py: RepoFacts, and Event.repo as a DECLARED field rather than extra, whose docstring says no shipped rule reads it",
+    "core/lwb_core/rules/lwb_proof_required.py: the rule, plus _strip_heredocs with a quote-aware introducer scan and both a lookahead and lookbehind so a herestring is not mistaken for a heredoc",
+    "core/lwb_core/rules/__init__.py, core/policy/default.json: registered, shipped at warn",
+    "adapters/claude/repo_facts.py: the impure collector -- reads .git/HEAD rather than running git, follows worktree gitdir: pointers, and walks proof records RECURSIVELY with forward-slash ids",
+    "plugins/claude/lwb/hooks/hooks.json: a Bash matcher added, Agent kept",
+    "plugins/*/lwb/vendor/: regenerated by scripts/lwb_build.py so the rule actually ships",
+    "docs/rules/lwb-proof-required.md: the rule doc, the DENY IS ADVISORY section, and the parser blind-spot list",
+    "tests/: 67 tests for the rule and collector, plus the widened shipped-policy deny lock"
+  ],
+  "unproven": [
+    "DENY IS ADVISORY, NOT A SECURITY CONTROL, and the doc says so in those words. The reviewer CONFIRMED that a bare repo, a missing .git, a corrupt HEAD and a detached HEAD all permit under deny -- the first two because event.repo is None, the latter two because RepoFacts(branch=None). Detaching HEAD in one call and pushing in the next defeats deny entirely. Also undetected: git -C <path> push, (git push), command git push, FOO=1 git push, echo $(git push), git.exe push, and a push inside an invoked script. Making deny fail CLOSED on missing facts is what it would take, and that is NOT done here.",
+    "repo=None MEANS SILENCE, deliberately and not fixed. Making it fail closed at warn would fire in every directory without a .git, which is worse than the gap. This is the same fail-open shape as the gh-unauthenticated path that hid the #24 bug from CI for its entire life, and it is chosen with that precedent in view rather than in ignorance of it.",
+    "THE RULE IS INERT ON CODEX: adapters/codex/hook_io.py supplies no RepoFacts, so Event.repo is None on every Codex event. The protocol is enforced on one host today. Not fixed because adapters/codex/ is not this author's lane.",
+    "WRONG-REPOSITORY EXPOSURE, PLAUSIBLE, NOT REPRODUCED: facts come from the session's cwd, so 'cd ../other && git push' is judged against the session repo's branch. Reviewer finding 4.",
+    "NOT CHECKED BY THE REVIEWER: a symlinked .git, PowerShell-native invocation forms beyond '& git push', and the end-to-end bin/lwb_hook.py run driven from hooks.json. The author ran bin/lwb_hook.py directly against a foreign repo, which is not the same as the hook being invoked BY Claude Code from hooks.json -- that path has still never been observed to fire.",
+    "THE 'Agent' MATCHER REMAINS UNCONFIRMED. Bash was added precisely because Agent has never been seen to fire; keeping Agent costs nothing but proves nothing.",
+    "Token accounting is cumulative across PRs 12-26, not attributable to this PR alone.",
+    "TWO BOOKKEEPING ERRORS IN AN EARLIER VERSION OF THIS RECORD, both found by the reviewer and corrected here rather than silently: it was pinned to commit cce3b9a where the reviewable head is 967b652, and its mutations entry said '61 tests for the rule and collector' where the targeted run gives 67. The commands[] array was captured at cce3b9a, where the full suite was 479; at this head it is 487, the extra 8 arriving with the merge of #25. The recorded digests are therefore honest for the commit they were taken at and are NOT a measurement of this head."
+  ]
+}
