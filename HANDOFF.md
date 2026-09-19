@@ -16,15 +16,15 @@ In order. Do not start step *n+1* before step *n* is done and proven.
    `docs/requirements/decisions.md` -- READ IT FIRST, do not re-decide.
    Branch tips, counts and PR state are NOT written here; they rot in
    minutes. Re-derive per `docs/handoff-protocol.md`.
-4. **Proof of completion: four PRs landed, one BLOCKED.** Digests are
+4. **Proof of completion: five PRs landed (#17-#21).** Digests are
    re-executed and compared in CI, report-only. Read
    `docs/maintainers/proof-of-completion-plan.md` before touching a gate.
-5. **BLOCKED, needs the owner. PR #21 cannot satisfy its own
-   independent-review gate** -- see D20: a session cannot produce an
-   independent reviewer identity, because none exists to produce. Work
-   complete, process requirement unmet. Owner's choice: a review from a
-   GENUINELY SEPARATE session, or merge with the non-independence
-   recorded. Do NOT relabel an identifier.
+5. **IN FLIGHT: PR #22**, the state-claim gate. It is the ONLY red step on
+   `main`, on all six runners, since #18. Its first fix made the gate pass
+   on garbage; an independent reviewer returned DISAGREE, then AGREE after
+   the rewrite. D20 is SUPERSEDED IN PRACTICE: two genuinely independent
+   reviews now exist (`reviews/21/`, `reviews/22/`), both from a separate
+   peer session. Do NOT relabel an identifier to manufacture a third.
 6. **AT SESSION START, before anything: verify the shipped hook fires.**
    `hooks.json` uses `"matcher": "Agent"`, never confirmed against a live
    tool name. Register a marker hook, START A NEW SESSION, dispatch a
@@ -40,16 +40,16 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 05:15 UTC
-main SHA: f8cb7706488feb29cf6cd2a950a4f82f3dd879b7
+Generated: 2026-09-19 06:48 UTC
+main SHA: 539ee659ce3473f5a8f7af6e30074b90e2ccd73c
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#21 CI re-executes verifiable commands — and it caught main on its first run (lwb-reexecute-digests)
+#22 The state-claim gate could never pass after a merge — main has been red for four merges (lwb-postmerge-gate)
 
 Deliverable proof state (from proof/):
-13/13 proven
+14/14 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

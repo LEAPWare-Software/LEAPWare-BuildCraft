@@ -1,0 +1,155 @@
+{
+  "deliverable": "state-claim-gate-passes-after-a-merge-without-going-blind",
+  "pr": 22,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-claude-3b64530b-2026-09-19",
+  "commit": "bd0011dcc47be3bfd0cd96aaaa928a0881cee746",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 18%]",
+        "........................................................................ [ 37%]",
+        "........................................................................ [ 56%]",
+        "........................................................................ [ 75%]",
+        "........................................................................ [ 93%]",
+        ".......................                                                  [100%]",
+        "383 passed in 78.46s (0:01:18)"
+      ],
+      "sha256": "e4c1cc384d3936c072c82d058658960abc2bbe544418c0c9e563ea7afdc7dd8c",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_lwb_check_state_claims.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        ".....................................................................    [100%]",
+        "69 passed in 42.37s"
+      ],
+      "sha256": "85ab88013243867a387b95c193ee776c4c65f2f33f77d61a9db1955254de09ef",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_state_claims.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:43: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 06:09 UTC",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "fbe0d471c9cdb00c6815341bbaf6dd9133ef55220be19b34a5d218292f769816",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "main's red step is fixed: lwb-check-state-claims passes on all six runners at bd0011d (run 35427186025), the step that failed on every main push since PR #18",
+      "met": true
+    },
+    {
+      "criterion": "The recorded value is validated as 7-40 hex BEFORE git is invoked, so a revision expression, flag, placeholder, empty string or bare digit fails and never reaches a git subprocess",
+      "met": true
+    },
+    {
+      "criterion": "Pass only on equal-to-live-main or equal-to-live-main's-first-parent, not any ancestor; the repo root commit, which passed under 'any ancestor' forever, now fails",
+      "met": true
+    },
+    {
+      "criterion": "The first fix's blindness is closed: deadbeef-x5, TBD, 0 and empty each exited 0 'check passed' at 7b901c3 and now exit 1, reproduced by both the author and an independent reviewer",
+      "met": true
+    },
+    {
+      "criterion": "A git-proven first-parent relationship is labelled INFO (git-verified), not UNVERIFIABLE -- git verified it rather than merely failing to disprove it",
+      "met": true
+    },
+    {
+      "criterion": "A shallow clone never silently passes, and never accuses a correct file: a correct main^1 at depth 1 exits non-zero under '[main SHA undeterminable in a shallow clone]', not '[stale main SHA]'",
+      "met": true
+    },
+    {
+      "criterion": "The test that asserted a nonexistent sha is NOT a failure -- which locked the defect in -- is rewritten to assert the opposite, and a real depth-1 clone test guards the shallow path",
+      "met": true
+    },
+    {
+      "criterion": "False claims in 7b901c3 and in an earlier version of this PR's description are named as false and corrected, since a pushed history cannot be rewritten here",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 836577352,
+    "cached_input": 830374868,
+    "uncached_input": 6202484,
+    "output": 2153362,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 121530.849,
+    "source": "transcript message.usage summed across this session's 1910 usage-bearing assistant records (2026-09-17T21:02:13Z to 2026-09-19T06:47:44Z). Covers PRs 12-22 cumulatively and EXCLUDES all subagent spend, including the implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
+  },
+  "mutations": [
+    "scripts/lwb_check_state_claims.py: added _looks_like_sha (strict 7-40 hex, checked before any git call), _sha_matches, _is_shallow_repository; rewrote the 'main SHA:' branch of _scan_generated_block to equal-or-first-parent with a distinct shallow-clone failure reason",
+    "tests/test_lwb_check_state_claims.py: rewrote test_ancestor_recorded_sha_does_not_exist_is_undeterminable to assert FAILURE; added tests for the root commit failing, 7-char prefixes of live and live^1, the INFO (git-verified) label, a real depth-1 clone, and a parametrized test tracking subprocess.run to prove git is never invoked on an invalid value",
+    "docs/maintainers/proof-of-completion-plan.md: recorded that the first fix introduced a worse defect, that an independent reviewer caught it, and the corrected rule",
+    "reviews/22/independent-verifier.json: the independent review record (DISAGREE at 7b901c3, AGREE at bd0011d)"
+  ],
+  "unproven": [
+    "The empty-value row of an earlier PR description said main exits 1; the reviewer found it false. PRECISE CLAIM, after the reviewer corrected the author's own restatement of it: on main's gate, (empty) and 5 raise NO 'main SHA' FINDING -- which is the pre-existing silent pass this PR closes. Whether the RUN exits 0 depends on unrelated lines: the author's clean clone of main exited 0, the reviewer's run exited 1 from the unrelated stale-open-PR line. The same false sentence is in commit bd0011d's message and CANNOT be removed, because force-push is denied in this environment. It is corrected in the PR description only.",
+    "DISCLOSED RESIDUAL, reachable and confirmed by the reviewer: if neither origin/main nor main resolves (a single-branch clone, or an actions/checkout without fetch-depth: 0), the gate prints an UNVERIFIABLE info line and exits 0 for any value that PASSES THE HEX FORMAT CHECK, including hex garbage such as deadbeef... Non-hex garbage (TBD, --help, empty) still exits 1 on that path, because the format check runs before any git call -- an earlier wording here said 'ANY hex value' in a way that read as 'any value at all', and the reviewer corrected it. This repo's CI uses fetch-depth: 0 and does not reach the residual. Not fixed here.",
+    "A second post-merge trap of the same class is unfixed: with gh authenticated, main's HANDOFF.md fails on '#21 listed as open but gh reports MERGED'. CI does not see it only because gh is unauthenticated there. Found by the reviewer, recorded, out of scope for this PR.",
+    "The reviewer did not check CI on bd0011d, did not read the new tests line by line (only their pass count), and did not review the plan doc rewrite beyond the six-runner and incident passages. The CI check at bd0011d was done by the author.",
+    "The Generated: timestamp in the HANDOFF block is still not checked against anything; only the main SHA line is verified.",
+    "Token accounting is unknown for this deliverable and is recorded as unknown rather than estimated."
+  ]
+}

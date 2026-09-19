@@ -135,6 +135,45 @@ mid-flight and were unrepairable because force-push is denied here.
   this repo so it eats its own cooking, and verifying the matcher
   actually fires.
 
+## Cross-platform digest evidence — MEASURED 2026-09-19
+
+The re-execution gate landed report-only because the sanitiser's
+determinism was verified on Windows only, and a blocking gate would have
+failed every PR if a runner disagreed. That condition is now measured
+rather than feared.
+
+PR #21's final green CI run, all six `test` jobs, each reporting the same
+line:
+
+    TOTAL: 4 of 107 commands re-executed across 13 records
+           -- ALL RE-EXECUTED COMMANDS MATCHED
+
+| runner | python | result |
+|---|---|---|
+| ubuntu-latest | 3.10 | all matched |
+| ubuntu-latest | 3.12 | all matched |
+| macos-latest | 3.10 | all matched |
+| macos-latest | 3.12 | all matched |
+| windows-latest | 3.10 | all matched |
+| windows-latest | 3.12 | all matched |
+
+**Digests recorded on one machine reproduce on three operating systems
+and two Python versions.** That is the evidence the blocking PR needed.
+An earlier note in this document said "one ubuntu-3.12 job log"; an
+independent reviewer had read exactly one, and the author had written it
+up as "Linux" before being corrected. This supersedes it with all six
+read directly.
+
+**What this still does NOT license.** Four commands are re-executable, not
+107. The 103 that predate the verifiability fields will never be
+re-executed and are deliberately not back-filled. And the three defects
+the independent review found — UNCOMPARABLE commands counting toward
+neither failures nor the total, a recursion guard escaped by an uppercase
+filename or a wrapper, and a missing `argv` crashing the run — must be
+fixed BEFORE the gate blocks, because each becomes load-bearing the
+moment a green result gates a merge. Reproducibility was one
+precondition of three.
+
 ## Open blockers
 
 Nothing in (d) or (e) is built while these stand.
@@ -317,6 +356,181 @@ mechanical and is entitled to know the edges.
   on a fresh clone it raises `ImportError` until `scripts/lwb_build.py`
   has run. Installing it here is part of (e), and the degraded case must
   be visible rather than silent.
+
+## A gate that could never pass, shipped by the PR about gates that cannot fail
+
+`lwb_check_state_claims.py` re-derives HANDOFF.md's generated block and
+compared its recorded `main SHA:` against live `main` for EQUALITY. That
+is correct on a branch, where the block's `main` claim and the live
+`main` ref are the same commit. It is not correct after a squash merge:
+`main` becomes a brand-new merge commit that, by definition, did not
+exist at the moment the block was generated, so the recorded sha can
+never equal live `main` again. The check that was supposed to make gates
+honest could not itself pass once merged — and this defect was
+introduced by the very PR (#18) whose subject was "gates that cannot
+fail."
+
+Measured consequence, `main`'s own push-triggered CI run, by merge
+commit:
+
+    a65e2ef (PR #17)  success
+    39c951b (PR #18)  failure   <- introduced the equality-only check
+    a300623 (PR #19)  failure
+    f8cb770 (PR #20)  failure
+    539ee65 (PR #21)  failure
+
+Four consecutive merges to `main` ran red, unnoticed for the whole
+session. The reason it went unnoticed is itself the lesson: **a PR's
+`pull_request` check run and `main`'s own `push` check run are different
+triggers, on different commits, and a green `pull_request` run says
+nothing about whether `main`'s push run is green.** Every one of those
+four PRs merged with a green `pull_request` check — the pre-merge diff
+really did pass — and every one then turned `main` red the moment the
+squash-merge commit landed, because that commit is precisely the one
+this gate could never match. Reading only PR checks is reading half the
+signal; the other half, `main`'s own push runs, is where this sat
+undetected.
+
+First fix (WRONG, superseded below): `main SHA: X` is a timestamped
+snapshot, not a live assertion — it means "main was X when this was
+generated," which stays true after `main` moves on as long as X is still
+an ancestor of live `main` (via `git merge-base --is-ancestor`). Equal →
+pass, silently, as before. An ancestor → pass, but reported as an
+UNVERIFIABLE info line naming both shas, not hidden. Neither equal nor an
+ancestor → FAIL. Cannot determine (the sha doesn't exist in this repo, a
+shallow clone truncated it out, or git itself is unavailable) → reported
+as undeterminable, never silently passed.
+
+### The first fix introduced a WORSE defect, and an independent reviewer caught it
+
+That "any ancestor, else cannot-determine-is-never-a-fail" design had two
+compounding holes, both found by an independent reviewer, not the author,
+running direct probes against the shipped gate rather than reading the
+diff:
+
+1. **Every unresolvable value passed.** The raw text after `main SHA:`
+   went straight to `git merge-base --is-ancestor` with no format check
+   first. `git merge-base` cannot resolve a nonexistent object (or `TBD`,
+   `--help`, `origin/main~50`, an empty string, or `0`) and exits with a
+   third code the old logic mapped to "cannot determine → never a
+   FAIL" — which meant it printed `lwb-check-state-claims check passed`
+   and exited 0. The reviewer reproduced this against `deadbeef…`×5,
+   `TBD`, `0`, and an empty value: every one passed. The commit that
+   shipped this ("the state-claim gate could never pass after a merge")
+   had turned "a gate that cannot pass" into "a gate that passes on
+   garbage" — strictly worse than the bug it fixed, and the commit
+   message claimed the opposite.
+2. **"Any ancestor" stopped detecting staleness at all.** A repo's root
+   commit is an ancestor of every later commit on `main` forever, so a
+   `HANDOFF.md` recording the root commit passed no matter how many years
+   out of date it was, and the block's own `Generated:` timestamp was
+   never checked against anything. The gate that exists to catch a stale
+   document could be satisfied once, at the very first commit, and never
+   have to be re-derived again.
+
+**The corrected rule, now shipped:**
+
+1. **Validate the recorded value as 7–40 hex characters BEFORE calling
+   git at all.** Anything else is a FAILURE, and git is never invoked to
+   decide it — closes hole 1, and also closes a pre-existing silent-pass
+   bug (an empty value or a 1-character prefix used to match via Python's
+   own `"main-sha".startswith("")`/`startswith(short-prefix)` with zero
+   output).
+2. **Pass ONLY when the recorded value equals live `main`, or equals live
+   `main`'s first parent (`live^1`)** — not "any ancestor". A squash
+   merge advances `main` by exactly one commit past what was recorded, so
+   equal-or-first-parent is the precise rule for that case and needs no
+   age bound; it also closes hole 2, since a root commit is an ancestor
+   but is not `live^1` once `main` has moved more than one commit past
+   it, so it now correctly FAILS. A 7–40 char prefix match against either
+   of those two shas is still honoured.
+3. **An unresolvable value in a full clone is a FAILURE**, not
+   undeterminable — CI checks out with `fetch-depth: 0`, so an object
+   that cannot be resolved there cannot be `main` or its first parent.
+   Shallowness is detected via `git rev-parse --is-shallow-repository`;
+   in a shallow clone, where the answer genuinely cannot be known, the
+   gate reports it and still exits non-zero (the one exception: the
+   recorded value equal to live `main`'s own sha is always verifiable
+   even at depth 1, since that commit is always present).
+4. **Labelling fixed**: when git proves the first-parent relationship the
+   info line now carries an `INFO (git-verified)` prefix, not
+   `UNVERIFIABLE` — git verified it, it did not merely fail to disprove
+   it.
+
+See `scripts/lwb_check_state_claims.py` (`_looks_like_sha`,
+`_sha_matches`, `_is_shallow_repository`, and the `main SHA:` branch of
+`_scan_generated_block`) and `tests/test_lwb_check_state_claims.py` (the
+`ancestor` test group, rewritten — `test_ancestor_recorded_sha_does_not_
+exist_is_a_failure` used to assert a nonexistent sha was NOT a failure,
+which enshrined hole 1 as a passing test; it now asserts the opposite)
+for the mechanics. `_merge_base_is_ancestor` remains in the module as a
+low-level git wrapper (still covered by its own direct-call tests) but is
+no longer used to decide pass/fail on `main SHA:` — that decision is now
+a direct comparison against live `main` and live `main^1`.
+
+### The second fix falsely accused a correct file, caught by the same reviewer in a real shallow clone
+
+The corrected rule above tried `main^1` only when the clone was already
+known to be shallow-but-otherwise-treated-as-a-blanket-FAIL — in practice
+that meant a shallow clone never even attempted the first-parent
+resolution, and any non-equal value there was reported as `stale main SHA
+in generated block`, regardless of whether it was actually stale.
+Measured by the reviewer in a real `git clone --depth 1` of this repo's
+own `main`: the recorded value `f8cb7706488feb29cf6cd2a950a4f82f3dd879b7`
+genuinely IS `main`'s first parent (a full clone proves it — see `git log
+--oneline -3 main`), but `git rev-parse origin/main^1` in the depth-1
+clone fails outright (`fatal: ambiguous argument`). The gate called the
+correct file "stale main SHA" — an UNPROVEN accusation reported as an
+established fact, the mirror image of the `INFO (git-verified)` labelling
+fix above (there, a git-PROVEN fact was mislabelled unverifiable; here,
+an unproven claim was mislabelled as a proven lie).
+
+**Fix:** the gate now always attempts `main^1` resolution, in a shallow
+clone too — some shallow clones (depth > 1, or ones that happen to
+include the parent) really can resolve it, and refusing to try would
+turn a provable pass into a needless failure. Only when `main^1` fails to
+resolve AND the clone is shallow does the gate report `main SHA
+undeterminable in a shallow clone` — still exits non-zero (a shallow
+clone can never positively confirm the claim either), but the reason
+names the truncation, states the recorded value may be correct, and
+tells the reader to re-run with `fetch-depth: 0` to actually decide.
+`stale main SHA in generated block` is now reserved for cases git has
+actually determined: `main^1` resolved and did not match, or `main^1`
+does not exist at all in a full clone (e.g. `main` is the repo's root
+commit). Verified against a real `git clone --depth 1 --branch main
+file://<this repo>` — see
+`tests/test_lwb_check_state_claims.py::test_ancestor_shallow_clone_
+correct_first_parent_is_undeterminable_not_stale`, which fails against
+the second-fix code (asserted, by stashing `scripts/lwb_check_state_
+claims.py` and re-running just that test) and passes against the third.
+
+### The record/head circularity has now bitten FOUR PRs in a row
+
+PR #18 predicted it in writing; #19, #20 and now #22 hit it. Adding
+`proof/<pr>.json` changes the proof-state lines the HANDOFF block derives,
+so the block must be regenerated — and `resolve_reviewable_head` treats
+only `reviews/` and `proof/` as record-only, so a commit touching
+`HANDOFF.md` **moves the reviewable head and invalidates the review record
+in the same act that makes the record fileable.**
+
+Measured here: with `proof/22.json` added and the block stale, the gate
+reported `[stale deliverable proof state in generated block]
+recorded=['13/13 proven'] re-derived=['14/14 proven']`.
+
+The workaround used again, for the fourth time, is ordering — regenerate
+`HANDOFF.md` **together with** `proof/22.json` in one substantive commit,
+then file `reviews/22/` in a commit touching nothing outside `reviews/`,
+which leaves the reviewable head on the substantive commit. That works but
+requires the reviewer to re-bind to a commit created *after* it gave its
+verdict, which is itself a small dishonesty pressure every time.
+
+**The structural fix is still not done**, and is named here so it stops
+being rediscovered: classify a commit whose only `HANDOFF.md` change is
+*inside the generated `lwb-handoff` markers* as record-only, since the
+block is machine-written and carries no reviewable intent. That is a
+change to `scripts/lwb_lanes.py`, a shared path, so it needs its own PR
+and its own independent review. Four occurrences and one documented
+prediction are enough evidence that ordering discipline is not holding.
 
 ## How this document should be read
 
