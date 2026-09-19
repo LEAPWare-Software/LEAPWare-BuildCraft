@@ -52,13 +52,42 @@ script over every `commands[].argv` in `proof/*.json`, normalising numeric
 arguments, there are **ten distinct command kinds**: five re-execute
 cleanly on a runner, three cannot, and two are conditional.
 
-An earlier draft of this paragraph said "five are re-executable and five
+**MEASURED AGAIN 2026-09-19, TWICE, and the second measurement was itself
+false.** A "MEASURED AGAIN" edit at this spot once claimed **5 of 9**,
+asserting `lwb_build.py --check` "appears in the table above but no proof
+record in this repo has ever actually run it." That claim was not checked
+against the records before it was written, and it was wrong: `lwb_build.py
+--check` genuinely RUNS as a `commands[]` entry in `proof/7.json` and
+`proof/8.json`. Re-derived properly this time: **ten distinct command
+kinds, five re-executable** — the original count in the paragraph below,
+before that false "correction" briefly overwrote it. This is recorded
+rather than quietly restored, because a false correction silently reverted
+is itself a small act of the same dishonesty this document exists to
+catch — the reader deserves to know the number moved twice, and why the
+second move was wrong.
+
+A second, narrower false claim was made correcting the first: a commit
+message (`e2859d6`) said `grep -l lwb_build proof/*.json` finds the string
+in `proof/7.json`, `proof/8.json` AND `proof/17.json`, and reported all
+three as records that RUN the command. That conflated "the string appears
+in the file" with "the command was executed" — `proof/17.json` mentions
+`scripts/lwb_build.py` only in its `acceptance_criteria` prose (describing
+what a *different* deliverable's guard test covers) and in `mutations`
+(a file that deliverable touched); it has no `lwb_build.py` entry in its
+own `commands[]` array. `grep -l` matches a filename mentioned in prose
+exactly as readily as a command actually run, and the difference was not
+checked before the commit message asserted it. Only `proof/7.json` and
+`proof/8.json` actually run `lwb_build.py --check` as proof.
+
+An earlier draft of the count below said "five are re-executable and five
 are not." That was wrong, and it was wrong in a document written to end
 false claims — caught by an independent review of PR #17. The review's own
 correction was also wrong: it counted nine kinds, merging
 `lwb_check_proof.py` with its `--pr N` form. Neither of us had run the
-count. The numbers above are measured, and the measurement is the only
-reason this sentence is trustworthy.
+count at that point. The table below is measured, checked against a real
+`grep` over `proof/*.json` rather than against the table's own memory of
+itself, and that check is the only reason this paragraph is trustworthy
+now.
 
 | Command | Re-executable | Why not |
 |---|---|---|
@@ -110,7 +139,15 @@ mid-flight and were unrepairable because force-push is denied here.
 
 Nothing in (d) or (e) is built while these stand.
 
-1. **The sanitiser does not exist as code.** `session-protocol.md` tells
+1. **CLOSED 2026-09-19 — the sanitiser exists as code.**
+   `scripts/lwb_sanitise.py` carries a `SANITISER_VERSION`, normalises
+   path separators so Windows and ubuntu produce identical bytes, and is
+   called by `scripts/lwb_record.py`, which replaces the throwaway
+   capture script. Each command entry records the `sanitiser_version`
+   that produced its digest. Records 7-19 predate the scheme and are NOT
+   back-filled — a back-filled digest is a fabricated receipt — so their
+   digests remain unverifiable, which `proof/README.md` now states.
+   Originally recorded as: **The sanitiser does not exist as code.** `session-protocol.md` tells
    each session to write a throwaway script and *delete it*. The records
    disagree about what it did: 7-13 say they replaced `<repo>`, `<home>`
    and `<path>`; 15-16 say `<repo>` and `<home>`. Two rule sets, so every
@@ -118,10 +155,22 @@ Nothing in (d) or (e) is built while these stand.
    `scripts/lwb_sanitise.py`, have the recorder call it, add
    `sanitiser_version` to `commands[]`, and state plainly that records
    7-16 predate the scheme.
-2. **Non-deterministic commands cannot be digest-matched.** Either exclude
+2. **CLOSED 2026-09-19 as to recording, OPEN as to enforcement.** A
+   command now carries `verifiable` plus a `verifiable_reason` from a
+   closed enum, so a non-deterministic command is named as such rather
+   than silently digest-matched. What does NOT yet exist is the CI job
+   that re-executes the verifiable ones and compares digests — that is
+   the next PR, and until it lands no digest in this repo has ever been
+   checked by anything.
+   Originally recorded as: **Non-deterministic commands cannot be
+   digest-matched.** Either exclude
    them by name or record a normalised form — argv, exit code, and a
    count extracted by regex — instead of a hash of raw output.
-3. **Git-range commands need resolved shas.** The record must store the
+3. **CLOSED 2026-09-19 — resolved shas are required and enforced.**
+   A command whose argv names a git revision range must carry
+   `resolved_base` and `resolved_head`, in both the `a..b` and the
+   `--base/--head` forms; the validator rejects it otherwise, from PR 20.
+   Originally recorded as: **Git-range commands need resolved shas.** The record must store the
    base and head it actually ran against, and CI must substitute those
    rather than re-running the symbolic argv.
 4. **Re-deriving the generated `HANDOFF.md` block cannot pass.** It

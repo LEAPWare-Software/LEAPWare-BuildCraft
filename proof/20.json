@@ -1,0 +1,222 @@
+{
+  "deliverable": "sanitiser-recorder-and-verifiability-fields",
+  "pr": 20,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "verifier-sonnet5-08a9159b-2026-09-19",
+  "commit": "d8f58a963e171392fd10d2300b8d96f0aee039ce",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 21%]",
+        "........................................................................ [ 42%]",
+        "........................................................................ [ 63%]",
+        "........................................................................ [ 84%]",
+        "...................................................                      [100%]",
+        "339 passed in 25.30s"
+      ],
+      "sha256": "91d6e4957c4cf89c295f36c0058222cd3dbf451852d8cd6c28a351bb7163b260",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed"
+      ],
+      "sha256": "5ed60d4cef192203fd8cda63217940fa01fadc9c21941fba9c2e6a375b38e384",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "needs-repo-secret"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_env_leak.py",
+        "--range",
+        "origin/main..HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-env-leak check passed"
+      ],
+      "sha256": "5ed60d4cef192203fd8cda63217940fa01fadc9c21941fba9c2e6a375b38e384",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "a3006232574ed642e131b2eec14fbf931ffacab1",
+      "resolved_head": "d8f58a963e171392fd10d2300b8d96f0aee039ce"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2214 bytes)"
+      ],
+      "sha256": "75c03a5b153adf1686b42590fdb5ecf5e2cd1cf9ea0b307c66e7d81471224348",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "needs-build-step"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD",
+        "--pr-number",
+        "20"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: reviews/20/independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "NOTICE: reviews/20/independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "NOTICE: reviews/20/independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "NOTICE: reviews/20/independent-verifier.json: reviewer_was_dispatched_by_author=true -- this review is NOT independent by construction (the reviewer is a subagent of the author's own session); the record is an audit trail only, not proof of independent review",
+        "lwb-lanes check passed"
+      ],
+      "sha256": "554df68f13275aeea4ba5f4b25731478c304ccc90b1cb02efe4692fd631f58b1",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "a3006232574ed642e131b2eec14fbf931ffacab1",
+      "resolved_head": "d8f58a963e171392fd10d2300b8d96f0aee039ce"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "The sanitiser exists as committed, versioned code and is called by a committed recorder, replacing the throwaway script each session used to write and delete",
+      "met": true
+    },
+    {
+      "criterion": "The same logical path sanitises to identical bytes regardless of separator style, case on Windows-shaped prefixes, or a bare drive root -- while POSIX case-distinct directories are NOT conflated",
+      "met": true
+    },
+    {
+      "criterion": "A prefix match requires a path boundary, so a sibling directory sharing the repo's prefix is not corrupted",
+      "met": true
+    },
+    {
+      "criterion": "Each command records the sanitiser_version that produced its digest, a verifiable flag, a reason from a closed enum when false, and resolved shas when its argv names a git range",
+      "met": true
+    },
+    {
+      "criterion": "On a pull_request run, where CI holds a genuinely external PR number, every proof record new or changed in the range must declare that number regardless of its filename -- closing both the slug-named and self-consistent-filename bypasses",
+      "met": true
+    },
+    {
+      "criterion": "Where no external number exists, the output states that every pr field is self-declared and unverified rather than implying a check occurred",
+      "met": true
+    },
+    {
+      "criterion": "This record is the first in the repo produced by the committed recorder rather than a script that deleted itself",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 584677582,
+    "cached_input": 584674540,
+    "uncached_input": 3042,
+    "output": 1806025,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 111995.0,
+    "source": "transcript message.usage summed across this session's usage-bearing assistant records. Covers the WHOLE session across PRs 12-20 and EXCLUDES all subagent spend -- this PR alone ran four review passes and five implementer rounds. A floor, not a total."
+  },
+  "mutations": [
+    ".github/workflows/ci.yml",
+    "HANDOFF.md",
+    "docs/maintainers/proof-of-completion-plan.md",
+    "docs/maintainers/session-protocol.md",
+    "proof/20.json",
+    "proof/README.md",
+    "proof/schema.json",
+    "reviews/20/independent-verifier.json",
+    "scripts/lwb_check_proof.py",
+    "scripts/lwb_record.py",
+    "scripts/lwb_sanitise.py",
+    "tests/test_lwb_check_proof_layout.py",
+    "tests/test_lwb_check_proof_pr_authority.py",
+    "tests/test_lwb_check_proof_verifiable.py",
+    "tests/test_lwb_record.py",
+    "tests/test_lwb_sanitise.py"
+  ],
+  "unproven": [
+    "3 OF 8 COMMANDS IN THIS RECORD ARE INDEPENDENTLY RE-EXECUTABLE, as the recorder itself reports. That is not the repo-wide figure: five of ten distinct command KINDS are re-executable across all records. This record omits lwb_check_proof.py and its --pr form deliberately -- a record cannot contain proof of its own existence, and including them would make CI re-execution recurse into itself.",
+    "NO DIGEST IN THIS REPO HAS EVER BEEN COMPARED TO ANYTHING. This PR makes a digest ATTRIBUTABLE to versioned code; the CI job that re-executes verifiable commands and compares digests does not exist yet and is the next PR. Until it runs, every sha256 here is a number nobody has checked.",
+    "Records 7-19 predate the sanitiser-as-code and are NOT back-filled. Their digests were produced by per-session throwaway scripts that disagreed about their own substitutions, so none is independently reproducible. A back-filled digest would be a fabricated receipt.",
+    "Whether github.event.pull_request.base.sha and head.sha resolve as expected in a live Actions run is UNVERIFIED. No reviewer executed one; PyYAML is not installed here to parse-validate the workflow. This PR's own CI run is the experiment.",
+    "On a local run or a push to main there is no external PR number, so only the filename cross-check runs -- which catches an inconsistent lie, not a self-consistent one. The runtime output says so.",
+    "The bare two-revision form (git diff origin/main HEAD) is not detected as a range; a well-formed but nonexistent sha passes the resolved_* pattern; and the recorder has no timeout, so a hung command hangs it. Each is named in code with a pinning test where one applies.",
+    "checked_by is a subagent of the author's session and declares reviewer_was_dispatched_by_author: true. This is an audit trail, not proof of independent review.",
+    "This record was written by the author of the work it proves."
+  ]
+}

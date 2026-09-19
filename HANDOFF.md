@@ -30,16 +30,16 @@ In order. Do not start step *n+1* before step *n* is done and proven.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 02:59 UTC
-main SHA: 39c951b4dd49c49f5b399eb08ab58798747889ee
+Generated: 2026-09-19 04:08 UTC
+main SHA: a3006232574ed642e131b2eec14fbf931ffacab1
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#19 A parseable reviewer identity, and an honest admission it is not independence (lwb-review-identity)
+#20 The sanitiser and recorder become code; a record declares what can be re-executed (lwb-falsifiable-records)
 
 Deliverable proof state (from proof/):
-11/11 proven
+12/12 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
