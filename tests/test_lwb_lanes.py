@@ -42,6 +42,23 @@ def test_classify_gitignore_is_shared():
     assert lwb_lanes.classify_path(".gitignore") == "shared"
 
 
+def test_classify_cli_config_dirs_are_shared():
+    """`.claude/` and `.codex/` configure the enforcement, so neither is
+    lane-owned.
+
+    `.claude/settings.json` registers the PreToolUse lane hook and
+    `.claude/agents/` holds the roles a cloud routine dispatches. Same shape
+    as the `.gitignore` case above: before these prefixes existed both trees
+    classified as "other", so NEITHER CLI could commit its own config and
+    `.claude/agents/` could never land. Shared -- not claude-lane -- so that
+    the agent cannot rewrite the hook that constrains it without an
+    independent review record.
+    """
+    assert lwb_lanes.classify_path(".claude/settings.json") == "shared"
+    assert lwb_lanes.classify_path(".claude/agents/lw-verifier.md") == "shared"
+    assert lwb_lanes.classify_path(".codex/config.toml") == "shared"
+
+
 def test_classify_tests_subdirectory():
     assert lwb_lanes.classify_path("tests/adapters/fixtures/claude/pretooluse_read.json") == "claude"
     assert lwb_lanes.classify_path("tests/adapters/fixtures/codex/pretooluse_read.json") == "codex"

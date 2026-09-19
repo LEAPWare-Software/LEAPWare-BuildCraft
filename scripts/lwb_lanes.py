@@ -72,6 +72,20 @@ SHARED_PREFIXES = (
     # not shared — so NEITHER CLI could touch it. Lane-owned subtrees inside
     # `tests/` still win: see classify_path's ordering.
     "tests/",
+    # `.claude/` and `.codex/` are the CLIs' own contributor-side config.
+    # `.claude/settings.json` registers the PreToolUse lane hook, and
+    # `.claude/agents/` holds the role definitions a cloud routine dispatches
+    # -- a routine only sees agents committed on the branch it checks out, so
+    # they have to be tracked. They are SHARED, not lane-owned, for the same
+    # reason `.gitignore` is: a file whose whole purpose is to govern what the
+    # enforcement does cannot be owned by the agent it enforces against. Put
+    # `.claude/` in the claude lane and the claude agent could rewrite the
+    # hook that constrains it with no independent review. Before this entry
+    # both trees classified as "other" -- in no lane and not shared -- so
+    # NEITHER CLI could touch its own config at all, which is what blocked
+    # `.claude/agents/` from ever landing.
+    ".claude/",
+    ".codex/",
 )
 # Root files that belong to no single CLI's lane. `.gitignore` is here
 # because a change to it is repo-wide by construction -- PR #16 added
