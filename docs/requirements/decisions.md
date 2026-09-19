@@ -618,6 +618,66 @@ what remain, and they are owed.
    before `SubagentStop` fires, so subagent capture is lossy.
 4. Then items 2-7 above.
 
+## D21 — Trial the adoptable components BEFORE writing more rules · 2026-09-19
+
+Owner-decided 2026-09-19, in answer to a direct question.
+
+Principle 4 ("adopt before building") had never been acted on. D12 surveyed
+15 SDLC responsibilities and named 8 adoptable components — Spec Kit,
+Superpowers, Anthropic's `code-review` and `security-review`, Trail of
+Bits, Sentry/Datadog MCP, PagerDuty MCP, Dependabot — and D13 set the
+standard each must clear. **Zero had been trialled into the product**, and
+no adoption register, pinned version, commit hash or licence record exists
+for any of them.
+
+Meanwhile 8 rules sit `PROPOSED` in `mission.md`. The temptation was to
+start writing them.
+
+**The decision: run the D13 scoped trials on the surveyed components
+first.** Building our own rules before trialling what already exists would
+contradict Principle 4 as written, and would risk rebuilding maintained
+work. The likely shape of the outcome is that several SDLC responsibilities
+get covered by someone else's component, and BuildCraft builds only the
+glue plus the gates nobody else provides — but that is an expectation, not
+a finding, and the trials decide it.
+
+This is slower to a first visible rule. That is accepted.
+
+**Status: CAPTURED, NOT STARTED.** The owner's instruction was "capture it
+but stand by". No trial has been run. Do not begin one without the owner
+saying so.
+
+## D22 — 1.0.0 requires driving an SDLC in a REAL repo, not a demo · 2026-09-19
+
+Owner-decided 2026-09-19, same exchange.
+
+The owner's bar for 1.0.0 is that BuildCraft **has driven an SDLC in
+another repository**. Asked whether that means a real project or a
+purpose-built demo, the answer is a **real LEAPWare repo doing real work**:
+`lwb` installed in an actual project, governing real changes end to end,
+with stages enforced, gates firing and evidence recorded.
+
+A purpose-built demo repo was explicitly not chosen. The reasoning the
+option carried, and which the choice accepts: a demo is a rehearsal we
+control, and it cannot surprise us the way real work does.
+
+**Consequence, stated plainly so it is not rediscovered later:** no version
+of this plugin is 1.0.0 until that has happened. Everything built to date —
+the proof-of-completion layer, the lane fix, `lwb_proof_required` — governs
+THIS repository's own contributions or warns in a foreign repo. None of it
+has driven an SDLC anywhere.
+
+**A correction belongs in this record.** On 2026-09-19 the author asked the
+owner whether to cut 1.0.0, offering options including "publish 1.0.0 now"
+and "publish 1.0.0 and arm deny". That question should not have been
+asked. It was prompted by a session goal-tracker repeatedly reporting the
+version number as unmet, which is not a reason to release. The owner's
+reply — "I am unclear why you think we are at a 1.0.0 release level" — was
+correct, and the audit that followed found 0 of 15 stages, 0 of 1 roles,
+2 of ~10 plugin rules, 0 armed to deny, 2 of 8 working skills, and no
+adoption register. See `docs/maintainers/proof-of-completion-plan.md`,
+"1.0.0 readiness".
+
 ### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
 
 Full detail on the first two in-flight steps, moved here so HANDOFF.md
