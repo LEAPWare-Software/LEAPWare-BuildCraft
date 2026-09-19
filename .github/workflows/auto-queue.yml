@@ -70,10 +70,43 @@ jobs:
               print("prs=" + ",".join(prs))
           PY
 
+      # THE BUILT-IN TOKEN CANNOT LAND A PULL REQUEST HERE, and the failure
+      # is silent. An enqueue made as `github-actions[bot]` does start the
+      # queue entry, but GitHub does not start workflow runs for events
+      # triggered by the built-in token -- so the merge_group checks never
+      # run and the pull request sits in the queue forever, green, looking
+      # like nothing is happening rather than like something failed.
+      #
+      # Measured by LEAPWare-ShellUX on their PR #194, 2026-09-19. Their fix
+      # is a classic repo-scope PAT in an Actions secret, with NO FALLBACK to
+      # the built-in token. Corroborated here from the other direction: PR #27
+      # merged through this repository's queue at 14:18Z the same day, and the
+      # queue's own CI ran -- that enqueue was made by hand with a human token.
+      #
+      # A fallback to `github.token` would be the exact defect this repository
+      # keeps shipping: a path that cannot work, reporting the same success as
+      # one that does. So the secret is REQUIRED, and its absence fails loudly.
+      - name: Require the AUTO_QUEUE_TOKEN secret
+        if: steps.find.outputs.prs != ''
+        env:
+          AUTO_QUEUE_TOKEN: ${{ secrets.AUTO_QUEUE_TOKEN }}
+        run: |
+          if [ -z "$AUTO_QUEUE_TOKEN" ]; then
+            echo "::error::AUTO_QUEUE_TOKEN is not set. The built-in GITHUB_TOKEN"
+            echo "::error::cannot start the merge_group checks, so an enqueue made"
+            echo "::error::with it leaves the pull request stalled in the queue."
+            echo "::error::Create a classic repo-scope token and add it as the"
+            echo "::error::Actions secret AUTO_QUEUE_TOKEN. There is no fallback"
+            echo "::error::on purpose: a path that cannot work must not report"
+            echo "::error::the same success as one that can."
+            exit 1
+          fi
+          echo "AUTO_QUEUE_TOKEN is present."
+
       - name: Enqueue if ready
         if: steps.find.outputs.prs != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.AUTO_QUEUE_TOKEN }}
         run: |
           for pr in $(echo "${{ steps.find.outputs.prs }}" | tr ',' ' '); do
             echo "::group::PR #$pr"
