@@ -208,3 +208,15 @@ being enforced (see below).
   merged code it had never seen, on a verdict never given for that code. A
   record is bound to the commit it reviewed, not just the PR it reviewed it
   under.
+
+**Known residual, recorded rather than resolved.** A shared token shorter
+than `MIN_SHARED_SEGMENT_LENGTH` goes undetected. This is not
+hypothetical: `reviews/schema.json` accepts a 7-character git short sha as
+a legitimate identifier, so a record mirroring that house style would
+produce a real 7-character shared token that clears the floor. A UUID's
+later groups are 4 characters and clear it too. Lowering the floor
+reopens the false-positive problem it exists to fix, and no value closes
+both. The cost of a missed accidental self-review is a weaker audit
+trail; the cost of a false positive is a gate someone switches off. That
+is why the floor sits where it does.
+

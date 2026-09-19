@@ -145,6 +145,19 @@ _DATE_SHAPED_RE = re.compile(r"^\d{4}-?\d{2}-?\d{2}$")
 # flagging it would block a legitimate review -- the failure mode that gets
 # a gate disabled. 8 is the floor observed in this repo's own real session
 # token, not an arbitrary round number.
+#
+# KNOWN RESIDUAL, found by the independent review of PR #19 and left open
+# deliberately rather than discovered later: a shared token SHORTER than
+# this goes undetected. That is not hypothetical here -- reviews/schema.json
+# accepts a 7-character git short sha as a legitimate identifier, so a
+# future record mirroring that house style would produce a real 7-character
+# shared token that clears this floor cleanly. A UUID's later groups are
+# 4 characters and likewise clear it. Lowering the floor reopens the
+# false-positive problem this constant exists to fix -- two unrelated ids
+# sharing "9999" would block a legitimate review -- and no value closes
+# both. The trade is recorded here rather than resolved, because the cost
+# of a missed accidental self-review is a weaker audit trail, while the
+# cost of a false positive is a gate someone switches off.
 MIN_SHARED_SEGMENT_LENGTH = 8
 
 # How many DISTINCT independent reviewers a shared-path change needs. The
@@ -624,8 +637,9 @@ def _review_ok(
         return None
 
     # From REVIEWER_ID_FORMAT_CUTOFF_PR onward: both ids must be parseable,
-    # must not share a session-token (the accidental self-review this PR
-    # exists to catch -- see the module docstring measurement), and the
+    # must not share any hyphen-delimited segment of at least
+    # MIN_SHARED_SEGMENT_LENGTH characters (the accidental self-review this
+    # PR exists to catch -- see the module docstring measurement), and the
     # record must honestly declare whether the reviewer was dispatched by
     # the author's own session. This CANNOT establish genuine independence
     # -- a subagent the author dispatched itself can declare `false` -- so
