@@ -136,8 +136,7 @@ jobs:
         # two PRs). The first real runner output is the experiment; making
         # this blocking is a separate PR, filed only after digests are
         # observed reproducing here. See
-        # docs/maintainers/proof-of-completion-plan.md, blocker 2, and
-        # SPEC-d2-ci-reexecution.md.
+        # docs/maintainers/proof-of-completion-plan.md, blocker 2.
         continue-on-error: true
         run: python scripts/lwb_check_proof.py --reexecute
 

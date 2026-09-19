@@ -703,6 +703,40 @@ def check_new_proof_records_declare_pr(
     return errors
 
 
+# `--reexecute` has three distinct exit codes, not two -- "nothing was
+# compared" must never share a value with "everything compared matched".
+# A record that marks every command `verifiable: false` (a legal opt-out;
+# the closed enum constrains the WORDING of a stated reason, never whether
+# that reason is actually TRUE of the command it labels -- no script can
+# judge that) re-executes nothing and must not look, at the exit-code
+# level, identical to a record that was genuinely re-executed and matched.
+# This is documented here so a later PR that makes this mode BLOCKING
+# inherits the distinction rather than re-discovering the need for it:
+#   0  REEXECUTE_EXIT_ALL_MATCHED        -- at least one command was
+#      re-executed, and every one of them matched (digest and exit code).
+#   1  REEXECUTE_EXIT_MISMATCH           -- at least one re-executed
+#      command's digest or exit code did not match the record.
+#   2  REEXECUTE_EXIT_NOTHING_REEXECUTED -- zero commands were re-executed
+#      (every command was skipped as self-referencing, UNCOMPARABLE due to
+#      sanitiser drift, marked verifiable: false, or there were no proof
+#      records at all). This is NOT a pass: nothing was checked.
+REEXECUTE_EXIT_ALL_MATCHED = 0
+REEXECUTE_EXIT_MISMATCH = 1
+REEXECUTE_EXIT_NOTHING_REEXECUTED = 2
+
+
+def reexecute_exit_code(report: dict) -> int:
+    """The exit code `--reexecute` reports for `report` (as returned by
+    `reexecute_verifiable_commands`) -- see the three `REEXECUTE_EXIT_*`
+    constants above for what each means and why they are distinct.
+    """
+    if report["failures"]:
+        return REEXECUTE_EXIT_MISMATCH
+    if report["total_reexecuted"] == 0:
+        return REEXECUTE_EXIT_NOTHING_REEXECUTED
+    return REEXECUTE_EXIT_ALL_MATCHED
+
+
 def _command_resolves_to_self(argv) -> bool:
     """True if `argv` names `lwb_check_proof.py` itself, by basename match
     on any token (so `python scripts/lwb_check_proof.py`, an absolute path,
@@ -738,19 +772,25 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
     disk or spawning a real process (`run` is injectable for the same
     reason -- production passes `subprocess.run`, tests pass a spy).
 
-    Four failure modes this function exists to prevent becoming theatre,
-    each named in `SPEC-d2-ci-reexecution.md`:
+    Four failure modes this function exists to prevent becoming theatre:
 
-    1. Recursion -- `_command_resolves_to_self` skips any command naming
-       `lwb_check_proof.py`, reported `SKIPPED-SELF`, never invoked.
+    1. Recursion -- every proof record lists `lwb_check_proof.py` among its
+       own commands, so blindly re-executing it would re-enter validation
+       (and, under an env-gated design, recurse into its own re-execution
+       forever). `_command_resolves_to_self` skips any command naming
+       `lwb_check_proof.py`, reported `SKIPPED-SELF`, never invoked -- on
+       top of `--reexecute` being a CLI flag that never appears in a
+       recorded `argv`, so a re-executed command never inherits it either.
     2. Sanitiser drift -- a command whose `sanitiser_version` differs from
        `lwb_sanitise.SANITISER_VERSION` is reported `UNCOMPARABLE` and is
        not re-run at all: comparing its digest under different rules would
        prove nothing, so this is neither a pass nor a failure.
     3. Empty is not success -- every record's line and the final `TOTAL`
        line always carry both the re-executed count and the total command
-       count, even when the re-executed count is 0. There is no "all
-       verified" message anywhere in this function.
+       count, even when the re-executed count is 0, and the TOTAL line
+       says so in words (see `reexecute_exit_code`'s
+       `REEXECUTE_EXIT_NOTHING_REEXECUTED`). There is no "all verified"
+       message anywhere in this function.
     4. Exit codes -- a re-run whose exit code differs from the recorded
        `exit` is a failure, checked BEFORE the digest comparison, even if
        the digest happens to match anyway.
@@ -759,7 +799,10 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
     "total_reexecuted": N}`. `failures` is empty exactly when every
     attempted re-execution passed (an empty `failures` list with
     `total_reexecuted == 0` is the explicit "0 of N" case above, not a
-    claim that anything was verified).
+    claim that anything was verified) -- pass this dict to
+    `reexecute_exit_code` for the exit status, which distinguishes
+    "nothing was re-executed" from "everything re-executed matched" as two
+    DIFFERENT values, not the same one.
     """
     lines: list[str] = []
     failures: list[str] = []
@@ -834,8 +877,15 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
         lines.append(f"{label}: {record_reexecuted} of {record_total} commands re-executed")
         lines.extend(record_lines)
 
+    if failures:
+        suffix = f" -- MISMATCH: {len(failures)} command(s) did not match"
+    elif total_reexecuted == 0:
+        suffix = " -- NOTHING WAS RE-EXECUTED, THIS PROVES NOTHING (not success, not a check)"
+    else:
+        suffix = " -- ALL RE-EXECUTED COMMANDS MATCHED"
     lines.append(
-        f"TOTAL: {total_reexecuted} of {total_commands} commands re-executed across {len(records)} records"
+        f"TOTAL: {total_reexecuted} of {total_commands} commands re-executed "
+        f"across {len(records)} records{suffix}"
     )
 
     return {
@@ -910,9 +960,11 @@ def main() -> int:
             "re-run every commands[] entry whose verifiable is true across all "
             "proof/*.json records, sanitise its output, and compare the sha256 "
             "against the recorded digest. Mutually exclusive with every other mode: "
-            "run alone, prints a re-execution report, and exits 1 on any digest or "
-            "exit-code mismatch (never on an UNCOMPARABLE sanitiser-version drift, "
-            "and never on zero verifiable commands -- see reexecute_verifiable_commands)."
+            "run alone, prints a re-execution report, and exits with one of THREE "
+            "distinct codes -- see REEXECUTE_EXIT_ALL_MATCHED (0), "
+            "REEXECUTE_EXIT_MISMATCH (1), REEXECUTE_EXIT_NOTHING_REEXECUTED (2) -- "
+            "'nothing was re-executed' is never the same exit code as 'everything "
+            "re-executed matched'."
         ),
     )
     args = parser.parse_args()
@@ -922,11 +974,9 @@ def main() -> int:
         report = reexecute_verifiable_commands(records)
         for line in report["lines"]:
             print(line)
-        if report["failures"]:
-            for f in report["failures"]:
-                print(f"FAIL: {f}")
-            return 1
-        return 0
+        for f in report["failures"]:
+            print(f"FAIL: {f}")
+        return reexecute_exit_code(report)
 
     errors, count = validate_all()
     errors.extend(check_flat_proof_layout())

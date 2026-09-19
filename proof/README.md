@@ -174,6 +174,65 @@ merely attributing it to a known sanitiser version.
   per-record and the total level.
 - An exit-code mismatch fails even when the digest happens to match.
 
+**Three distinct exit codes, not two.** "Nothing was compared" and
+"everything compared matched" must never share an exit status -- otherwise
+a record that marks every command `verifiable: false` re-executes nothing
+and reads, at the exit-code level, exactly like a record that was
+genuinely checked and passed. `--reexecute` returns:
+
+- `0` (`REEXECUTE_EXIT_ALL_MATCHED`) -- at least one command was
+  re-executed, and every one matched.
+- `1` (`REEXECUTE_EXIT_MISMATCH`) -- at least one re-executed command's
+  digest or exit code did not match.
+- `2` (`REEXECUTE_EXIT_NOTHING_REEXECUTED`) -- zero commands were
+  re-executed at all (every command skipped, `UNCOMPARABLE`, marked
+  `verifiable: false`, or no proof records exist). This is harmless today
+  because the CI step is report-only (see below); it is NOT harmless once
+  a later PR makes it blocking, and the code exists now so that PR
+  inherits the distinction rather than discovering the need for it after
+  the fact. The printed `TOTAL` line also says so in words -- it is never
+  worded so as to read as a pass when nothing was re-executed.
+
+**What this does NOT check, and cannot.** The closed
+`verifiable_reason` enum constrains the WORDING an author may give for
+opting a command out of re-execution -- it does not, and cannot, check
+whether that stated reason is actually TRUE of the command it labels. An
+author can mark every command in a record `verifiable: false` with a
+plausible enum reason, re-execute nothing, and (today) get a report that
+is honest about re-executing nothing but cannot detect that the record
+itself dodged verification. See
+`docs/maintainers/proof-of-completion-plan.md`, blocker 2, for this named
+as the open hole a blocking PR must address — no script can judge whether
+a stated reason is honest.
+
+**The rule for marking a command `verifiable: true` (a mistake this repo
+has already made once):** a command is `verifiable: true` ONLY if its
+output depends on nothing but the repository's tracked content at the
+recorded commit. If a machine re-executing it at that same commit, on any
+machine, could ever print something different from what was recorded --
+because the output embeds a byte count, a file count, a timestamp, a live
+`gh`/network result, a generated-block value, or anything else derived
+from repo STATE rather than repo CONTENT -- it is not `verifiable: true`,
+whatever the `verifiable_reason` enum would otherwise suggest. This is a
+judgement the enum cannot make for you; nothing validates it mechanically,
+so the record's author is the only check there is.
+
+`proof/20.json` originally marked `python scripts/lwb_handoff.py --check`
+`verifiable: true`. It was wrong: that command prints the byte count of
+`HANDOFF.md`'s GENERATED block (`main SHA:`, `Open PRs:`, the proof-state
+summary), which changes with live repo state independent of any change to
+the tracked file -- observed printing 2262 bytes on `main` and 2214 bytes
+on a feature branch with the file itself unchanged, so its digest can only
+reproduce when the byte count happens to coincide across commits. Found by
+independent review; corrected in `proof/20.json`'s `commands[]` entry
+(`verifiable: false`, `verifiable_reason: nondeterministic-output`) and
+its `unproven[]`, with the captured evidence -- `argv`, `exit`, `tail`,
+`sha256` -- left byte-for-byte untouched. **This is the one legitimate
+edit to a proof record after the fact: correcting the AUTHOR'S OWN
+CLASSIFICATION of a command, never the captured result.** Rewriting
+`sha256`/`tail`/`exit` instead would be exactly the fabrication this
+mechanism exists to prevent.
+
 **Landed report-only.** `.github/workflows/ci.yml`'s `lwb-proof-reexecute`
 step runs `--reexecute` with `continue-on-error: true` and `if: always()`
 -- it cannot fail a PR. The sanitiser's cross-platform determinism has

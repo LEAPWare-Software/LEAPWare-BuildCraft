@@ -85,8 +85,9 @@ failed" from "the run was cancelled". Not a correctness defect -- every
 step still reports its own true result -- but it means a cancelled run on
 this job costs the full run time rather than stopping partway.
 
-Design decisions (see SPEC-b-state-claim-gate.md for the brief this
-implements):
+Design decisions (the brief this originally implemented lived in a session
+scratchpad and was never committed to this repo -- restated here in full
+rather than cited, so a reader never follows a pointer to vapour):
   - Wrapped prose is joined into one logical line per paragraph/bullet/
     heading/blockquote before matching, and a hit is mapped back to the
     FIRST physical line of that logical line for reporting. This repo

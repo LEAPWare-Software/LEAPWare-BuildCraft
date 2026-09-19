@@ -177,6 +177,25 @@ Nothing in (d) or (e) is built while these stand.
    directory, checkout layout) is still unmeasured -- that run is the
    next open question, and this gate becomes blocking only in a separate
    PR filed after it is answered.
+
+   **The open hole a blocking PR must close, named plainly rather than
+   fixed by a script (found by independent review of this PR):** the
+   closed `verifiable_reason` enum constrains the WORDING an author gives
+   for declaring a command unverifiable -- `nondeterministic-output`,
+   `git-range-not-reproducible`, `needs-repo-secret`, `needs-build-step` --
+   it does not and cannot constrain whether that stated reason is actually
+   TRUE of the command it labels. Nothing stops an author from marking
+   EVERY command in a record `verifiable: false` with a plausible enum
+   reason, re-executing nothing, and — once this mode is made blocking —
+   getting a green gate for a record that opted out of verification
+   entirely. `reexecute_exit_code`'s `REEXECUTE_EXIT_NOTHING_REEXECUTED`
+   (distinct from `REEXECUTE_EXIT_ALL_MATCHED`) makes that opt-out visible
+   in the exit code and in the `TOTAL` line's wording, so a blocking PR at
+   least CANNOT mistake it for a pass -- but visibility is not the same as
+   prevention, and no script can judge whether a stated reason is honest.
+   That judgement call belongs to review, not to this gate; the blocking
+   PR must say, explicitly, what (if anything) closes it, rather than
+   silently relying on the enum to have done more than constrain wording.
    Originally recorded as: **Non-deterministic commands cannot be
    digest-matched.** Either exclude
    them by name or record a normalised form — argv, exit code, and a

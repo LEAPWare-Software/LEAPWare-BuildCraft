@@ -1,9 +1,8 @@
 """Tests for `scripts/lwb_check_proof.py --reexecute`.
 
-SPEC-d2-ci-reexecution.md: re-run every command whose `verifiable` is
-true, sanitise its output through `lwb_sanitise`, and compare the sha256
-against the recorded digest. Four ways this becomes theatre, each guarded
-here:
+Re-run every command whose `verifiable` is true, sanitise its output
+through `lwb_sanitise`, and compare the sha256 against the recorded
+digest. Four ways this becomes theatre, each guarded here:
 
 1. Recursion -- a recorded command whose argv resolves to
    `lwb_check_proof.py` must never be re-executed, gated by an explicit
@@ -254,6 +253,84 @@ def test_main_reexecute_requires_explicit_flag(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "re-executed" not in out
     assert rc in (0, 1)
+
+
+# --- Three distinct exit states -------------------------------------------
+#
+# "0 of N re-executed" and "N of N re-executed and matched" must not share
+# an exit code: a later, blocking PR inherits whatever this returns, and a
+# record that marks every command verifiable: false (a legal way to opt out
+# of verification entirely) must not look identical, at the exit-code level,
+# to a record that was genuinely re-executed and matched.
+
+
+def test_exit_code_distinguishes_nothing_reexecuted_from_all_matched():
+    nothing_report = lwb_check_proof.reexecute_verifiable_commands(
+        [
+            (
+                "proof/x.json",
+                _record([_cmd(["python", "-m", "pytest"], verifiable=False, verifiable_reason="nondeterministic-output")]),
+            )
+        ],
+        run=lambda *a, **k: _proc(),
+    )
+    matched_report = lwb_check_proof.reexecute_verifiable_commands(
+        [("proof/x.json", _record([_cmd(["python", "scripts/lwb_check_prefix.py"], exit=0, sha256=_digest_for("ok"))]))],
+        run=lambda *a, **k: _proc(returncode=0, stdout="ok"),
+    )
+    nothing_code = lwb_check_proof.reexecute_exit_code(nothing_report)
+    matched_code = lwb_check_proof.reexecute_exit_code(matched_report)
+    assert nothing_code != matched_code
+    assert nothing_code == lwb_check_proof.REEXECUTE_EXIT_NOTHING_REEXECUTED
+    assert matched_code == lwb_check_proof.REEXECUTE_EXIT_ALL_MATCHED
+
+
+def test_exit_code_for_mismatch_is_its_own_distinct_value():
+    mismatch_report = lwb_check_proof.reexecute_verifiable_commands(
+        [("proof/x.json", _record([_cmd(["python", "scripts/lwb_check_prefix.py"], exit=0, sha256="b" * 64)]))],
+        run=lambda *a, **k: _proc(returncode=0, stdout="not matching"),
+    )
+    code = lwb_check_proof.reexecute_exit_code(mismatch_report)
+    assert code == lwb_check_proof.REEXECUTE_EXIT_MISMATCH
+    assert len({
+        lwb_check_proof.REEXECUTE_EXIT_ALL_MATCHED,
+        lwb_check_proof.REEXECUTE_EXIT_MISMATCH,
+        lwb_check_proof.REEXECUTE_EXIT_NOTHING_REEXECUTED,
+    }) == 3
+
+
+def test_zero_reexecuted_total_line_cannot_read_as_success():
+    """The TOTAL line's wording alone -- without looking at the exit code --
+    must not read as a pass when nothing was actually compared."""
+    report = lwb_check_proof.reexecute_verifiable_commands(
+        [
+            (
+                "proof/x.json",
+                _record([_cmd(["python", "-m", "pytest"], verifiable=False, verifiable_reason="nondeterministic-output")]),
+            )
+        ],
+        run=lambda *a, **k: _proc(),
+    )
+    total_line = next(line for line in report["lines"] if line.startswith("TOTAL:"))
+    lowered = total_line.lower()
+    assert "pass" not in lowered
+    assert "matched" not in lowered or "not" in lowered or "nothing" in lowered
+    assert "nothing" in lowered or "not verified" in lowered or "0 re-executed" in lowered.replace(" ", " ")
+
+
+def test_main_reexecute_exits_with_nothing_reexecuted_code(monkeypatch, tmp_path, capsys):
+    proof_dir = tmp_path / "proof"
+    proof_dir.mkdir()
+    record = _record(
+        [_cmd(["python", "-m", "pytest"], verifiable=False, verifiable_reason="nondeterministic-output")]
+    )
+    (proof_dir / "1.json").write_text(__import__("json").dumps(record), encoding="utf-8")
+    monkeypatch.setattr(lwb_check_proof, "PROOF_DIR", proof_dir)
+    monkeypatch.setattr(sys, "argv", ["lwb_check_proof.py", "--reexecute"])
+    rc = lwb_check_proof.main()
+    assert rc == lwb_check_proof.REEXECUTE_EXIT_NOTHING_REEXECUTED
+    assert rc != 0
+    assert rc != lwb_check_proof.REEXECUTE_EXIT_MISMATCH
 
 
 def test_main_reexecute_real_command_integration(monkeypatch, tmp_path, capsys):
