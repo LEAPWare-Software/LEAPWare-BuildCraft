@@ -48,7 +48,8 @@
       ],
       "sha256": "b46eda93c8c6fdfd55b63fdecbeb803b0b12230927b1826d512a86bd45d0c2a9",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
@@ -63,7 +64,8 @@
       ],
       "sha256": "76e3444b5a681d370182c71251c2f1b8e9b98effebcce0d52366a56262e42190",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
