@@ -748,6 +748,57 @@ is now stages 10 and 11, each named for what it actually does.
 layer that runs across all thirteen, which is why it is Phase 1
 infrastructure rather than a step in the line — see D24.
 
+## D24 — Acceptance criteria are anchored to GitHub's clock, not ours · 2026-09-19
+
+Owner-decided 2026-09-19. Closes the design gap in quality-floor item 1.
+
+**The floor's FIRST item has never had a mechanical check.** `mission.md`
+states it plainly: *"nothing records or timestamps acceptance criteria
+before work starts -- so it is verified by the reviewer reading the PR's
+own chronology. Closing that is required work, not an accepted gap."*
+
+Why it matters more than the other four floor items: every one of those
+grades work AFTER the fact -- tests pass, gates green, evidence recorded.
+Only item 1 stops an agent choosing the target after seeing where the
+arrow landed. Without it, work can be built and criteria written
+afterwards to describe whatever was built, and every downstream check goes
+green. It is the cheapest way to fake *done*, and the one we could not
+detect.
+
+**Why it was unsolved rather than merely unbuilt.** Every approach that
+keeps the evidence inside our own control fails:
+
+| approach | why it fails |
+|---|---|
+| criteria in a committed file | nothing stops writing it last and committing it first |
+| git commit timestamps | settable to any value |
+| commit ORDER | history can be rewritten before pushing |
+| the agent attests it | same agent doing the work -- self-attestation, the identical weakness that makes `reviewer_id` an audit trail rather than proof (D16) |
+
+The pattern: **any evidence we produce, we can forge.** The proof has to
+come from a clock we do not own.
+
+**THE DECISION: work starts with a GitHub issue stating what done means,
+and the gate compares GitHub's own creation timestamp against the first
+commit of the deliverable.** We cannot forge GitHub's clock. The evidence
+is external by construction.
+
+**The cost, accepted explicitly:** this changes how work STARTS, not just
+what we check at the end. Every deliverable opens with an issue, every
+time, with no exception that can be argued into existence later. A gate
+whose precondition is skippable is not a gate -- this repository has
+documented eight instances of exactly that failure.
+
+**Not yet designed, and not to be hand-waved when it is:** what counts as
+"the first commit of a deliverable" when a branch is merged forward or a
+deliverable spans branches; and what happens to work that legitimately
+begins before its scope is known. Both need answering before the rule is
+written, and neither is answered here.
+
+This lands in Phase 1 as item 1.5. It is the only item in that phase that
+changes the owner's process rather than our code, which is why it was the
+owner's call and not the CTO's.
+
 ### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
 
 Full detail on the first two in-flight steps, moved here so HANDOFF.md
