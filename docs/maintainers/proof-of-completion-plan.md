@@ -532,7 +532,7 @@ change to `scripts/lwb_lanes.py`, a shared path, so it needs its own PR
 and its own independent review. Four occurrences and one documented
 prediction are enough evidence that ordering discipline is not holding.
 
-### The second instance of the same post-merge class — predicted, then live on `main`
+### The second instance of the same post-merge class — observed, then live on `main`
 
 `lwb_check_state_claims.py`'s `Open PRs:` listing has the identical
 structural defect the `main SHA:` field had (above), one field further
@@ -587,6 +587,53 @@ See `scripts/lwb_check_state_claims.py` (`_pr_merge_commit`, and the
 and `tests/test_lwb_check_state_claims.py` (the `test_pr_merged_*` and
 `test_pr_closed_*`/`test_pr_gh_unauthenticated_*` group) for the
 mechanics and the six cases each covers.
+
+#### Corrections to this section's first version, all found by the reviewer
+
+Three things the first version of this section and of PR #24's description
+got wrong. They are corrected here rather than quietly edited, because the
+whole point of this document is that a claim is unverified until a command
+confirms it.
+
+- **"Predicted it" overstates the reviewer.** It did not predict the bug;
+  it OBSERVED the failure on `main` while reviewing #22 and marked it
+  PLAUSIBLE and explicitly out of scope. Its words, not a forecast.
+- **"for the sixth recorded time" is wrong.** PR #22's own commit message
+  says *"That makes seven instances of this repo's signature defect"*, so
+  this one is the **eighth**, not the sixth. Two numbers for the same
+  running count, three days apart, in the same repository.
+- **"the unresolvable case never wrongly accuses" was false**, and is the
+  third occurrence of that exact error — see below.
+
+#### The third occurrence of accusing a correct document
+
+The `main SHA:` fix made this mistake twice: first passing every
+unresolvable value, then calling a correct file stale. PR #24's first
+version made it a third time, in the open-PR branch, while its own
+description promised it had been avoided.
+
+In a real `--depth 1 --branch main` clone the reviewer found a listing for
+a PR whose merge commit genuinely IS `main^1` reported as:
+
+```
+[stale open-PR listing in generated block] ... is neither live main (...)
+nor live main's first parent (None)
+```
+
+`None` printed in the message was the tell, and the `main SHA:` line
+directly above it in the same run was reporting the same situation
+correctly as `undeterminable in a shallow clone`. One block, two adjacent
+lines, two different standards.
+
+Now fixed: when `main^1` cannot be resolved and the repo is shallow, the
+open-PR branch reports `open-PR listing undeterminable in a shallow
+clone` and still exits non-zero. Locked by
+`test_pr_merged_at_parent_in_shallow_clone_is_undeterminable_not_stale`,
+which was confirmed RED against the pre-fix script and green after.
+
+The pattern worth naming: **every time this repo adds a check that says
+"X is wrong", the case where X cannot be evaluated gets handled last and
+wrongly.** Three occurrences in two adjacent lines of one file.
 
 ## How this document should be read
 

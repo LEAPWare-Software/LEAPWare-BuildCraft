@@ -1294,6 +1294,57 @@ def test_pr_merged_but_merge_commit_unresolvable_fails_distinctly_not_as_stale(t
         _force_rmtree(repo)
 
 
+def test_pr_merged_at_parent_in_shallow_clone_is_undeterminable_not_stale(tmp_path, monkeypatch):
+    """THE THIRD OCCURRENCE OF THIS CLASS, caught by an independent
+    reviewer. A CORRECT listing -- the PR's merge commit genuinely is live
+    main's first parent -- must not be called "stale" merely because a
+    shallow clone truncated `main^1` out of the visible history.
+
+    The reviewer reproduced it in a real `--depth 1 --branch main` clone:
+    #21, whose merge commit IS `main^1`, was reported
+    `[stale open-PR listing in generated block] ... nor live main's first
+    parent (None)` -- with the literal `None` in the message as the tell.
+    The `main SHA:` branch already handles the same situation correctly;
+    only this branch fell through to the accusation.
+
+    Exit non-zero is CORRECT and must stay: a shallow clone may never
+    silently pass. Only the reason must change, so the gate stops
+    asserting what git has not established here.
+    """
+    repo = _kstmp_repo("pr-merged-parent-shallow")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha_a = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(
+            _handoff_text_with_pr(sha_a, 21, "A correctly listed PR (b)"), encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+        subprocess.run(["git", "checkout", "main"], cwd=repo, check=True)
+        _commit_file(repo, "b.txt", "b\n")
+        subprocess.run(["git", "checkout", "work"], cwd=repo, check=True)
+
+        monkeypatch.setattr(m, "_pr_state", lambda repo, n: "MERGED")
+        monkeypatch.setattr(m, "_pr_merge_commit", lambda repo, n: sha_a)
+        # main^1 unresolvable, exactly as at depth 1, plus a shallow repo.
+        real_rev_parse = m._rev_parse
+        monkeypatch.setattr(
+            m, "_rev_parse", lambda repo, rev: None if "^" in rev else real_rev_parse(repo, rev)
+        )
+        monkeypatch.setattr(m, "_is_shallow_repository", lambda repo: True)
+
+        findings, infos, errors = m._check_all(repo)
+        assert any(
+            "undeterminable in a shallow clone" in f.label and "21" in f.text for f in findings
+        ), findings
+        assert not any(
+            "stale open-PR listing" in f.label and "21" in f.text for f in findings
+        ), findings
+    finally:
+        _force_rmtree(repo)
+
+
 def test_pr_gh_unauthenticated_stays_info_and_passes(tmp_path, monkeypatch):
     """No regression on the already-covered degraded path: `gh`
     unavailable/unauthenticated (`_pr_state` returns None) must keep

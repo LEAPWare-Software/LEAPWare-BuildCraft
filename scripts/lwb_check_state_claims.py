@@ -1020,6 +1020,38 @@ def _scan_generated_block(
                                             prefix="INFO (git-verified)",
                                         )
                                     )
+                                elif live_parent is None and _is_shallow_repository(repo):
+                                    # THE THIRD TIME THIS CLASS OF MISTAKE HAS
+                                    # BEEN MADE IN THIS FILE. `main^1` failing
+                                    # to resolve in a shallow clone means the
+                                    # clone's depth truncated the parent out,
+                                    # NOT that the merge commit is provably
+                                    # something else -- so calling the listing
+                                    # "stale" accuses a possibly-correct
+                                    # document of lying. The `main SHA:` branch
+                                    # a few lines up already reports exactly
+                                    # this situation as undeterminable; an
+                                    # independent reviewer found the open-PR
+                                    # branch falling through to "stale"
+                                    # instead, with `first parent (None)`
+                                    # printed in the message as the tell.
+                                    # Still exits non-zero -- a shallow clone
+                                    # must never silently pass -- but under a
+                                    # reason that does not assert what git has
+                                    # not established here.
+                                    findings.append(
+                                        Finding(
+                                            rel_path,
+                                            pr_lineno,
+                                            "open-PR listing undeterminable in a shallow clone",
+                                            f"#{number} listed as open, gh reports MERGED at "
+                                            f"{merge_commit}, which is not live main ({live}); "
+                                            f"main^1 is not present at this clone's depth, so "
+                                            f"this cannot be proven to be the expected "
+                                            f"post-merge state -- the listing may be correct; "
+                                            f"re-run with fetch-depth: 0 to decide: {pr_text}",
+                                        )
+                                    )
                                 else:
                                     findings.append(
                                         Finding(
