@@ -131,6 +131,22 @@ _REPO_FACTS_ERROR_MARKER = "lwb: repo facts unavailable"
 #: all -- found by the same independent reviewer.
 _POLICY_ERROR_MARKER = "lwb: policy unreadable"
 
+#: A different shape of the same failure: the bundled policy WAS read and
+#: parsed but is structurally broken (a typo'd rule mode, a non-object
+#: rule config) -- `lwb_core/config.py` records this as `Policy.degraded`
+#: rather than raising. None of this CI check's own CASES should ever
+#: produce it (the bundled default policy is well-formed), so its
+#: appearance here would mean the shipped default itself regressed.
+_POLICY_DEGRADED_MARKER = "lwb: policy degraded"
+
+#: And the repo-facts-side sibling of `_POLICY_DEGRADED_MARKER`: the
+#: collector ran and returned data, but part of what it read (a proof
+#: directory, `.git/HEAD`) existed and could not be READ. None of this
+#: check's own CASES should trigger it either -- the scratch repo this
+#: script builds is always fully readable by the process that built it --
+#: so its appearance would mean `adapters/claude/repo_facts.py` regressed.
+_REPO_FACTS_INCOMPLETE_MARKER = "lwb: repo facts incomplete"
+
 
 def _onerror_clear_readonly(func, path, exc_info):
     """`shutil.rmtree` onerror handler for read-only files git leaves behind.
@@ -467,6 +483,18 @@ def main() -> int:
                 # check means to exercise. See _POLICY_ERROR_MARKER above.
                 errors.append(
                     f"{case.name}: the bundled policy was unreadable instead of loaded, got: {reason!r}"
+                )
+                continue
+
+            if bool(reason) and _POLICY_DEGRADED_MARKER in reason:
+                errors.append(
+                    f"{case.name}: the bundled policy was degraded instead of clean, got: {reason!r}"
+                )
+                continue
+
+            if bool(reason) and _REPO_FACTS_INCOMPLETE_MARKER in reason:
+                errors.append(
+                    f"{case.name}: repo facts were incomplete instead of fully gathered, got: {reason!r}"
                 )
                 continue
 

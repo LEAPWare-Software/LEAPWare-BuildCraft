@@ -131,10 +131,39 @@ def main() -> int:
             f"lwb: repo facts unavailable ({repo_error}) -- rules that need "
             "repository facts (e.g. lwb_proof_required) could not run for this event"
         )
+    elif repo is not None and repo.facts_incomplete:
+        # One layer below a collector crash: the collector ran and
+        # returned data, but part of what it read (a proof directory or
+        # .git/HEAD) existed and could not be READ -- e.g. permission
+        # denied. lwb_proof_required.evaluate() already refuses to treat
+        # that as "checked, found nothing" and stays silent; this is what
+        # makes the fact that it COULD NOT CHECK visible in the output
+        # instead of merely quiet. Independent reviewer's Attacks C/D
+        # (proof/ and .git/HEAD made unreadable) found both a false deny
+        # and a silent allow reachable here before this branch existed.
+        extra_warnings.append(
+            f"lwb: repo facts incomplete ({repo.facts_incomplete_reason}) -- "
+            "rules that need repository facts (e.g. lwb_proof_required) may "
+            "have stayed silent for this event rather than risk acting on "
+            "facts they could not fully gather"
+        )
     if policy_error:
         extra_warnings.append(
             f"lwb: policy unreadable at {policy_path} ({policy_error}) -- "
             "falling back to a policy with every rule off"
+        )
+    elif policy.degraded:
+        # Same principle, one layer lower again: the policy file WAS read
+        # and parsed, but its shape or a rule's mode was malformed (e.g.
+        # a typo'd mode string) -- `lwb_core/config.py`'s own docstring
+        # says this condition "is recorded so an adapter can log it", and
+        # until now nothing did: `degraded`/`degraded_reason` were set by
+        # `load_policy_dict` and read by no adapter, no hook, no script.
+        # A typo that silently disarms an armed rule must not render the
+        # same as a clean policy with nothing to say.
+        extra_warnings.append(
+            f"lwb: policy degraded ({policy.degraded_reason}) -- one or more "
+            "rules may have resolved to off because of a malformed policy entry"
         )
     if extra_warnings:
         from dataclasses import replace

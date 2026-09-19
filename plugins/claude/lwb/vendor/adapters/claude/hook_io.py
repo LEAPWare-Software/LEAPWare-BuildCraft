@@ -78,17 +78,33 @@ def render_decision(decision: Decision) -> dict:
     """Build the JSON dict Claude Code expects on a PreToolUse hook's stdout.
 
     A DENY finding maps to `hookSpecificOutput.permissionDecision: "deny"`
-    with `permissionDecisionReason` set to the deny reason. A WARN-only or
-    clean decision maps to `"allow"`; warnings are carried in
-    `permissionDecisionReason` too, joined, so they are visible in the
+    with `permissionDecisionReason` set to the deny reason, followed by any
+    WARN-mode findings that ALSO fired before the deny (the engine still
+    consults every rule before the one that denies, per `engine.evaluate`'s
+    own docstring, and collects their reasons into `decision.warnings`).
+    A WARN-only or clean decision maps to `"allow"`; warnings are carried
+    in `permissionDecisionReason` too, joined, so they are visible in the
     transcript even though they never block.
+
+    Previously a deny dropped `decision.warnings` entirely: the ledger
+    recorded them (`ledger_record` reads the whole `Decision`), but the
+    user-facing reason the hook actually prints did not, so a warning that
+    fired alongside a deny was invisible outside the ledger file. With
+    today's two shipped rules this could never be observed (a repo-facts
+    failure silences `lwb_proof_required` before it can deny, and a
+    degraded policy turns every rule off, so nothing can deny while
+    anything else warns) -- but the gap is in the general-purpose render
+    function, not behind either of those conditions, so it is fixed here
+    rather than left for the first policy that adds a second denying rule.
     """
     if not decision.permit:
+        deny_reason = decision.deny_reason or "denied by policy"
+        reason = "; ".join([deny_reason, *decision.warnings]) if decision.warnings else deny_reason
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",
-                "permissionDecisionReason": decision.deny_reason or "denied by policy",
+                "permissionDecisionReason": reason,
             }
         }
 
