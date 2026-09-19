@@ -127,7 +127,9 @@ than assume the note is right.
 | the repository has **no Actions variables**, so `vars.LWB_AUTO_QUEUE` is unset and the auto-queue is disabled by construction | `gh api repos/{owner}/{repo}/actions/variables` |
 | `.claude/` and `.codex/` classified as **`other`** — in no lane and not shared — so neither CLI could commit its own config and `.claude/agents/` could never land | `scripts/lwb_lanes.py::classify_path`; fixed in this package |
 | ShellUX's cross-repo review drop is real and carries a BuildCraft review | `gh api repos/LEAPWare-Software/LEAPWare-ShellUX/contents/reviews/buildcraft?ref=reviews/buildcraft` |
-| `scripts/lwb_auto_queue.py` reaches the ruleset, the check-runs, the proof record and the review records, and correctly refuses a pull request that is missing them | ran against a live pull request; output in the pull request that introduced this file |
+| `scripts/lwb_auto_queue.py` reaches the ruleset, the check-runs, the proof record and the review records, and correctly refuses a pull request that is missing them | ran against a live pull request, from a laptop **and** from a GitHub-hosted runner |
+| a job-level `permissions:` block grants **above** the repository default of `read` | the `GITHUB_TOKEN Permissions` group in the run log |
+| **GraphQL is reachable from a GitHub Actions runner**, and `enqueuePullRequest` is in the schema `GITHUB_TOKEN` sees | `scripts/lwb_auto_queue.py --probe`, run on the runner |
 
 ### Copied from ShellUX on trust — NOT reproduced here
 
@@ -217,7 +219,10 @@ Two further differences:
 |---|---|
 | the script reads the live ruleset, the check-runs, `proof/<pr>.json` and `reviews/<pr>/*.json`, and refuses a pull request missing any of them | **MEASURED** against a live pull request |
 | GraphQL is reachable, and `enqueuePullRequest` is present in the schema the token sees | **MEASURED** by `--probe` |
-| the workflow runs at all, and what permissions GitHub actually grants its token | **MEASURED** by the run on the branch that introduced it — read the run log |
+| the workflow runs on a GitHub-hosted runner, and the decide path refuses a pull request that is red and unreviewed, with `LWB_AUTO_QUEUE` empty | **MEASURED** on the runner, both on `push` and on `workflow_dispatch` |
+| **a job-level `permissions:` block grants above the repository default.** `default_workflow_permissions` is `read`, and the run log's `GITHUB_TOKEN Permissions` group reported `Contents: read`, `Metadata: read`, **`PullRequests: write`** | **MEASURED** on the runner. The repository setting does not cap the armed path out of existence. |
+| **GraphQL is reachable from an Actions runner** — `viewer` resolved to `github-actions[bot]` — and `enqueuePullRequest` is present in the schema that token sees | **MEASURED** on the runner. This is the whole premise of the decision, and it is the one part of it that is not copied. |
+| `gh api user` returns 403 `Resource not accessible by integration` for `GITHUB_TOKEN` | **MEASURED**; expected for an app token, and nothing depends on it |
 | **the `enqueuePullRequest` mutation itself succeeds from an Actions runner, with `GITHUB_TOKEN`** | **UNPROVEN.** Executing it would merge a pull request, which no routine and no session is authorized to do. `default_workflow_permissions` is `read`, which may cap the token below what the mutation needs. This is the one remaining hole in the merge path and it can only be closed by an armed run the owner authorizes. |
 | the CCR route as a fallback | **UNPROVEN, and inapplicable.** It enables *auto-merge*, which is disabled on this repository, so even a working CCR call would fail the same way `gh pr merge --auto` does. Recorded as a fallback only if the owner ever enables `allow_auto_merge`. |
 
