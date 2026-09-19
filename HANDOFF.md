@@ -40,16 +40,16 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 11:34 UTC
-main SHA: 9b374b52a56e04e6b443f9aa9d86fa51a0d8a47c
+Generated: 2026-09-19 14:36 UTC
+main SHA: f9b4deadbb441f0c1046a0d73b0434424f1cf13c
 CLI: claude
-Session: goal-1.0.0
+Session: conductor-track-a-01XXZR3A
 
 Open PRs:
-#27 Prove the plugin works in a repo that is not this one (lwb-foreign-repo)
+(unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-19/19 proven
+20/20 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
