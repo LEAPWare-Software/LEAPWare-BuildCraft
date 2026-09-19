@@ -104,6 +104,28 @@ rather than cited, so a reader never follows a pointer to vapour):
     count rather than record count, owner ruling 2026-09-18 -- are
     re-derived by calling `lwb_handoff._proof_state_lines()` directly and
     compared line for line.
+  - `main SHA:` (see `_looks_like_sha`/`_sha_matches`/
+    `_is_shallow_repository`, and the `main SHA:` branch of
+    `_scan_generated_block`): the recorded value must first be a bare
+    7-40 character hex string, checked BEFORE git is ever invoked --
+    anything else (a revision expression, a flag, a placeholder, empty,
+    a bare digit) is a FAILURE with no git subprocess run to decide it.
+    A valid value then passes ONLY if it equals live `main` or equals
+    live `main`'s FIRST PARENT (`main^1`) -- not "any ancestor". A squash
+    merge advances `main` by exactly one commit past what was recorded,
+    so equal-or-first-parent is the precise, no-age-bound rule; "any
+    ancestor" was tried first and an independent reviewer proved it
+    regressed this gate to a silent pass on every unresolvable value
+    (`deadbeef...`, `TBD`, `0`, empty all passed) and stopped detecting
+    staleness altogether (a repo's root commit is an ancestor of
+    everything forever). A short-sha prefix match against either target
+    is honoured. An unresolvable value is a FAILURE in a full clone
+    (detected via `git rev-parse --is-shallow-repository` returning
+    false) and, in a shallow clone, is reported AND still exits non-zero
+    -- never a silent pass either way. When git proves the first-parent
+    relationship, the info line carries `INFO (git-verified)`, not
+    `UNVERIFIABLE` -- see `docs/maintainers/proof-of-completion-plan.md`,
+    "The first fix introduced a WORSE defect", for the full incident.
   - The marker is bound to `HANDOFF.md` specifically; the same text in
     any other file grants no exemption. Inside HANDOFF.md, exactly one
     BEGIN and one matching END are required -- a missing/duplicated/
@@ -360,9 +382,16 @@ class Info:
     path: str
     lineno: int
     text: str
+    # Default "UNVERIFIABLE": this session could not determine an answer.
+    # A distinct prefix ("INFO (git-verified)") is used when git actually
+    # PROVED the claim (e.g. the recorded sha is live main's first
+    # parent) -- that must never be printed as if it were merely
+    # unresolved, which is the mislabelling an independent reviewer
+    # flagged in this gate's own PR history.
+    prefix: str = "UNVERIFIABLE"
 
     def render(self) -> str:
-        return f"{self.path}:{self.lineno}: UNVERIFIABLE: {self.text}"
+        return f"{self.path}:{self.lineno}: {self.prefix}: {self.text}"
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +459,57 @@ def _merge_base_is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool 
     if result.returncode == 1:
         return False
     return None
+
+
+_SHA_STRICT = re.compile(r"^[0-9a-fA-F]{7,40}$")
+
+
+def _looks_like_sha(value: str) -> bool:
+    """True only for a bare 7-40 char hex string -- nothing else. This is
+    the gate an independent reviewer's finding #1 demanded: validated
+    BEFORE git is ever consulted, so a revision expression ("origin/
+    main~50"), a flag ("--help"), a placeholder ("TBD"), an empty string,
+    or a single digit ("0") can never reach `git merge-base` or `git
+    rev-parse` as if it were a commit-ish. Any of those used to be handed
+    to git directly; several (a 1-char prefix, empty) even matched via
+    Python's own `str.startswith("")`, a silent pass with no output at
+    all (finding #5)."""
+    return bool(_SHA_STRICT.match(value))
+
+
+def _sha_matches(recorded: str, target: str | None) -> bool:
+    """True if `recorded` (already validated by `_looks_like_sha`) equals
+    live `target`, or is a short-sha prefix of it. `recorded` is never
+    longer than a full 40-char sha, so checking `target.startswith
+    (recorded)` alone covers both the short-prefix case and the
+    full-length-equal case -- no second, reversed comparison is needed."""
+    return target is not None and target.lower().startswith(recorded.lower())
+
+
+def _is_shallow_repository(repo: Path) -> bool:
+    """True if `repo` is a shallow clone. CI runs with `fetch-depth: 0`
+    (a full clone) precisely so this gate can trust its own answers; a
+    shallow clone is missing history a full clone would have, so an
+    "unresolvable" recorded sha there is not necessarily a lie -- it may
+    just be truncated out of the visible history. Per the reviewer's
+    prescription, that must be reported AND treated as a failure, never
+    silently passed, and never silently treated the same as a resolvable
+    non-ancestor."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    if result.returncode != 0:
+        return False
+    return result.stdout.strip() == "true"
 
 
 def _pr_state(repo: Path, pr_number: int) -> str | None:
@@ -730,54 +810,99 @@ def _scan_generated_block(
 
         if re.match(r"^main SHA:", stripped, re.IGNORECASE):
             recorded = stripped.split(":", 1)[1].strip()
+
+            # Reviewer finding #1: validate BEFORE calling git at all. A
+            # revision expression, a flag, a placeholder, an empty string
+            # or a bare digit must never reach a git subprocess as if it
+            # were a commit-ish -- and must FAIL, not pass or "info".
+            if not _looks_like_sha(recorded):
+                findings.append(
+                    Finding(
+                        rel_path,
+                        lineno,
+                        "invalid main SHA value in generated block",
+                        f"{stripped} (not a 7-40 character hex commit sha)",
+                    )
+                )
+                i += 1
+                continue
+
             live = _live_main_sha(repo)
             if live is None:
                 infos.append(
                     Info(rel_path, lineno, f"main SHA could not be re-derived here: {stripped}")
                 )
-            elif live == recorded or live.startswith(recorded) or recorded.startswith(live):
+                i += 1
+                continue
+
+            if _sha_matches(recorded, live):
                 # Equal (mod short-sha prefix matching): the block's claim
-                # is true right now. Unchanged from before -- no info line,
-                # a plain pass.
+                # is true right now, and live main (HEAD) is always
+                # resolvable regardless of clone depth. No info line, a
+                # plain pass.
                 pass
             else:
-                # Not equal. The block is a TIMESTAMPED SNAPSHOT -- "main
-                # SHA: X" asserts "main was X when this was generated",
-                # which stays TRUE after main moves on (e.g. a squash
-                # merge) as long as X is still an ancestor of live main.
-                # That is not the same claim as "main IS X right now", so
-                # it passes, but it is reported rather than hidden -- this
-                # repo's whole problem is checks that pass quietly. Only a
-                # sha that is neither equal NOR an ancestor is an actual
-                # lie (a sibling-branch commit, or a divergent history),
-                # and only a resolvable "no" (not "cannot tell") earns
-                # that FAIL -- see `_merge_base_is_ancestor`.
-                relation = _merge_base_is_ancestor(repo, recorded, live)
-                if relation is True:
+                # Reviewer finding #2: pass ONLY on equal-or-first-parent,
+                # not "any ancestor". A squash merge advances main by
+                # exactly one commit past what was recorded, so live
+                # main's first parent is the precise, no-age-bound rule --
+                # not "the root commit still counts forever". Always
+                # attempt the resolution, even in a shallow clone: a
+                # shallow clone deeper than 1, or one that happens to
+                # include the parent, CAN resolve it, and refusing to try
+                # would turn a provable pass into a needless failure.
+                live_parent = _rev_parse(repo, live + "^1")
+                if live_parent is not None and _sha_matches(recorded, live_parent):
+                    # Reviewer finding #4: git PROVED this relationship --
+                    # it must not carry the UNVERIFIABLE prefix, which
+                    # would mislabel a git-verified fact as an unresolved
+                    # question.
                     infos.append(
                         Info(
                             rel_path,
                             lineno,
-                            f"recorded main SHA {recorded} predates live main {live} "
-                            f"(still an ancestor of it -- block is a timestamped snapshot)",
+                            f"recorded main SHA {recorded} is live main's first parent "
+                            f"{live_parent} (live main is now {live}) -- verified by git",
+                            prefix="INFO (git-verified)",
                         )
                     )
-                elif relation is False:
+                elif live_parent is None and _is_shallow_repository(repo):
+                    # THE FIX TO THE SECOND FIX: `main^1` failing to
+                    # resolve in a shallow clone means "this clone's depth
+                    # truncated the parent out", NOT "the parent is
+                    # provably something else". Calling this "stale" is a
+                    # false accusation -- the recorded value may well be
+                    # correct, this clone just cannot prove it, which is
+                    # the mirror image of finding #4 (a git-PROVEN fact
+                    # mislabelled UNVERIFIABLE; here an UNPROVEN
+                    # accusation was mislabelled as a proven fact). Still
+                    # exits non-zero -- per the reviewer, a shallow clone
+                    # must never silently pass -- but under a DISTINCT
+                    # reason that does not accuse the file of being wrong.
+                    findings.append(
+                        Finding(
+                            rel_path,
+                            lineno,
+                            "main SHA undeterminable in a shallow clone",
+                            f"{stripped} (live: {live}; main^1 is not present at this clone's "
+                            "depth, so this cannot be proven equal to live main's first "
+                            "parent -- the recorded value may be correct; re-run with "
+                            "fetch-depth: 0 to decide)",
+                        )
+                    )
+                else:
+                    # Either a full clone (main^1 resolves but does not
+                    # match, or main has no parent at all -- e.g. it IS
+                    # the root commit), or a shallow clone where main^1
+                    # resolved anyway and simply did not match. Either
+                    # way git has actually determined the value is wrong.
                     findings.append(
                         Finding(
                             rel_path,
                             lineno,
                             "stale main SHA in generated block",
-                            f"{stripped} (live: {live})",
-                        )
-                    )
-                else:
-                    infos.append(
-                        Info(
-                            rel_path,
-                            lineno,
-                            f"main SHA ancestry could not be determined here (recorded "
-                            f"{recorded}, live {live}) -- not verified, not treated as a pass",
+                            f"{stripped} (live: {live}, live main's first parent: "
+                            f"{live_parent!r})",
                         )
                     )
             i += 1

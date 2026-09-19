@@ -25,6 +25,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPT_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -866,11 +868,14 @@ def test_ancestor_recorded_sha_unrelated_fails(tmp_path):
         _force_rmtree(repo)
 
 
-def test_ancestor_recorded_sha_does_not_exist_is_undeterminable(tmp_path):
-    """The recorded sha is not any object in the repo at all -- a
-    fabricated or corrupted value. `git merge-base --is-ancestor` cannot
-    even answer the question (exit 128), so this must be reported as
-    undeterminable, never silently treated as a pass."""
+def test_ancestor_recorded_sha_does_not_exist_is_a_failure(tmp_path):
+    """THE FIX TO THE FIX: an independent reviewer proved the original
+    ancestor-aware rewrite made this WORSE than the bug it replaced -- a
+    fabricated/nonexistent sha (or `TBD`, `0`, empty ...) exited 0 and
+    printed "check passed" on every probe. A recorded sha that does not
+    resolve to live main or live main's first parent is a FAILURE in a
+    full clone, full stop -- this test used to assert the opposite and
+    thereby locked the defect in."""
     repo = _kstmp_repo("nonexistent")
     try:
         subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
@@ -880,21 +885,18 @@ def test_ancestor_recorded_sha_does_not_exist_is_undeterminable(tmp_path):
         subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
         findings, infos, errors = m._check_all(repo)
-        assert not any("stale main sha" in f.label.lower() for f in findings), findings
-        assert any(fake_sha in i.text or fake_sha[:7] in i.text for i in infos), infos
-        assert any(
-            "not" in i.text.lower() or "could not" in i.text.lower() or "undeterminable" in i.text.lower()
-            for i in infos
-        ), infos
+        assert any("main sha" in f.label.lower() for f in findings), findings
+        assert any(fake_sha in f.text for f in findings), findings
     finally:
         _force_rmtree(repo)
 
 
-def test_ancestor_shallow_clone_degrades_honestly(tmp_path):
+def test_ancestor_shallow_clone_is_a_failure_not_a_silent_pass(tmp_path):
     """A shallow clone cannot resolve a commit truncated out of its
-    history; `merge-base --is-ancestor` fails the same way it does for a
-    nonexistent sha (exit 128, not 0/1) -- must degrade to undeterminable,
-    not a silent pass."""
+    history, so a recorded sha that is not live main itself cannot be
+    verified there. The reviewer's words: "report exit non-zero when it
+    is shallow" -- not a silent pass, and not a bare UNVERIFIABLE info
+    line either."""
     origin = _kstmp_repo("shallow-origin")
     shallow = _KSTMP_ROOT / "shallow-clone"
     try:
@@ -913,11 +915,174 @@ def test_ancestor_shallow_clone_degrades_honestly(tmp_path):
         subprocess.run(["git", "config", "user.name", "Test"], cwd=shallow, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=shallow, check=True)
         findings, infos, errors = m._check_all(shallow)
-        assert not any("stale main sha" in f.label.lower() for f in findings), findings
-        assert any(sha_old[:7] in i.text for i in infos), infos
+        assert any("main sha" in f.label.lower() and "shallow" in f.label.lower() for f in findings), findings
     finally:
         _force_rmtree(origin)
         _force_rmtree(shallow)
+
+
+def test_ancestor_shallow_clone_recorded_sha_equal_to_live_still_passes(tmp_path):
+    """The one thing a shallow clone CAN verify: whether the recorded
+    value is live main's own sha, since live main (HEAD) is always
+    present even at depth 1."""
+    origin = _kstmp_repo("shallow-equal-origin")
+    shallow = _KSTMP_ROOT / "shallow-equal-clone"
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=origin, check=True)
+        sha = _commit_file(origin, "a.txt", "a\n")
+        if shallow.exists():
+            _force_rmtree(shallow)
+        subprocess.run(
+            ["git", "clone", "-q", "--depth", "1", "--branch", "main", f"file://{origin.as_posix()}", str(shallow)],
+            check=True,
+        )
+        (shallow / "HANDOFF.md").write_text(_handoff_text(sha), encoding="utf-8")
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=shallow, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=shallow, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=shallow, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=shallow, check=True)
+        findings, infos, errors = m._check_all(shallow)
+        assert not any("main sha" in f.label.lower() for f in findings), findings
+    finally:
+        _force_rmtree(origin)
+        _force_rmtree(shallow)
+
+
+def test_ancestor_root_commit_is_now_a_failure(tmp_path):
+    """The root commit is an ancestor of live main, but not live main's
+    FIRST PARENT once main has moved on more than one commit -- the old
+    "any ancestor" rule let a years-stale HANDOFF.md pass forever. Under
+    the tightened equal-or-first-parent rule this must FAIL."""
+    repo = _kstmp_repo("root-commit-stale")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        root_sha = _commit_file(repo, "a.txt", "a\n")
+        _commit_file(repo, "b.txt", "b\n")
+        _commit_file(repo, "c.txt", "c\n")
+        (repo / "HANDOFF.md").write_text(_handoff_text(root_sha), encoding="utf-8")
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+        findings, infos, errors = m._check_all(repo)
+        assert any("main sha" in f.label.lower() for f in findings), findings
+    finally:
+        _force_rmtree(repo)
+
+
+def test_ancestor_recorded_sha_is_short_prefix_of_live_passes(tmp_path):
+    """A 7-char prefix of live main's own sha must still pass."""
+    repo = _kstmp_repo("prefix-of-live")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(_handoff_text(sha[:7]), encoding="utf-8")
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+        findings, infos, errors = m._check_all(repo)
+        assert not any("main sha" in f.label.lower() for f in findings), findings
+    finally:
+        _force_rmtree(repo)
+
+
+def test_ancestor_recorded_sha_is_short_prefix_of_live_parent_passes(tmp_path):
+    """A 7-char prefix of live main's FIRST PARENT must also pass, and
+    must be reported with a git-verified INFO line, not UNVERIFIABLE --
+    git proved this one, it did not merely fail to disprove it."""
+    repo = _kstmp_repo("prefix-of-parent")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        sha_a = _commit_file(repo, "a.txt", "a\n")
+        subprocess.run(["git", "checkout", "-b", "work"], cwd=repo, check=True)
+        (repo / "HANDOFF.md").write_text(_handoff_text(sha_a[:7]), encoding="utf-8")
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+        subprocess.run(["git", "checkout", "main"], cwd=repo, check=True)
+        _commit_file(repo, "b.txt", "b\n")
+        subprocess.run(["git", "checkout", "work"], cwd=repo, check=True)
+        findings, infos, errors = m._check_all(repo)
+        assert findings == [], findings
+        assert any(i.prefix != "UNVERIFIABLE" for i in infos if sha_a[:7] in i.text), infos
+        assert not any(i.prefix == "UNVERIFIABLE" and sha_a[:7] in i.text for i in infos), infos
+    finally:
+        _force_rmtree(repo)
+
+
+def test_ancestor_shallow_clone_correct_first_parent_is_undeterminable_not_stale(tmp_path):
+    """THE FIX TO THE SECOND FIX: measured by an independent reviewer in a
+    real depth-1 shallow clone. The recorded value genuinely IS live
+    main's first parent (a full clone proves it), but `main^1` cannot be
+    resolved at depth 1 (`git rev-parse origin/main^1` -> "fatal:
+    ambiguous argument"). The gate must NOT call this "stale main SHA" --
+    that accuses a correct file of a lie the gate never actually proved.
+    It must still exit non-zero (a shallow clone can never confirm the
+    claim either), but under a distinct, honest reason."""
+    origin = _kstmp_repo("shallow-correct-origin")
+    shallow = _KSTMP_ROOT / "shallow-correct-clone"
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=origin, check=True)
+        sha_parent = _commit_file(origin, "a.txt", "a\n")
+        sha_tip = _commit_file(origin, "b.txt", "b\n")
+        if shallow.exists():
+            _force_rmtree(shallow)
+        subprocess.run(
+            ["git", "clone", "-q", "--depth", "1", "--branch", "main", f"file://{origin.as_posix()}", str(shallow)],
+            check=True,
+        )
+        assert (
+            subprocess.run(
+                ["git", "rev-parse", "--is-shallow-repository"],
+                cwd=shallow, capture_output=True, text=True, check=True,
+            ).stdout.strip() == "true"
+        )
+        unresolvable = subprocess.run(
+            ["git", "rev-parse", "origin/main^1"], cwd=shallow, capture_output=True, text=True, check=False,
+        )
+        assert unresolvable.returncode != 0, "test setup invalid: main^1 resolved at depth 1"
+        (shallow / "HANDOFF.md").write_text(_handoff_text(sha_parent), encoding="utf-8")
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=shallow, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=shallow, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=shallow, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=shallow, check=True)
+
+        findings, infos, errors = m._check_all(shallow)
+        assert not any("stale" in f.label.lower() for f in findings), findings
+        assert any(
+            "main sha" in f.label.lower() and "undeterminable" in f.label.lower() and "shallow" in f.label.lower()
+            for f in findings
+        ), findings
+    finally:
+        _force_rmtree(origin)
+        _force_rmtree(shallow)
+
+
+@pytest.mark.parametrize("bad_value", ["TBD", "--help", "origin/main~50", "", "0"])
+def test_ancestor_invalid_recorded_values_fail_without_calling_git(tmp_path, monkeypatch, bad_value):
+    """Item 1 of the reviewer's prescription: the recorded value must be
+    validated as 7-40 hex characters BEFORE git is ever consulted. None of
+    these five probe values is valid hex of that length, so each must be
+    a FAILURE and git must never be invoked to decide it."""
+    repo = _kstmp_repo(f"invalid-{abs(hash(bad_value))}")
+    try:
+        subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True)
+        _commit_file(repo, "a.txt", "a\n")
+        (repo / "HANDOFF.md").write_text(_handoff_text(bad_value), encoding="utf-8")
+        subprocess.run(["git", "add", "HANDOFF.md"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "handoff"], cwd=repo, check=True)
+
+        real_run = subprocess.run
+        calls = []
+
+        def _tracking_run(cmd, *args, **kwargs):
+            calls.append(cmd)
+            return real_run(cmd, *args, **kwargs)
+
+        monkeypatch.setattr(m.subprocess, "run", _tracking_run)
+        findings, infos, errors = m._check_all(repo)
+        assert any("main sha" in f.label.lower() for f in findings), findings
+        # git must never be asked to resolve THIS invalid value.
+        assert not any(bad_value and bad_value in " ".join(c) for c in calls), calls
+    finally:
+        _force_rmtree(repo)
 
 
 def test_ancestor_missing_git_degrades_honestly(tmp_path, monkeypatch):

@@ -391,19 +391,118 @@ this gate could never match. Reading only PR checks is reading half the
 signal; the other half, `main`'s own push runs, is where this sat
 undetected.
 
-Fix: `main SHA: X` is a timestamped snapshot, not a live assertion — it
-means "main was X when this was generated," which stays true after
-`main` moves on as long as X is still an ancestor of live `main` (via
-`git merge-base --is-ancestor`). Equal → pass, silently, as before. An
-ancestor → pass, but reported as an UNVERIFIABLE info line naming both
-shas, not hidden — this repo's whole problem is checks that pass
-quietly. Neither equal nor an ancestor (a sha that was never `main`, or a
-divergent history) → FAIL, a genuine lie. Cannot determine (the sha
-doesn't exist in this repo, a shallow clone truncated it out, or git
-itself is unavailable) → reported as undeterminable, never silently
-passed. See `scripts/lwb_check_state_claims.py` (`_merge_base_is_ancestor`)
-and `tests/test_lwb_check_state_claims.py` (the `ancestor` test group)
-for the mechanics.
+First fix (WRONG, superseded below): `main SHA: X` is a timestamped
+snapshot, not a live assertion — it means "main was X when this was
+generated," which stays true after `main` moves on as long as X is still
+an ancestor of live `main` (via `git merge-base --is-ancestor`). Equal →
+pass, silently, as before. An ancestor → pass, but reported as an
+UNVERIFIABLE info line naming both shas, not hidden. Neither equal nor an
+ancestor → FAIL. Cannot determine (the sha doesn't exist in this repo, a
+shallow clone truncated it out, or git itself is unavailable) → reported
+as undeterminable, never silently passed.
+
+### The first fix introduced a WORSE defect, and an independent reviewer caught it
+
+That "any ancestor, else cannot-determine-is-never-a-fail" design had two
+compounding holes, both found by an independent reviewer, not the author,
+running direct probes against the shipped gate rather than reading the
+diff:
+
+1. **Every unresolvable value passed.** The raw text after `main SHA:`
+   went straight to `git merge-base --is-ancestor` with no format check
+   first. `git merge-base` cannot resolve a nonexistent object (or `TBD`,
+   `--help`, `origin/main~50`, an empty string, or `0`) and exits with a
+   third code the old logic mapped to "cannot determine → never a
+   FAIL" — which meant it printed `lwb-check-state-claims check passed`
+   and exited 0. The reviewer reproduced this against `deadbeef…`×5,
+   `TBD`, `0`, and an empty value: every one passed. The commit that
+   shipped this ("the state-claim gate could never pass after a merge")
+   had turned "a gate that cannot pass" into "a gate that passes on
+   garbage" — strictly worse than the bug it fixed, and the commit
+   message claimed the opposite.
+2. **"Any ancestor" stopped detecting staleness at all.** A repo's root
+   commit is an ancestor of every later commit on `main` forever, so a
+   `HANDOFF.md` recording the root commit passed no matter how many years
+   out of date it was, and the block's own `Generated:` timestamp was
+   never checked against anything. The gate that exists to catch a stale
+   document could be satisfied once, at the very first commit, and never
+   have to be re-derived again.
+
+**The corrected rule, now shipped:**
+
+1. **Validate the recorded value as 7–40 hex characters BEFORE calling
+   git at all.** Anything else is a FAILURE, and git is never invoked to
+   decide it — closes hole 1, and also closes a pre-existing silent-pass
+   bug (an empty value or a 1-character prefix used to match via Python's
+   own `"main-sha".startswith("")`/`startswith(short-prefix)` with zero
+   output).
+2. **Pass ONLY when the recorded value equals live `main`, or equals live
+   `main`'s first parent (`live^1`)** — not "any ancestor". A squash
+   merge advances `main` by exactly one commit past what was recorded, so
+   equal-or-first-parent is the precise rule for that case and needs no
+   age bound; it also closes hole 2, since a root commit is an ancestor
+   but is not `live^1` once `main` has moved more than one commit past
+   it, so it now correctly FAILS. A 7–40 char prefix match against either
+   of those two shas is still honoured.
+3. **An unresolvable value in a full clone is a FAILURE**, not
+   undeterminable — CI checks out with `fetch-depth: 0`, so an object
+   that cannot be resolved there cannot be `main` or its first parent.
+   Shallowness is detected via `git rev-parse --is-shallow-repository`;
+   in a shallow clone, where the answer genuinely cannot be known, the
+   gate reports it and still exits non-zero (the one exception: the
+   recorded value equal to live `main`'s own sha is always verifiable
+   even at depth 1, since that commit is always present).
+4. **Labelling fixed**: when git proves the first-parent relationship the
+   info line now carries an `INFO (git-verified)` prefix, not
+   `UNVERIFIABLE` — git verified it, it did not merely fail to disprove
+   it.
+
+See `scripts/lwb_check_state_claims.py` (`_looks_like_sha`,
+`_sha_matches`, `_is_shallow_repository`, and the `main SHA:` branch of
+`_scan_generated_block`) and `tests/test_lwb_check_state_claims.py` (the
+`ancestor` test group, rewritten — `test_ancestor_recorded_sha_does_not_
+exist_is_a_failure` used to assert a nonexistent sha was NOT a failure,
+which enshrined hole 1 as a passing test; it now asserts the opposite)
+for the mechanics. `_merge_base_is_ancestor` remains in the module as a
+low-level git wrapper (still covered by its own direct-call tests) but is
+no longer used to decide pass/fail on `main SHA:` — that decision is now
+a direct comparison against live `main` and live `main^1`.
+
+### The second fix falsely accused a correct file, caught by the same reviewer in a real shallow clone
+
+The corrected rule above tried `main^1` only when the clone was already
+known to be shallow-but-otherwise-treated-as-a-blanket-FAIL — in practice
+that meant a shallow clone never even attempted the first-parent
+resolution, and any non-equal value there was reported as `stale main SHA
+in generated block`, regardless of whether it was actually stale.
+Measured by the reviewer in a real `git clone --depth 1` of this repo's
+own `main`: the recorded value `f8cb7706488feb29cf6cd2a950a4f82f3dd879b7`
+genuinely IS `main`'s first parent (a full clone proves it — see `git log
+--oneline -3 main`), but `git rev-parse origin/main^1` in the depth-1
+clone fails outright (`fatal: ambiguous argument`). The gate called the
+correct file "stale main SHA" — an UNPROVEN accusation reported as an
+established fact, the mirror image of the `INFO (git-verified)` labelling
+fix above (there, a git-PROVEN fact was mislabelled unverifiable; here,
+an unproven claim was mislabelled as a proven lie).
+
+**Fix:** the gate now always attempts `main^1` resolution, in a shallow
+clone too — some shallow clones (depth > 1, or ones that happen to
+include the parent) really can resolve it, and refusing to try would
+turn a provable pass into a needless failure. Only when `main^1` fails to
+resolve AND the clone is shallow does the gate report `main SHA
+undeterminable in a shallow clone` — still exits non-zero (a shallow
+clone can never positively confirm the claim either), but the reason
+names the truncation, states the recorded value may be correct, and
+tells the reader to re-run with `fetch-depth: 0` to actually decide.
+`stale main SHA in generated block` is now reserved for cases git has
+actually determined: `main^1` resolved and did not match, or `main^1`
+does not exist at all in a full clone (e.g. `main` is the repo's root
+commit). Verified against a real `git clone --depth 1 --branch main
+file://<this repo>` — see
+`tests/test_lwb_check_state_claims.py::test_ancestor_shallow_clone_
+correct_first_parent_is_undeterminable_not_stale`, which fails against
+the second-fix code (asserted, by stashing `scripts/lwb_check_state_
+claims.py` and re-running just that test) and passes against the third.
 
 ## How this document should be read
 
