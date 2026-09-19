@@ -94,17 +94,35 @@ config object against what it ignores in the same object** — we read
 
 ## State at handoff
 
-- `main` is **9b374b5**, green.
-- **PR #27** is open at **c75a37b**, all four blockers fixed and pushed.
-  It carries two DISAGREE verdicts, both now addressed. A cloud routine
-  polls its head hourly and publishes a re-review to
+**DO NOT TRUST ANY SHA IN THIS DOCUMENT. RE-DERIVE.** An earlier version
+of this section pinned `main` and PR #27 to specific commits; both were
+stale within minutes, in a file no gate protects. That is this
+repository's signature defect, written into the handoff that warns about
+it. Re-derive per `docs/handoff-protocol.md`.
+
+- `main` -- re-derive. It was green at the time of writing.
+- **PR #27 IS NOT NEARLY DONE.** It carries **TWO DISAGREE verdicts**.
+  The first round's three findings were fixed. The SECOND review then
+  found **four more blockers**, and the lead one was a false claim in the
+  author's own commit: a timeout fix was applied to
+  `lwb_check_foreign_repo.py` and declared repo-wide in the commit
+  message, while the sibling `scripts/lwb_check_hook_launch.py` kept the
+  identical defect -- so the `lwb-portable` CI job reports green for a
+  plugin Claude Code would kill mid-run in any real session. The other
+  three: nothing enforces the new behaviour by test; `Policy.degraded` is
+  computed and discarded two lines from the fix; and the repo-facts path
+  that was patched barely occurs while the reachable ones stay conflated.
+- **A CLOUD AGENT is fixing all four.** It commits and pushes itself, so
+  the head will move with no local session running. An hourly cloud
+  watcher reviews every new head and publishes to
   `LEAPWare-Software/LEAPWare-ShellUX`, branch `reviews/buildcraft`, path
-  `reviews/buildcraft/pr27-<full-head-sha>.md`. **That is the source of
-  truth for the verdict** — it does not depend on any session staying
-  alive. Read it, file it into `reviews/27/` verbatim, then merge.
-- **D21-D26 and the build plan are committed LOCALLY and NOT PUSHED**, on
-  branch `lwb-capture-d21-d22`. The owner said stand by; pushing opens a
-  PR. That is a decision waiting, not an oversight.
+  `reviews/buildcraft/pr27-<full-head-sha>.md`. **That branch is the
+  source of truth** and does not depend on any session staying alive.
+  Read the newest file there, file it into `reviews/27/` verbatim, then
+  merge -- only if it says AGREE.
+- **D21-D26 and the build plan are PUSHED** on branch
+  `lwb-capture-d21-d22`. No PR was opened for them; that decision is the
+  owner's and is still open.
 
 ## What a next session must not do
 
@@ -117,6 +135,19 @@ config object against what it ignores in the same object** — we read
 - Do not build anything before checking, absolutely and positively, that
   no worthy vetted tool already does it. That is the owner's condition on
   every phase of the plan.
+- Do not pin a SHA, count or PR state in prose. The generated block at
+  the bottom of `HANDOFF.md` is gated by
+  `scripts/lwb_check_state_claims.py`; the prose above it is NOT, and an
+  earlier version of this very document pinned two SHAs that were stale
+  within minutes.
+
+## Loose end found in the audit, not fixed
+
+`plugins/claude/lwb/skills/` contains **five** directories, not four:
+`lwb-config`, `lwb-handoff`, `lwb-report`, `lwb-status`, and a nested
+**`skills/skills/`**. The fifth is either junk or a packaging fault, and
+it ships. Nobody has looked at it. It was found by auditing a count the
+author had stated without verifying.
 
 ## The next step
 

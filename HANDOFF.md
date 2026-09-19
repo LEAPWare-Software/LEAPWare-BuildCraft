@@ -21,20 +21,22 @@ that no WORTHY AND VETTED tool already does it before building anything.
 2. **DONE.** Scaffold, ruleset, mission, proof-of-completion in CI
    (#17-#26). `main` green. Decisions:
    `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
-3. **IN FLIGHT: PR #27** at `c75a37b`. Two DISAGREE verdicts, both
-   addressed. A cloud routine polls its head hourly and publishes the
-   re-review to `LEAPWare-ShellUX`, branch `reviews/buildcraft`, path
+3. **IN FLIGHT: PR #27, NOT NEARLY DONE.** TWO DISAGREE verdicts;
+   the second found FOUR MORE blockers. A CLOUD agent is fixing them and
+   pushes itself, so **do not assume a head SHA -- re-derive**. An hourly
+   cloud watcher reviews each new head and publishes to
+   `LEAPWare-ShellUX`, branch `reviews/buildcraft`,
    `reviews/buildcraft/pr27-<full-head-sha>.md`. **That branch is the
-   source of truth** -- it survives any session ending. File it into
-   `reviews/27/` verbatim, then merge.
+   source of truth.** File the newest verbatim into `reviews/27/`, then
+   merge only on AGREE. Detail: session handoff.
 4. **WHAT BLOCKS 1.0.0 -- not a gate fix.** 0 of 13 stages enforced,
-   2 of ~10 rules shipped, **0 armed to deny**, 2 of 8 skills working,
-   no adoption register. **A consuming repo installs `lwb` and gets a
-   no-op.** Plan Phase 1 is `lwbpoce`, internal AND external.
-5. **THE DEFECT PATTERN, three times in three layers:** "I could not
-   check" must never share a representation with "I checked and found
-   nothing". Still live in Codex's lane. Session handoff has the detail.
-6. **One reviewer identity is a single point of failure.** Item 1.7.
+   2 rules shipped, **0 armed to deny**, 2 of 8 skills working, no
+   adoption register. **A consuming repo installs `lwb` and gets a
+   no-op.** Phase 1 is `lwbpoce`, internal AND external.
+5. **DEFECT PATTERN, 3x in 3 layers:** "I could not check" must never
+   share a representation with "I checked and found nothing". Still live
+   in Codex's lane.
+6. **One reviewer identity = single point of failure.** Item 1.7.
 7. **The hook has never been seen to fire from `hooks.json`.** Item 1.8.
 8. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
