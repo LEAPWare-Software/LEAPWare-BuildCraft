@@ -16,20 +16,20 @@ detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 **THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
 that no WORTHY AND VETTED tool already does it before building anything.
 
-1. **DONE: #7-#27, #31.** `main` green. Decisions:
-   `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
-   Branch tips and PR state are not written here; re-derive per
+1. **DONE: #7-#27, #31.** Decisions: `docs/requirements/decisions.md`
+   -- READ FIRST, do not re-decide. `main`'s tip is #34, NOT green:
+   `lwb-proof-coverage` fails (#34 shipped with no proof/34.json, not
+   in proof/exempt.json) -- #34's gap. Re-derive branch/PR state per
    `docs/handoff-protocol.md`.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
    every 2h; a separate reviewer routine writes the gating record
    hourly. No routine can create a routine, so a conductor CANNOT
    dispatch its reviewer -- independence is structural.
-3. **IN FLIGHT, each blocked on a DISAGREE review at its current
-   head:** #30 (this PR -- plan + D21-D27 onto main, which the
-   conductor reads), #29 (cloud-only runbook; also conflicts with
-   main), #32 (correction to #27's review record). This list is the
-   plan, not the fact -- re-derive every SHA per
-   `docs/handoff-protocol.md`.
+3. **IN FLIGHT, each blocked on a DISAGREE review at its head:**
+   #35 (this PR -- re-cuts #30, dead: its commits fail commit-identity
+   permanently and force-push can't fix them; do not touch #30), #29
+   (cloud-only runbook; also conflicts with main), #32 (correction to
+   #27's review record). Plan, not fact -- re-derive every SHA.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
