@@ -47,9 +47,18 @@ CI re-executes the commands a proof record claims were run, sanitises the
 output the same way, and compares the digest. A fabricated record fails
 where its author cannot reach.
 
-**It does not cover everything, and the record must say so.** Of ten
-distinct commands across the existing records, five are re-executable on a
-runner and five are not:
+**It does not cover everything, and the record must say so.** Counted by
+script over every `commands[].argv` in `proof/*.json`, normalising numeric
+arguments, there are **ten distinct command kinds**: five re-execute
+cleanly on a runner, three cannot, and two are conditional.
+
+An earlier draft of this paragraph said "five are re-executable and five
+are not." That was wrong, and it was wrong in a document written to end
+false claims — caught by an independent review of PR #17. The review's own
+correction was also wrong: it counted nine kinds, merging
+`lwb_check_proof.py` with its `--pr N` form. Neither of us had run the
+count. The numbers above are measured, and the measurement is the only
+reason this sentence is trustworthy.
 
 | Command | Re-executable | Why not |
 |---|---|---|
@@ -58,7 +67,8 @@ runner and five are not:
 | `lwb_lanes.py --base origin/main --head HEAD` | **no** | same |
 | `lwb_check_env_leak.py` | conditional | needs the repo secret; a fork PR has none |
 | `lwb_build.py --check` | conditional | `vendor/` is gitignored |
-| `lwb_check_proof.py` (± `--pr N`) | yes | must not recurse into re-execution |
+| `lwb_check_proof.py` | yes | must not recurse into re-execution |
+| `lwb_check_proof.py --pr N` | yes | same; counted separately, it is a distinct invocation |
 | `lwb_handoff.py --check` | yes | |
 | `lwb_check_prefix.py` | yes | |
 | `lwb_check_no_instruction_dep.py` | yes | |
@@ -91,8 +101,10 @@ mid-flight and were unrepairable because force-push is denied here.
   self-review check that depends on it.
 - **(d) Falsifiable records** — the sanitiser as committed code, resolved
   shas, `verifiable` flags, CI re-execution.
-- **(e) The session-boundary rule** — only after the `Stop` semantics
-  question below is answered.
+- **(e) The session-boundary REPORT** — a `SessionEnd` report, not a
+  gate, because that event cannot block. Plus installing the plugin in
+  this repo so it eats its own cooking, and verifying the matcher
+  actually fires.
 
 ## Open blockers
 
@@ -117,13 +129,46 @@ Nothing in (d) or (e) is built while these stand.
    merge, and a `gh` call that is unauthenticated in CI. Only the
    proof-state lines, derived from `proof/*.json` in-tree, are stable
    enough to compare; the rest must be declared unverifiable out loud.
-5. **`Stop` semantics are unverified.** `render_decision` hardcodes the
-   PreToolUse contract in both branches, so a Stop rule is new adapter
-   surface, a new manifest entry and a new conformance obligation. Worse,
-   if `Stop` fires per assistant turn rather than at session end, a
-   left-behinds rule would block every turn with an untracked scratch
-   file. Verify against the vendor reference **before** writing any of
-   (e); if it is per-turn, target `SessionEnd` instead.
+5. **RESOLVED 2026-09-19, and the answer shrinks (e).** Checked against
+   Claude Code's hooks reference:
+   - **`Stop` fires after every assistant turn**, not at session end.
+     Confirmed across repeated independent fetches. A left-behinds rule
+     on `Stop` would block every turn that had an untracked scratch file.
+     `Stop` is therefore wrong for this, exactly as the audit suspected.
+   - **`SessionEnd` is the right event and it CANNOT BLOCK.** It fires
+     once when the session terminates, carries `session_end_reason`, and
+     is purely observational: exit code 2 has no effect and its JSON is
+     not honoured for control. So session-boundary enforcement is
+     **impossible by construction** — the best available is a report.
+   - Consequence: the no-left-behinds rule can never be a gate. It is a
+     `SessionEnd` REPORT. Anything stronger must move to CI, which sees
+     the repository after the fact, or to `PreToolUse`, which sees the
+     action before it happens. `docs/handoff-protocol.md` §Traps says
+     this "can only be caught at a session boundary — a `Stop`-hook rule
+     or an operator-run skill"; the `Stop`-hook half of that sentence is
+     now known to be wrong and should be corrected when (e) lands.
+   - Still true, and still owed: `render_decision` hardcodes the
+     PreToolUse contract in both branches, so any second event is new
+     adapter surface, a new manifest entry and a new conformance
+     obligation for both adapters.
+
+6. **The shipped hook may match nothing at all — verify before 1.0.**
+   `plugins/claude/lwb/hooks/hooks.json` uses `"matcher": "Agent"`. A
+   `PreToolUse` matcher filters on the TOOL NAME. The docs check could
+   not find a built-in tool documented as `Agent`, and named `Task` as
+   the subagent-dispatch tool in the reference. If `Agent` is not a live
+   tool name in the installed version, the only hook this product ships
+   fires zero times — a seventh gate that cannot fail, and the one that
+   would matter most to another repo installing this. It cannot be
+   settled by reading: install the plugin in a scratch project, dispatch
+   a subagent, and confirm a ledger line appears. Do that before 1.0.0
+   is tagged.
+   Noted while there: the reference documents an `if` field alongside
+   `matcher`, e.g. `"if": "Bash(git *)"`. That would let the HOST filter
+   a publishing action without lwb parsing any shell string itself,
+   which is a materially different proposition from the trigger the
+   owner rejected. It is not being acted on — the non-goal stands — but
+   it is recorded so the option is not rediscovered as a novelty.
 
 ## What this will still NOT cover
 

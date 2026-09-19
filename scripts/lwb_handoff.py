@@ -246,9 +246,18 @@ def _validate(text: str) -> list[str]:
             errors.append(f"forbidden pattern found (absolute path): {pattern.pattern!r}")
 
     lowered = text.lower()
-    for needle in resolve_needles():
+    # Report the needle by its 1-based INDEX, never by value. This file used
+    # to interpolate the matched needle into the error, so a real leak
+    # printed the private name it exists to protect -- into a maintainer's
+    # terminal, and into any log capturing this command's output. The sibling
+    # scanner was fixed for exactly this in PR #17; an independent review
+    # found the same defect surviving here, in the file whose own comment
+    # narrates the fix. One class of bug, two places, one of them missed.
+    # The index is stable for a given configured list, so an operator can map
+    # it back privately.
+    for index, needle in enumerate(resolve_needles(), start=1):
         if needle in lowered:
-            errors.append(f"forbidden substring found: {needle!r}")
+            errors.append(f"forbidden substring found: needle #{index}")
 
     # The durable sections moved out of HANDOFF.md under the 3000-byte cap.
     # Assert they landed in the protocol doc, so "trim HANDOFF.md" can never

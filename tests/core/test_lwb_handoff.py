@@ -260,3 +260,36 @@ def test_real_handoff_md_passes_check():
     monkeypatch_path = REPO_ROOT / "HANDOFF.md"
     text = monkeypatch_path.read_text(encoding="utf-8")
     assert lwb_handoff._validate(text) == []
+
+
+def test_needle_finding_reports_an_index_never_the_value(monkeypatch):
+    """A leak must not print the private name it exists to protect.
+
+    This file used to interpolate the matched needle into its error, so a
+    maintainer running `--check` with the real secret exported would see the
+    private name in their terminal and in any captured output. The sibling
+    scanner was fixed for this in PR #17; an independent review found the
+    same defect surviving here, in the file whose own comment narrates the
+    fix. One bug class, two sites, one missed.
+    """
+    monkeypatch.setattr(lwb_handoff, "resolve_needles", lambda: ["zzsynthalpha", "zzsynthbeta"])
+    text = _valid_text().replace("1. do the thing", "1. do the thing for zzsynthbeta")
+
+    errors = lwb_handoff._validate(text)
+
+    joined = " ".join(errors)
+    assert "zzsynthbeta" not in joined, "the needle's VALUE must never appear in a finding"
+    assert "zzsynthalpha" not in joined
+    assert "needle #2" in joined, "the finding must name the needle by its stable 1-based index"
+
+
+def test_needle_index_is_stable_for_a_given_list(monkeypatch):
+    """Same configured list, same index -- so an operator can map it back."""
+    monkeypatch.setattr(lwb_handoff, "resolve_needles", lambda: ["zzsynthalpha", "zzsynthbeta"])
+    text = _valid_text().replace("1. do the thing", "1. do the thing for zzsynthalpha")
+
+    first = lwb_handoff._validate(text)
+    second = lwb_handoff._validate(text)
+
+    assert first == second
+    assert any("needle #1" in e for e in first)
