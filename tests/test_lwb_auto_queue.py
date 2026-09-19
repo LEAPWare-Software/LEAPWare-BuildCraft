@@ -365,19 +365,89 @@ def test_required_review_count_matches_the_lane_gate():
     assert aq.REQUIRED_INDEPENDENT_REVIEWS == expected
 
 
-def test_the_workflow_never_checks_out_pull_request_code_under_a_write_token():
-    """The workflow holds `pull-requests: write`. If a pull_request trigger is
-    ever added, an unpinned checkout would run PR-controlled code with that
-    token. This test fails the moment those two facts coexist."""
-    workflow = (REPO_ROOT / ".github" / "workflows" / "lwb-auto-queue.yml").read_text(
+def _auto_queue_workflow():
+    import yaml
+
+    raw = (REPO_ROOT / ".github" / "workflows" / "lwb-auto-queue.yml").read_text(
         encoding="utf-8"
     )
-    triggers_on_pr = any(
-        t in workflow
-        for t in ("\n  pull_request:", "\n  pull_request_target:", "\n  workflow_run:")
+    # `on:` is the YAML 1.1 boolean True, not the string "on".
+    return yaml.safe_load(raw)
+
+
+def _checkout_steps(workflow):
+    for job in (workflow.get("jobs") or {}).values():
+        for step in job.get("steps") or []:
+            uses = str(step.get("uses") or "")
+            if uses.startswith("actions/checkout"):
+                yield step
+
+
+def test_the_workflow_never_checks_out_pull_request_code_under_a_write_token():
+    """The workflow holds `pull-requests: write`. If a pull-request-driven
+    trigger is ever added, an unpinned checkout would run PR-controlled code
+    with that token.
+
+    THE FIRST VERSION OF THIS TEST WAS VACUOUS AND AN INDEPENDENT CLOUD
+    REVIEWER CAUGHT IT. It asked `"default_branch" in workflow_text`, a
+    substring search over the whole file -- and that string already appears
+    in the COMMENT above the checkout step, the comment warning about this
+    exact hazard. So the guard was satisfied by its own warning, passed
+    unconditionally, and would have kept passing after someone added a
+    `pull_request:` trigger. A test for "a check that still passes when you
+    break what it guards" that itself could not fail.
+
+    This version parses the YAML and looks at the checkout STEP.
+    """
+    workflow = _auto_queue_workflow()
+    triggers = workflow.get(True) or workflow.get("on") or {}
+    if isinstance(triggers, str):
+        triggers = {triggers: None}
+    pr_driven = {"pull_request", "pull_request_target", "workflow_run"} & set(triggers)
+
+    steps = list(_checkout_steps(workflow))
+    assert steps, "the workflow must check out something for this guard to mean anything"
+
+    unpinned = [s for s in steps if not (s.get("with") or {}).get("ref")]
+    assert not pr_driven or not unpinned, (
+        f"{sorted(pr_driven)} trigger(s) are pull-request-driven while "
+        f"{len(unpinned)} checkout step(s) pin no `ref`. Pin "
+        "`ref: ${{ github.event.repository.default_branch }}`; a job holding "
+        "`pull-requests: write` must never run pull-request-controlled code."
     )
-    pins_default_branch = "default_branch" in workflow
-    assert not triggers_on_pr or pins_default_branch, (
-        "a pull-request-driven trigger requires the checkout to pin the default "
-        "branch; see the comment above `actions/checkout` in the workflow"
-    )
+
+
+def test_that_guard_actually_fails_when_the_hazard_is_introduced():
+    """Proves the guard above is not vacuous, which is the whole point.
+
+    Rather than trust that it would fail, construct the hazardous shape --
+    a pull-request-driven trigger plus an unpinned checkout -- and assert
+    the same predicate rejects it.
+    """
+    hazardous = {
+        True: {"pull_request": {"branches": ["main"]}},
+        "permissions": {"pull-requests": "write"},
+        "jobs": {"decide": {"steps": [{"uses": "actions/checkout@v7"}]}},
+    }
+    triggers = hazardous.get(True) or {}
+    pr_driven = {"pull_request", "pull_request_target", "workflow_run"} & set(triggers)
+    unpinned = [s for s in _checkout_steps(hazardous) if not (s.get("with") or {}).get("ref")]
+    assert pr_driven and unpinned, "the constructed hazard is not hazardous"
+
+    pinned = {
+        True: {"pull_request": {"branches": ["main"]}},
+        "jobs": {
+            "decide": {
+                "steps": [
+                    {
+                        "uses": "actions/checkout@v7",
+                        "with": {"ref": "${{ github.event.repository.default_branch }}"},
+                    }
+                ]
+            }
+        },
+    }
+    still_unpinned = [
+        s for s in _checkout_steps(pinned) if not (s.get("with") or {}).get("ref")
+    ]
+    assert not still_unpinned, "pinning a ref must satisfy the guard"
