@@ -544,3 +544,77 @@ def test_shorthand_main_colon_sha_is_flagged(tmp_path):
     _commit_md(repo, "NOTE.md", "main: deadbeef1234 (verified).\n")
     findings = m.check(repo)
     assert len(findings) == 1, findings
+
+
+# ---------------------------------------------------------------------------
+# Second adversarial round: Unicode-normalisation evasions. NFKC closes the
+# fullwidth colon and the zero-width space; it does NOT close an en dash
+# (a genuinely different character) or a Cyrillic homoglyph (no confusable
+# folding in stdlib) -- see the module docstring for why those two stay open
+# by design, not by oversight.
+# ---------------------------------------------------------------------------
+
+
+def test_fullwidth_colon_sha_label_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "main SHA： deadbeef1234\n")  # U+FF1A fullwidth colon
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_zero_width_space_in_label_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "main​SHA: deadbeef1234\n")  # U+200B zero-width space
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_en_dash_for_colon_remains_undetected(tmp_path):
+    """Documented residue, not a bug: en dash is a genuinely different
+    character, not an NFKC equivalent of a colon."""
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "main SHA– deadbeef1234\n")  # U+2013 en dash
+    assert m.check(repo) == []
+
+
+def test_cyrillic_homoglyph_remains_undetected(tmp_path):
+    """Documented residue, not a bug: stdlib has no confusable folding."""
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "mаin SHA: deadbeef1234\n")  # U+0430 Cyrillic а
+    assert m.check(repo) == []
+
+
+def test_escape_still_binds_correctly_when_paragraph_has_nfkc_rewrite(tmp_path):
+    """The critical interaction: NFKC changes string length (fullwidth
+    colon U+FF1A -> ASCII ':'), so the escape's physical-line binding
+    (built on char_linenos) must not desync. BOTH physical lines here
+    carry a fullwidth colon -- the offset-shifting character -- so a
+    length mismatch on either line would corrupt the mapping. Line 1 is
+    legitimately escaped; line 2 is a live, unescaped fullwidth-colon SHA
+    claim in the SAME paragraph and must still be flagged, not shielded
+    by line 1's escape."""
+    repo = _init_repo(tmp_path)
+    _commit_md(
+        repo,
+        "NOTE.md",
+        "- A note using a fullwidth colon： purely as punctuation, nothing"
+        " volatile here. <!-- volatile-ok: illustrative -->\n"
+        "  main SHA： deadbeef1234, a live stale claim in the same paragraph.\n",
+    )
+    findings = m.check(repo)
+    assert any("SHA" in f.label for f in findings), findings
+
+
+def test_table_row_split_across_two_lines_remains_undetected(tmp_path):
+    """Documented evasion, not fixed: a table row is flushed as its own
+    logical line and never joined with the next, so a label on one row
+    and its value on the next land in unrelated logical lines. Joining
+    table rows with arbitrary following lines would produce false
+    positives across every table in the repo."""
+    repo = _init_repo(tmp_path)
+    _commit_md(
+        repo,
+        "NOTE.md",
+        "| main SHA |\n9463214739b90a6de1ae0b384fdc8ac2b1e6e40c |\n",
+    )
+    assert m.check(repo) == []

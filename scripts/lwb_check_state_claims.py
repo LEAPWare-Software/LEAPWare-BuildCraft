@@ -45,6 +45,46 @@ genuine historical mention with `<!-- volatile-ok: historical -->` (or
 physical line it appears on, not the paragraph, so it will not also
 exempt an unrelated claim two lines later in the same bullet.
 
+KNOWN EVASIONS, found by a second adversarial review and left open on
+purpose (each is a decision, not an oversight):
+  - Table-row split: a label and its value on two separate table rows,
+    e.g.
+        | main SHA |
+        9463214739b90a6de1ae0b384fdc8ac2b1e6e40c |
+    passes clean. A table row is flushed as its own logical line and
+    never joined with the row after it (see `_build_logical_lines`), so
+    the label and the value land in unrelated logical lines and neither
+    alone matches a pattern. NOT fixed: joining a table row with
+    whatever follows it would join every ordinary two-row table in this
+    repo the same way, producing false positives across all of them, to
+    close one adversarially-constructed table.
+  - En dash for colon ("main SHA– <sha>", U+2013): NOT fixed. An en
+    dash is a genuinely different character, not an NFKC-normalised form
+    of a colon -- `unicodedata.normalize("NFKC", ...)` does not touch it,
+    and adding a bespoke dash-to-colon substitution would start a list of
+    "characters that sort of look like a colon" with no principled end.
+  - Cyrillic homoglyph substitution ("mаin SHA: <sha>", U+0430 for
+    Latin "a"): NOT fixed. The stdlib has no confusable-folding table
+    (that is what Unicode TR39 / a library like `confusable-homoglyphs`
+    is for, and this script is stdlib-only by design). Left open
+    deliberately, not from lack of effort: this gate exists to catch an
+    HONEST author whose true statement rotted, not to catch someone
+    smuggling a false claim past it on purpose -- anyone willing to type
+    a Cyrillic homoglyph to defeat this check could simply not write the
+    sentence. Pretending a partial, unmaintained confusable table closed
+    this case would be exactly the false-confidence failure this whole
+    gate exists to prevent.
+
+CI NOTE (not this script, but worth recording here since it governs when
+this script runs): `.github/workflows/ci.yml`'s `test` job now carries
+`if: always()` on nearly every step, so that one failing gate cannot mask
+a later one (see the fix history for why). A side effect: a CANCELLED
+workflow run will still execute the rest of that job's steps instead of
+stopping early, because `always()` does not distinguish "a previous step
+failed" from "the run was cancelled". Not a correctness defect -- every
+step still reports its own true result -- but it means a cancelled run on
+this job costs the full run time rather than stopping partway.
+
 Design decisions (see SPEC-b-state-claim-gate.md for the brief this
 implements):
   - Wrapped prose is joined into one logical line per paragraph/bullet/
@@ -91,6 +131,17 @@ implements):
     a normalised table row "main SHA <sha>" (no colon at all) in one
     pattern. A reordered "at <sha> ... on main" is covered in addition to
     the subject-first "main is at <sha>" form.
+  - Each physical line is NFKC-normalised and stripped of zero-width
+    characters (U+200B/U+200C/U+200D/U+FEFF) BEFORE classification and
+    joining -- closing a fullwidth colon ("main SHA： <sha>", U+FF1A) and
+    a zero-width space hidden inside a label ("main​SHA:"). Normalising
+    per PHYSICAL line, not on the already-joined paragraph, matters: NFKC
+    can change a segment's length, and doing this before the join
+    guarantees any length change lands entirely within one physical
+    line's own span of `char_linenos`, so the escape's per-physical-line
+    binding (above) cannot desync even when an earlier line in the same
+    paragraph is the one that gets rewritten. See "KNOWN EVASIONS" above
+    for the two Unicode cases this does NOT close.
 
 Scans tracked `.md` files only (via `git ls-files`), so an untracked
 scratch file can never fail CI and a file nobody will ship is not policed.
@@ -109,6 +160,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -410,6 +462,29 @@ _BULLET_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 _BLOCKQUOTE_RE = re.compile(r"^\s*>")
 _TABLE_RE = re.compile(r"^\s*\|")
 
+# Zero-width characters that can sit inside a label with no visible trace:
+# ZERO WIDTH SPACE, ZERO WIDTH NON-JOINER, ZERO WIDTH JOINER, and the BOM /
+# ZERO WIDTH NO-BREAK SPACE. Stripped alongside NFKC below. Written as
+# explicit \u escapes, never as literal invisible characters in this file.
+_ZERO_WIDTH_RE = re.compile("[​‌‍﻿]")
+
+
+def _normalize_segment(s: str) -> str:
+    """NFKC-normalise a single physical line's text and strip zero-width
+    characters, closing a fullwidth colon (U+FF1A -> ':') and a
+    zero-width space hidden inside a label. Applied per PHYSICAL line,
+    before joining, so the length change NFKC can introduce never crosses
+    a physical-line boundary and the char-to-lineno offset map built
+    during joining stays correct -- see `_build_logical_lines`.
+
+    Deliberately does NOT close every Unicode evasion: an en dash is a
+    genuinely different character, not an NFKC equivalent of a colon, and
+    a Cyrillic homoglyph substitution (e.g. U+0430 for Latin "a") needs
+    confusable folding, which the stdlib does not provide. See the module
+    docstring, "KNOWN EVASIONS", for why those are left open by design.
+    """
+    return _ZERO_WIDTH_RE.sub("", unicodedata.normalize("NFKC", s))
+
 
 def _line_kind(line: str) -> str:
     if not line.strip():
@@ -485,11 +560,19 @@ def _build_logical_lines(physical: list[tuple[int, str, bool]]) -> list[LogicalL
                 result.append(LogicalLine("".join(chars), parts[0][0], kind, linenos))
         parts = []
 
-    for lineno, line, skip in physical:
-        if skip or not line.strip():
+    for lineno, raw_line, skip in physical:
+        if skip or not raw_line.strip():
             flush()
             prev_kind = None
             continue
+        # Normalise PER PHYSICAL LINE, before classification and before
+        # joining: NFKC can change a segment's length (a fullwidth colon
+        # is 1 char, ':' is 1 char, but that is not true of every NFKC
+        # rewrite in general), and doing this per-line -- rather than on
+        # the already-joined paragraph -- guarantees the length change
+        # never crosses a physical-line boundary, so char_linenos below
+        # stays correctly aligned to physical lines.
+        line = _normalize_segment(raw_line)
         this_kind = _line_kind(line)
         starts_new = (
             this_kind in ("heading", "bullet", "table")
