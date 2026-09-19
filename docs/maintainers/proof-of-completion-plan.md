@@ -635,6 +635,62 @@ The pattern worth naming: **every time this repo adds a check that says
 "X is wrong", the case where X cannot be evaluated gets handled last and
 wrongly.** Three occurrences in two adjacent lines of one file.
 
+## 1.0.0 readiness — what the goal asks for, and what exists
+
+The stated goal is "BuildCraft 1.0.0 fully built and ready to be used by
+other repos with a complete proof of completion protocol that is foolproof
+and ensures both in BuildCraft and where BuildCraft is used that done is
+truly done."
+
+Measured 2026-09-19, each line by command, not inference:
+
+| Goal clause | State |
+|---|---|
+| "1.0.0" | Version is **0.1.0** (`plugins/claude/lwb/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`). `git tag -l` is **empty**. `scripts/lwb_release.py` exists, is wired into no CI job, and has apparently never run — nothing in `dist/` is tracked. `CHANGELOG.md` has only `## [Unreleased]`. |
+| "fully built" | `core/lwb_core/rules/` contains **one** rule, `lwb_version.py`, whose own docstring calls it "the walking-skeleton rule -- a safe no-op" that "never denies: even if a policy file configures it to `deny`". The shipped `vendor/policy/default.json` configures that one rule at `warn`. |
+| "ready to be used by other repos" | An install path is documented (`docs/install-claude.md`) but has **never been executed against a foreign repo**. `lwb-portable` runs the hook on three OSes **inside this checkout** (`cwd=REPO_ROOT`); `lwb-hosted-runners` asserts this repo's own jobs use hosted runners. Neither proves foreign-repo use. |
+| "where BuildCraft is used ... done is truly done" | **No shipping mechanism exists.** Every proof gate — lanes, state-claims, review independence, prefix, env-leak, proof validation — is a `scripts/` file invoked only from this repo's `.github/workflows/ci.yml`, with hardcoded lane paths (`plugins/claude/`, `plugins/codex/`), bootstrap PR-number exceptions, and this repo's own `LWB_PRIVATE_NEEDLES` secret. **None of it is vendored into the plugin.** A consuming repo that installs `lwb` today gets one no-op rule. |
+| "foolproof" | The only hook the product ships (`matcher: "Agent"`) has never been observed to fire. Open residuals are listed above and in `proof/*.json` `unproven` arrays. |
+
+**The consequence, stated plainly:** the six landed PRs (#17–#22) harden
+*this repository's own CI*. That is the first half of the goal. The second
+half — proof of completion travelling to the repos that *use* BuildCraft —
+has not been started, and closing it is not more gate fixes. It means
+building the protocol as actual `lwb_core` rules that ship in `vendor/`,
+then proving them in a second, separate repository.
+
+### The lane guard is a nudge, and says so
+
+Worth recording because it is easy to mistake for a hole in the premise.
+`scripts/lwb_check_lane_write.py`'s own docstring calls it "a same-session
+nudge" and states "The CI check is the check of record". An independent
+reviewer confirmed by reading every relevant file that **nothing gates
+`Bash`**: `.claude/settings.json` matches only
+`Edit|Write|MultiEdit|NotebookEdit` and carries no permissions or deny
+list, `.codex/hooks.json` matches only `apply_patch`, the plugin hook
+matches `"Agent"`, and `scripts/githooks/pre-commit` has no lane check. A
+shell write into another lane is therefore caught only by `lwb-lanes` in
+CI, at commit level — which is exactly what the docstring claims.
+
+Two defects that are NOT by design, both confirmed by simulating the
+hook's `evaluate()` in-process:
+
+- A worktree **inside** the checkout misclassifies: a claude-lane file at
+  `.claude/worktrees/wt1/plugins/claude/lwb/x.md` classifies as `other`
+  and is DENIED. This blocks honest in-lane work, and it is what drove an
+  implementer to do all its edits through `Bash` instead.
+- A worktree **outside** the checkout is worse: `_relativize` returns
+  `None` for any path outside the repo, which classifies as "not a lane
+  question" and returns **allow**. Out-of-lane edits there are never
+  checked at all.
+
+PLAUSIBLE and unverified: the hook returns an explicit
+`"permissionDecision": "allow"` for every edit it does not deny, which
+under Claude Code's hook semantics may skip the normal permission prompt
+for those edits. Not checked against Claude Code itself. **This one
+touches the owner's permission experience and should be settled before
+anything else in this section.**
+
 ## How this document should be read
 
 Everything above is a claim. Two audit rounds found thirteen blockers in

@@ -1,0 +1,132 @@
+{
+  "deliverable": "open-pr-listing-survives-its-own-merge",
+  "pr": 24,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-claude-3b64530b-2026-09-19",
+  "commit": "cd366e6",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 18%]",
+        "........................................................................ [ 36%]",
+        "........................................................................ [ 55%]",
+        "........................................................................ [ 73%]",
+        "........................................................................ [ 92%]",
+        "..............................                                           [100%]",
+        "390 passed in 92.15s (0:01:32)"
+      ],
+      "sha256": "a370b65b2e030a5338bd6f3543f55a965e9d85a37c0a671c766279034a75eaf1",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_lwb_check_state_claims.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 94%]",
+        "....                                                                     [100%]",
+        "76 passed in 42.68s"
+      ],
+      "sha256": "fe70bef516671f8251086a608610427f3baa34211b4257d18266daeb7b09da99",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "The defect was LIVE ON MAIN: with gh authenticated, main at ae05882 failed with '#22 listed as open but gh reports MERGED'. CI was green only because the runner cannot authenticate gh",
+      "met": true
+    },
+    {
+      "criterion": "A PR whose merge commit is live main or live main^1 is the expected post-merge state and passes as INFO (git-verified), mirroring the main SHA rule rather than inventing a looser one",
+      "met": true
+    },
+    {
+      "criterion": "A PR merged anywhere else still FAILS as stale; CLOSED-not-merged still FAILS; the gh-unavailable path is unchanged",
+      "met": true
+    },
+    {
+      "criterion": "Discrimination measured against this repo's real merged PRs: #22 at live main and #21 at main^1 pass; #20 at main^2 and #19 fail",
+      "met": true
+    },
+    {
+      "criterion": "THIRD-OCCURRENCE FIX: a shallow clone where main^1 is truncated reports 'open-PR listing undeterminable in a shallow clone' and exits non-zero, instead of accusing a correct listing of being stale",
+      "met": true
+    },
+    {
+      "criterion": "The shallow-clone test was confirmed RED against the pre-fix script by restoring it and re-running, not merely asserted",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 875451236,
+    "cached_input": 868991549,
+    "uncached_input": 6459687,
+    "output": 2316006,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 125341.993,
+    "source": "transcript message.usage summed across this session's 2114 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T07:51:15.581Z). Cumulative across PRs 12-24 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
+  },
+  "mutations": [
+    "scripts/lwb_check_state_claims.py: added _pr_merge_commit(); rewrote the MERGED branch of the 'Open PRs:' loop to reuse _sha_matches/_live_main_sha/_rev_parse exactly as the 'main SHA:' branch does; added the shallow-clone undeterminable branch in cd366e6",
+    "tests/test_lwb_check_state_claims.py: 6 tests covering every branch, plus test_pr_merged_at_parent_in_shallow_clone_is_undeterminable_not_stale",
+    "docs/maintainers/proof-of-completion-plan.md: recorded this as the second instance of the post-merge class, the third occurrence of accusing a correct document, and two factual corrections",
+    "reviews/24/independent-verifier.json: the independent review record (AGREE at 17a0ee3 with one confirmed defect, AGREE held at cd366e6)"
+  ],
+  "unproven": [
+    "FORK PR EXPOSURE, PLAUSIBLE, NOT REPRODUCED and NOT INTRODUCED HERE: 'gh pr view N' is called without --repo, so in a fork clone gh picks its default repo and origin/main may be the fork's own lagging main; a PR merged upstream would then compare against that and be reported stale. The reviewer noted the pre-existing _pr_state call has the identical exposure.",
+    "THE GH-UNAVAILABLE FAIL-OPEN IS UNCHANGED BY DESIGN, and it is the same fail-open that hid this very bug from CI for the whole time it was live on main. A check that cannot run remains indistinguishable from one that passes on this path.",
+    "TWO FACTUAL ERRORS in commit 17a0ee3's message, found by the reviewer and uncorrectable there because force-push is denied: 'predicted it' overstates the reviewer, which OBSERVED the failure and marked it PLAUSIBLE and out of scope; and 'for the sixth recorded time' contradicts PR #22's own commit message, which says 'seven instances', making this the eighth. Both corrected in the PR description and the plan doc only.",
+    "The reviewer did not run the full suite (it ran the state-claims file, 76 passed) and did not check CI on cd366e6 or the plan-doc changes.",
+    "The Generated: timestamp in the HANDOFF block is still checked against nothing.",
+    "Token accounting is carried forward from proof/22.json rather than re-derived, and is cumulative across PRs 12-24 rather than attributable to this one."
+  ]
+}
