@@ -74,19 +74,34 @@ def _cmd(argv, **overrides):
 
 
 def test_self_referencing_command_is_skipped_never_invoked():
-    """A recorded command naming lwb_check_proof.py must never reach the
-    injected runner -- if the guard were missing, this test's runner would
-    be called and would raise, simulating the hang/recursion the guard
-    exists to prevent."""
+    """A recorded command naming lwb_check_proof.py, legitimately opted out
+    (verifiable: false with an enum reason), must never reach the injected
+    runner -- if the guard were missing, this test's runner would be called
+    and would raise, simulating the hang/recursion the guard exists to
+    prevent."""
 
     def _runner(argv, **kwargs):
         raise AssertionError(f"must never re-execute a self-referencing command: {argv!r}")
 
-    records = [("proof/x.json", _record([_cmd(["python", "scripts/lwb_check_proof.py"])]))]
+    records = [
+        (
+            "proof/x.json",
+            _record(
+                [
+                    _cmd(
+                        ["python", "scripts/lwb_check_proof.py"],
+                        verifiable=False,
+                        verifiable_reason="needs-build-step",
+                    )
+                ]
+            ),
+        )
+    ]
     report = lwb_check_proof.reexecute_verifiable_commands(records, run=_runner)
     assert report["total_reexecuted"] == 0
     assert any("SKIPPED-SELF" in line for line in report["lines"])
     assert report["failures"] == []
+    assert report["total_skipped_self"] == 1
 
 
 def test_self_referencing_command_with_pr_flag_is_also_skipped():
@@ -96,12 +111,97 @@ def test_self_referencing_command_with_pr_flag_is_also_skipped():
     records = [
         (
             "proof/x.json",
-            _record([_cmd(["python", "scripts/lwb_check_proof.py", "--pr", "20"])]),
+            _record(
+                [
+                    _cmd(
+                        ["python", "scripts/lwb_check_proof.py", "--pr", "20"],
+                        verifiable=False,
+                        verifiable_reason="needs-build-step",
+                    )
+                ]
+            ),
         )
     ]
     report = lwb_check_proof.reexecute_verifiable_commands(records, run=_runner)
     assert report["total_reexecuted"] == 0
     assert any("SKIPPED-SELF" in line for line in report["lines"])
+
+
+# --- Finding 1: verifiable: true self-reference is a silent opt-out --------
+
+
+def test_self_referencing_command_marked_verifiable_true_is_a_failure_not_a_skip():
+    """CONFIRMED by independent review: 'verifiable: true' plus any argv
+    token containing the script's name was a silent opt-out needing no
+    enum reason -- the run still exited 0. A self-referencing command must
+    be verifiable: false with an enum reason to be legitimately skipped;
+    verifiable: true on one is now a FAILURE, not a quiet SKIPPED-SELF."""
+
+    def _runner(argv, **kwargs):
+        raise AssertionError(f"must never re-execute a self-referencing command: {argv!r}")
+
+    records = [
+        ("proof/x.json", _record([_cmd(["python", "scripts/lwb_check_proof.py"], verifiable=True)])),
+    ]
+    report = lwb_check_proof.reexecute_verifiable_commands(records, run=_runner)
+    assert report["total_reexecuted"] == 0
+    assert report["total_skipped_self"] == 0
+    assert len(report["failures"]) == 1
+    assert not any("SKIPPED-SELF" in line for line in report["lines"])
+    code = lwb_check_proof.reexecute_exit_code(report)
+    assert code == lwb_check_proof.REEXECUTE_EXIT_MISMATCH
+    assert code != lwb_check_proof.REEXECUTE_EXIT_ALL_MATCHED
+
+
+def test_skip_count_is_in_the_total_line():
+    records = [
+        (
+            "proof/x.json",
+            _record(
+                [
+                    _cmd(
+                        ["python", "scripts/lwb_check_proof.py"],
+                        verifiable=False,
+                        verifiable_reason="needs-build-step",
+                    ),
+                    _cmd(["python", "scripts/lwb_check_prefix.py"], exit=0, sha256=_digest_for("ok")),
+                ]
+            ),
+        )
+    ]
+    report = lwb_check_proof.reexecute_verifiable_commands(
+        records, run=lambda *a, **k: _proc(returncode=0, stdout="ok")
+    )
+    total_line = next(line for line in report["lines"] if line.startswith("TOTAL:"))
+    assert "1 skipped-self" in total_line
+
+
+def test_reproduction_a_wrongly_worded_self_ref_command_does_not_falsely_pass(monkeypatch, tmp_path, capsys):
+    """The exact reproduction from the finding: one genuinely passing
+    verifiable command next to a second verifiable: true command whose argv
+    merely MENTIONS lwb_check_proof (a realistic pytest invocation of the
+    test file) and carries a deliberately WRONG digest. This must NOT exit
+    0 -- the self-reference can no longer be used as a silent opt-out from
+    a wrong digest."""
+    proof_dir = tmp_path / "proof"
+    proof_dir.mkdir()
+    passing = _cmd([sys.executable, "-c", "print('ok')"], exit=0, sha256=_digest_for("ok" + chr(10)))
+    self_ref_wrong_digest = _cmd(
+        ["python", "-m", "pytest", "-q", "tests/test_lwb_check_proof_reexecute.py"],
+        verifiable=True,
+        exit=0,
+        sha256="0" * 64,
+    )
+    record = _record([passing, self_ref_wrong_digest])
+    (proof_dir / "1.json").write_text(__import__("json").dumps(record), encoding="utf-8")
+
+    monkeypatch.setattr(lwb_check_proof, "PROOF_DIR", proof_dir)
+    monkeypatch.setattr(sys, "argv", ["lwb_check_proof.py", "--reexecute"])
+    rc = lwb_check_proof.main()
+    out = capsys.readouterr().out
+    assert rc != 0
+    assert "SKIPPED-SELF" not in out
+    assert "FAIL" in out
 
 
 def _assert_argv_is_skipped_as_self(argv):
@@ -113,7 +213,12 @@ def _assert_argv_is_skipped_as_self(argv):
     def _runner(a, **kwargs):
         raise AssertionError(f"must never re-execute a self-referencing command: {a!r}")
 
-    records = [("proof/x.json", _record([_cmd(argv)]))]
+    records = [
+        (
+            "proof/x.json",
+            _record([_cmd(argv, verifiable=False, verifiable_reason="needs-build-step")]),
+        )
+    ]
     report = lwb_check_proof.reexecute_verifiable_commands(records, run=_runner)
     assert report["total_reexecuted"] == 0
     assert any("SKIPPED-SELF" in line for line in report["lines"])
@@ -136,15 +241,15 @@ def test_bypass_bash_c_wrapper_is_skipped():
 
 
 def test_bypass_sh_c_wrapper_is_skipped():
-    _assert_argv_is_skipped_as_self(["sh", "-c", "python scripts/lwb_check_proof.py"])
+    _assert_argv_is_skipped_as_self(["sh", "-c", "python scripts/lwb_check_proof.py --reexecute"])
 
 
 def test_bypass_cmd_c_wrapper_is_skipped():
-    _assert_argv_is_skipped_as_self(["cmd", "/c", "python scripts\\lwb_check_proof.py"])
+    _assert_argv_is_skipped_as_self(["cmd", "/c", "python scripts\lwb_check_proof.py --reexecute"])
 
 
 def test_bypass_powershell_c_wrapper_is_skipped():
-    _assert_argv_is_skipped_as_self(["powershell", "-c", "python scripts/lwb_check_proof.py"])
+    _assert_argv_is_skipped_as_self(["powershell", "-c", "python scripts/lwb_check_proof.py --reexecute"])
 
 
 def test_bypass_subprocess_run_wrapper_is_skipped():

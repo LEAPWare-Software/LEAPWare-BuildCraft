@@ -230,6 +230,82 @@ See `scripts/lwb_check_proof.py` (`_command_resolves_to_self`,
 `tests/test_lwb_check_proof_reexecute.py` for the mechanics and the
 regression tests for each defect.
 
+**CLOSED 2026-09-19 — a fourth AGREE-as-report-only independent review of
+774f04d CONFIRMED three further defects, fixed:**
+
+1. **The over-inclusive self-reference skip hid a real failure behind exit
+   0 — and it falsified a claim this document had published as fact.** An
+   earlier pass of this document asserted that a false `SKIPPED-SELF`
+   "can only lower the re-executed count, never manufacture a pass." That
+   claim was FALSE, and the author's own reproduction against this exact
+   code proved it: a record with one genuinely passing verifiable command
+   next to a second command whose `argv` merely MENTIONED
+   `lwb_check_proof` (a realistic `pytest` invocation of the test file
+   itself) and carried a deliberately WRONG recorded `sha256` still
+   exited 0, with `total_reexecuted: 1`, `failures: []`, and the `TOTAL`
+   line reading `ALL RE-EXECUTED COMMANDS MATCHED`. The reviewer's own
+   words: "Once blocking, `verifiable: true` plus any token containing
+   the name makes a silent opt-out that needs no enum reason." Checking
+   every real `proof/*.json` record found 16 self-referencing commands
+   and confirmed NOT ONE was marked `verifiable: true` — so closing this
+   changes nothing about today's records and shuts the opt-out
+   permanently. Fixed two ways, both in
+   `reexecute_verifiable_commands`/`_command_resolves_to_self` in
+   `scripts/lwb_check_proof.py`: (a) a new `total_skipped_self` counter is
+   tracked and printed in the `TOTAL` line (`N of M commands re-executed,
+   U uncomparable, S skipped-self, ...`) — the `TOTAL` line previously
+   carried no skip count at all, only a per-record line and a shrunken "1
+   of 2"; (b) a self-referencing command marked `verifiable: true` is now
+   a FAILURE, not a quiet skip — `SKIPPED-SELF` remains legitimate only
+   for a self-referencing command opted out as `verifiable: false` with
+   an enum reason, exactly as the 16 real records already do. See
+   `test_self_referencing_command_marked_verifiable_true_is_a_failure_not_a_skip`,
+   `test_skip_count_is_in_the_total_line`, and
+   `test_reproduction_a_wrongly_worded_self_ref_command_does_not_falsely_pass`
+   (the exact reproduction above, now asserting the run does NOT exit 0)
+   in `tests/test_lwb_check_proof_reexecute.py`.
+2. **Stale `--help` text.** The `--reexecute` help in
+   `scripts/lwb_check_proof.py` still said the mode "exits with one of
+   THREE distinct codes" and named only `REEXECUTE_EXIT_ALL_MATCHED`,
+   `REEXECUTE_EXIT_MISMATCH`, and `REEXECUTE_EXIT_NOTHING_REEXECUTED` —
+   left over from before `REEXECUTE_EXIT_UNCOMPARABLE` was added. There
+   are four. The help text and the module docstring (which was already
+   correct) now agree. The reviewer confirmed nothing in `ci.yml`,
+   `scripts/`, or `docs/` assumed the stale three-code count.
+3. **Three of the seven recursion-guard bypass regression tests were
+   vacuous.** The reviewer restored only the old exact-basename guard
+   line (`Path(a).name == "lwb_check_proof.py"`, pre-dating the
+   case-insensitive-substring fix) and ran
+   `tests/test_lwb_check_proof_reexecute.py` against it: 4 failed, 29
+   passed. The four failures were the uppercase-filename, `-m` module
+   form, `bash -c` wrapper, and `subprocess.run` wrapper tests — each of
+   those wrapper strings does NOT end in the exact name
+   `lwb_check_proof.py`, so they genuinely discriminate old code from
+   new. `test_bypass_sh_c_wrapper_is_skipped`,
+   `test_bypass_cmd_c_wrapper_is_skipped`, and
+   `test_bypass_powershell_c_wrapper_is_skipped` passed on BOTH the old
+   and the new guard, because each of those three wrapper strings
+   happened to END in `lwb_check_proof.py` as its last path component —
+   exactly what the old exact-basename check already caught, so the test
+   proved nothing about the fix it was named for. Fixed by appending a
+   trailing ` --reexecute` to those three wrapper payloads, so the
+   self-reference no longer sits at the string's final path component;
+   re-running the same before/after experiment against the corrected
+   payloads confirms it: with the old exact-basename guard restored,
+   `tests/test_lwb_check_proof_reexecute.py` now reads 7 failed, 29
+   passed (the original four, plus the three newly-discriminating
+   wrapper tests); with the new case-insensitive-substring guard
+   restored, all 36 pass. (Reverting the guard alone gives 4 red before
+   this fix and 7 red after it — the other tests in that file that were
+   red at other points in this pass were red for the two defects above,
+   not for this one; the two counts should not be conflated.)
+
+See `scripts/lwb_check_proof.py` (`_command_resolves_to_self`,
+`reexecute_verifiable_commands`'s `total_skipped_self`, and the
+`--reexecute` argparse help) and `tests/test_lwb_check_proof_reexecute.py`
+for the mechanics and the regression tests for each of the three defects
+above.
+
 **What still stands between this gate and being made blocking.** Fixing
 these three defects closes the "would become load-bearing the moment a
 green result gates a merge" concern the independent review raised — it
@@ -252,6 +328,17 @@ plan's earlier passes and unchanged by this fix:
 - A blocking PR must say explicitly what (if anything) closes the
   `verifiable_reason` honesty gap, rather than silently relying on the
   enum to have done more than constrain wording.
+- **NOT fixed here, handled separately (independent review of 774f04d,
+  finding 2):** on Windows, a timed-out command whose child keeps the
+  pipes open makes `subprocess.run`'s `timeout=` wait for the child
+  anyway — the reviewer measured a 2-second `REEXECUTE_TIMEOUT_SECONDS`
+  limit actually taking 20 seconds wall-clock in that case. There is also
+  no OVERALL budget across a whole `--reexecute` run — worst case is
+  `REEXECUTE_TIMEOUT_SECONDS` (300s) multiplied by however many commands
+  are re-executed — and `.github/workflows/ci.yml` sets no
+  `timeout-minutes` on the job or step that runs it, so neither the
+  per-command timeout's own failure mode nor the absence of a job-level
+  ceiling is currently bounded.
 
 ## Open blockers
 

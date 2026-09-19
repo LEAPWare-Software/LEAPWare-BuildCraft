@@ -32,7 +32,14 @@ claim as "some digests could not be compared at all":
                             record contained a malformed `commands[]`
                             entry (missing/non-list/empty/non-string
                             `argv`) that could not be launched at all, OR
-                            a re-executed command exceeded its timeout.
+                            a re-executed command exceeded its timeout, OR
+                            a command's argv resolves to this script
+                            itself while marked `verifiable: true` (a
+                            self-referencing command may only be
+                            legitimately skipped as `verifiable: false`
+                            with an enum reason -- pairing self-reference
+                            with `verifiable: true` used to be a silent
+                            opt-out and is now a failure).
     2  NOTHING_REEXECUTED  zero commands were re-executed (everything was
                             skipped as self-referencing, opted out with
                             `verifiable: false`, or there were no records
@@ -983,10 +990,24 @@ def _command_resolves_to_self(argv) -> bool:
         needle appears in the source-code string token.
 
     Deliberately over-inclusive: a token that merely MENTIONS this
-    script's name (in a log message, say) also matches and gets skipped.
-    That costs nothing here -- a false SKIPPED-SELF only means one fewer
-    command re-executed this run, never a false pass -- and erring toward
-    skipping is the correct trade against erring toward recursion.
+    script's name (in a log message, say) also matches. Erring toward
+    catching the self-reference is the correct trade against erring toward
+    recursion -- but "matches" no longer means "silently skipped and
+    forgotten" on its own. An independent reviewer of PR #21's own
+    re-execution logic found that pairing this over-inclusive match with
+    `verifiable: true` was a silent opt-out that needed no
+    `verifiable_reason` from the closed enum: a command could name this
+    script (even just by mentioning it, e.g. inside a `pytest` invocation
+    of this very test file) with a deliberately WRONG recorded digest and
+    still be treated as skipped rather than compared, and the run still
+    exited 0. So the caller (`reexecute_verifiable_commands`) does NOT
+    treat every match here as a free pass: a match paired with
+    `verifiable: true` is now a FAILURE, and only a match paired with
+    anything else (`verifiable: false` with an enum reason, the only
+    legitimate way to opt out) is a genuine SKIPPED-SELF, counted in its
+    own `total_skipped_self` total. This function only answers "does argv
+    resolve to self"; the verifiable-true-means-failure decision lives at
+    the call site, not here.
     """
     if not isinstance(argv, list):
         return False
@@ -1012,12 +1033,19 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
     1. Recursion -- every proof record lists `lwb_check_proof.py` among its
        own commands, so blindly re-executing it would re-enter validation
        (and, under an env-gated design, recurse into its own re-execution
-       forever). `_command_resolves_to_self` skips any command naming,
-       invoking, or wrapping `lwb_check_proof.py`, reported `SKIPPED-SELF`,
-       never invoked -- on top of `--reexecute` being a CLI flag that never
-       appears in a recorded `argv`, so a re-executed command never
-       inherits it either, and a `SELF_REEXECUTE_GUARD_ENV` marker set on
-       every launched child as a belt-and-braces third layer (see `main`).
+       forever). `_command_resolves_to_self` identifies any command naming,
+       invoking, or wrapping `lwb_check_proof.py`; such a command is never
+       invoked either way, but is only reported `SKIPPED-SELF` (counted in
+       `total_skipped_self`) when legitimately opted out as `verifiable:
+       false` with an enum reason. A self-referencing command marked
+       `verifiable: true` is instead reported as a FAILURE -- found by
+       independent review to be a silent opt-out otherwise, needing no
+       enum reason at all, that let a deliberately wrong recorded digest
+       sail through as a skip rather than a mismatch. On top of that,
+       `--reexecute` is a CLI flag that never appears in a recorded
+       `argv`, so a re-executed command never inherits it either, and a
+       `SELF_REEXECUTE_GUARD_ENV` marker is set on every launched child as
+       a belt-and-braces third layer (see `main`).
     2. Sanitiser drift -- a command whose `sanitiser_version` differs from
        `lwb_sanitise.SANITISER_VERSION` is reported `UNCOMPARABLE`, is not
        re-run at all (comparing its digest under different rules would
@@ -1059,6 +1087,7 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
     total_commands = 0
     total_reexecuted = 0
     total_uncomparable = 0
+    total_skipped_self = 0
     run_env = {**os.environ, SELF_REEXECUTE_GUARD_ENV: "1"}
 
     for label, data in records:
@@ -1076,6 +1105,30 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
             name = " ".join(argv) if isinstance(argv, list) and all(isinstance(a, str) for a in argv) else repr(argv)
 
             if _command_resolves_to_self(argv):
+                if cmd.get("verifiable") is True:
+                    # Found by independent review: 'verifiable: true' plus
+                    # any argv token merely MENTIONING this script's name
+                    # was a silent opt-out that needed no
+                    # 'verifiable_reason' from the closed enum -- a proof
+                    # record could carry a deliberately WRONG digest on a
+                    # self-referencing command and still exit 0, because
+                    # the command was skipped rather than compared. A
+                    # self-referencing command is only legitimately skipped
+                    # when it is verifiable: false with an enum reason (see
+                    # ALLOWED_VERIFIABLE_REASONS and _validate_verifiability
+                    # above, which already enforces that pairing); claiming
+                    # verifiable: true on one is now a FAILURE, never a
+                    # quiet SKIPPED-SELF.
+                    msg = (
+                        f"{label}: {name}: self-referencing command is marked "
+                        "verifiable: true -- a proof record cannot claim its own "
+                        "re-execution as proof; mark it verifiable: false with an "
+                        "enum reason instead"
+                    )
+                    failures.append(msg)
+                    record_lines.append(f"    FAIL {name} (self-referencing but verifiable: true)")
+                    continue
+                total_skipped_self += 1
                 record_lines.append(
                     f"    SKIPPED-SELF {name} -- a proof record cannot contain proof of its own re-execution"
                 )
@@ -1162,7 +1215,8 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
         suffix = " -- ALL RE-EXECUTED COMMANDS MATCHED"
     lines.append(
         f"TOTAL: {total_reexecuted} of {total_commands} commands re-executed, "
-        f"{total_uncomparable} uncomparable, across {len(records)} records{suffix}"
+        f"{total_uncomparable} uncomparable, {total_skipped_self} skipped-self, "
+        f"across {len(records)} records{suffix}"
     )
 
     return {
@@ -1171,6 +1225,7 @@ def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
         "total_commands": total_commands,
         "total_reexecuted": total_reexecuted,
         "total_uncomparable": total_uncomparable,
+        "total_skipped_self": total_skipped_self,
     }
 
 
@@ -1238,11 +1293,13 @@ def main() -> int:
             "re-run every commands[] entry whose verifiable is true across all "
             "proof/*.json records, sanitise its output, and compare the sha256 "
             "against the recorded digest. Mutually exclusive with every other mode: "
-            "run alone, prints a re-execution report, and exits with one of THREE "
+            "run alone, prints a re-execution report, and exits with one of FOUR "
             "distinct codes -- see REEXECUTE_EXIT_ALL_MATCHED (0), "
-            "REEXECUTE_EXIT_MISMATCH (1), REEXECUTE_EXIT_NOTHING_REEXECUTED (2) -- "
-            "'nothing was re-executed' is never the same exit code as 'everything "
-            "re-executed matched'."
+            "REEXECUTE_EXIT_MISMATCH (1), REEXECUTE_EXIT_NOTHING_REEXECUTED (2), "
+            "REEXECUTE_EXIT_UNCOMPARABLE (3) -- 'nothing was re-executed' is never "
+            "the same exit code as 'everything re-executed matched', and a "
+            "sanitiser-version-drifted command that could not be compared at all "
+            "is never the same exit code as either."
         ),
     )
     args = parser.parse_args()
