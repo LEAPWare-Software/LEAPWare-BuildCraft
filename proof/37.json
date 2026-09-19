@@ -3,7 +3,7 @@
   "pr": 37,
   "author": "conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
-  "commit": "80834aa",
+  "commit": "0f85904",
   "commands": [
     {
       "argv": [
@@ -16,18 +16,17 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 41%]",
+        "........................................................................ [ 55%]",
         "........................................................................ [ 68%]",
         "........................................................................ [ 82%]",
         "........................................................................ [ 96%]",
         "..................                                                       [100%]",
-        "=============================== warnings summary ===============================",
-        "tests/test_lwb_check_proof_reexecute.py:248",
-        "  <repo>/tests/test_lwb_check_proof_reexecute.py:248: DeprecationWarning: invalid escape sequence '<path>'",
-        "    _assert_argv_is_skipped_as_self([\"cmd\", \"<path>\", \"python scripts/lwb_check_proof.py --reexecute\"])",
-        "-- Docs: http<path>",
-        "522 passed, 1 warning in 21.52s"
+        "522 passed in 18.89s"
       ],
-      "sha256": "d020c6b17f3213383355194f744ca667373e9315799bd5920a223ff93d83750e",
+      "sha256": "3653a758ff4c932ea2e2634b9740ad1cefed1bf56544084be60306cea20aa537",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -42,12 +41,13 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 17:05 UTC",
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 18:19 UTC",
         "lwb-check-state-claims check passed"
       ],
-      "sha256": "c5f3dcd2690169e3a596b2874fadf3b96431eaacbf532d3d40f52211d93b22a2",
+      "sha256": "257e09133f6fa657e1fde0651bbb728e8daea3ea980efe5130ae00dc0fd03ea6",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
@@ -58,9 +58,9 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "OK: <repo>/HANDOFF.md passes all checks (2980 bytes)"
+        "OK: <repo>/HANDOFF.md passes all checks (2968 bytes)"
       ],
-      "sha256": "0932895089c6973e689ff9db877f4ab400f8a3938d49dd939fd2a197260cc652",
+      "sha256": "b57de528370ff724a650f44678ba22e09178fac9b60d1ccd14d3c9a6ab932885",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -154,7 +154,8 @@
     "docs/requirements/build-plan.md: the consolidated seven-phase plan, walked with the owner phase by phase and approved (unchanged by this fix)",
     "docs/requirements/decisions.md: D21, D22, D23, D24, D25, D26, D27 (unchanged by this fix; the previous record under-enumerated this to D21/D22/D23/D24/D27 only -- non-blocking finding 3 in reviews/30/cloud-reviewer-b.json, corrected here)",
     "docs/maintainers/session-handoff-2026-09-19.md: the session handoff, corrected after an audit found it had pinned stale SHAs in ungated prose (unchanged by this fix)",
-    "HANDOFF.md: the branch's own in-flight rewrite (THE PLAN pointer, the adopt-before-build condition, an in-flight list naming #29/#30/#32 in place of the stale #23/#24) re-applied on top of merge commit 1a171c9, which had reverted it to main's stale copy; generated block regenerated last against main SHA bfe8507 and merged main up to bfe8507 (carrying #34) first"
+    "HANDOFF.md: the branch's own in-flight rewrite (THE PLAN pointer, the adopt-before-build condition, an in-flight list naming #29/#30/#32 in place of the stale #23/#24) re-applied on top of merge commit 1a171c9, which had reverted it to main's stale copy; generated block regenerated last against main SHA bfe8507 and merged main up to bfe8507 (carrying #34) first",
+    "HANDOFF.md: item 3 updated to name #37 as \"this PR\" instead of #35 (carried over from the #30 re-cut); #37 re-cuts #35 the same way #35 re-cut #30. reviews/35/cloud-reviewer.json and cloud-reviewer-b.json are unchanged/inherited (they still say #35 in filename only, not content); proof/35.json renamed to proof/37.json, pr field updated to 37, commands[] and commit field regenerated against this branch's actual head."
   ],
   "unproven": [
     "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. `checked_by` is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, because inventing or borrowing one is the exact dishonesty this system exists to catch. This is PR #35, not #30: reviews/30/cloud-reviewer-b.json reviewed PR #30's branch (1a171c9a, and then that branch's first repair attempt at 1793c1f) and does not apply here by filename (lwb_lanes.py globs reviews/<pr_number>/, i.e. reviews/35/ for this PR). A fresh independent review record under reviews/35/ at THIS head is what makes this record complete, and until it exists this PR must not land. I did not write and must not write that record myself (D20).",
@@ -163,6 +164,8 @@
     "THE PLAN'S CONTENT IS NOT PROVEN BY ANY COMMAND, as the previous record already noted; this fix touches only HANDOFF.md and this proof record, not the plan or decisions documents themselves.",
     "THE CONDUCTOR'S FALLBACK IS UNTESTED IN THE FAILING DIRECTION, as the previous record already noted; not re-verified here.",
     "NON-BLOCKING FINDING 4 (reviews/30/cloud-reviewer-b.json): D25's own justification overstates what is measurable (\"one figure for sixteen deliverables\" vs. 14 distinct cumulative figures plus two 'unknown' records plus one non-cumulative outlier). Not corrected here -- D25's substantive conclusion is unaffected and the reviewer marked this non-blocking; left for whoever next touches decisions.md.",
-    "python scripts/lwb_check_proof.py --reexecute WAS RUN THIS TIME (the previous record on this branch had not, which the same reviewer flagged as the gap they would close first): TOTAL 25 of 146 commands re-executed, 0 uncomparable, 17 skipped-self, across 21 records -- ALL RE-EXECUTED COMMANDS MATCHED, confirming this record's own commands[] digests are genuine and not just self-consistent."
+    "python scripts/lwb_check_proof.py --reexecute WAS RUN THIS TIME (the previous record on this branch had not, which the same reviewer flagged as the gap they would close first): TOTAL 25 of 146 commands re-executed, 0 uncomparable, 17 skipped-self, across 21 records -- ALL RE-EXECUTED COMMANDS MATCHED, confirming this record's own commands[] digests are genuine and not just self-consistent.",
+    "THIS PR RE-CUTS lwb-capture-d21-d22-v2 (PR #35) FROM 277e97f -- the last commit on that branch with correct author identity, one past its reviewable head 80834aa6 -- because #35's last commit (861ee7d, reviewer A's own record-only commit) was authored LEAPWare-HQ <manny.ramos@followoz.com> instead of the required LEAPWare <leapware@outlook.com>, and force-push is denied here. 861ee7d's content was re-applied byte-for-byte (git diff 861ee7d <new commit> is empty) under the correct identity. #35's branch is abandoned and commented as superseded.",
+    "reviews/35/cloud-reviewer.json is STALE by lwb_lanes' own check (it names 277e97f, not the reviewable head), and reviews/35/cloud-reviewer-b.json's AGREE is rejected on a same-repo-name segment collision ('buildcraft') both of #35's reviewers already measured and reported as a gate false positive -- not fixed here (D20: not this session's call to relax its own review gate). Neither record lives under reviews/37/ at all, so lwb-lanes reports 0 independent reviews for this PR until the reviewer routine files a fresh record there. That is the one remaining gate failure this record does not resolve."
   ]
 }
