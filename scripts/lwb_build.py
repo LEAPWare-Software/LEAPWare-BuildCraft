@@ -136,6 +136,30 @@ def _trees_equal(a: Path, b: Path) -> bool:
     return True
 
 
+class CannotCheckStowaways(RuntimeError):
+    """Raised when the stowaway check could not run at all.
+
+    A distinct signal rather than an empty list, because "I checked and
+    found nothing" and "I could not check" must never share a
+    representation. The independent reviewer of PR #25 found the first
+    version printing "NOTHING WAS CHECKED -- this is not a pass" and then
+    exiting 0: the words and the exit code disagreed, which is exactly the
+    contradiction PR #22 fixed in the `main SHA` gate.
+
+    THIS REPOSITORY HAS NOW ANSWERED THE SAME QUESTION THREE TIMES, and the
+    answer has to stay the same each time or the codebase holds two
+    standards: a shallow clone that cannot resolve `main^1` FAILS (PR #22),
+    an open-PR listing that cannot be resolved FAILS (PR #24), and a
+    stowaway check that cannot run FAILS here. In every case the exit code
+    is non-zero and the REASON says the check was undeterminable rather
+    than accusing the tree of being wrong.
+
+    CI always has git, so this cannot fire there. It fires for someone
+    running `--check` outside a git repository, and telling that person
+    "OK" would be the lie this whole file exists to prevent.
+    """
+
+
 def tracked_files_the_build_does_not_produce(vendor_dir: Path, staging: Path) -> list[str]:
     """git-TRACKED paths under `vendor_dir` that the build did not write.
 
@@ -177,7 +201,9 @@ def tracked_files_the_build_does_not_produce(vendor_dir: Path, staging: Path) ->
             f"(git ls-files exited {result.returncode}); NOTHING WAS CHECKED "
             f"-- this is not a pass"
         )
-        return []
+        raise CannotCheckStowaways(
+            f"git ls-files exited {result.returncode} for {vendor_dir}"
+        )
 
     # COMPARE AGAINST A SET OF PATHS, NOT `Path.exists()`. `exists()` asks the
     # FILESYSTEM, and on Windows and macOS that question is case-insensitive:
@@ -234,7 +260,13 @@ def main() -> int:
                 # Separate from drift, and reported separately: a tracked
                 # file the build does not produce is not "stale", it is
                 # something that should not be in the shipped plugin at all.
-                stowaways = tracked_files_the_build_does_not_produce(vendor_dir, staging)
+                try:
+                    stowaways = tracked_files_the_build_does_not_produce(vendor_dir, staging)
+                except CannotCheckStowaways:
+                    # The notice has already been printed by the function.
+                    # Exit non-zero so the words and the exit code agree.
+                    drift_found = True
+                    stowaways = []
                 if stowaways:
                     print(
                         f"STOWAWAY: {len(stowaways)} git-tracked file(s) under {vendor_dir} "

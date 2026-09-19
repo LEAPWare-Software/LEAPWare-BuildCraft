@@ -12,6 +12,8 @@ the check could be satisfied by a tree that is not what the build produced.
 from __future__ import annotations
 
 import sys
+
+import pytest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -125,10 +127,11 @@ def test_no_stowaways_when_every_tracked_file_is_built(tmp_path, monkeypatch):
     assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == []
 
 
-def test_git_unavailable_reports_nothing_rather_than_inventing_an_answer(tmp_path, monkeypatch):
-    """A non-zero `git ls-files` must not crash the build, and must not be
-    dressed up as a positive finding. It returns an empty list; `main`
-    decides how to report that state."""
+def test_git_unavailable_signals_rather_than_inventing_an_answer(tmp_path, monkeypatch):
+    """A non-zero `git ls-files` must not be dressed up as a positive
+    finding. It raises a DISTINCT signal rather than returning an empty
+    list, because "I checked and found nothing" and "I could not check"
+    must never share a representation."""
     vendor = tmp_path / "vendor"
     staging = tmp_path / "staging"
     vendor.mkdir()
@@ -140,7 +143,8 @@ def test_git_unavailable_reports_nothing_rather_than_inventing_an_answer(tmp_pat
 
     monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
-    assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == []
+    with pytest.raises(lwb_build.CannotCheckStowaways):
+        lwb_build.tracked_files_the_build_does_not_produce(vendor, staging)
 
 
 def test_a_case_variant_stowaway_is_reported_on_every_os(tmp_path, monkeypatch, capsys):
@@ -199,7 +203,38 @@ def test_git_failure_says_nothing_was_checked_rather_than_passing_quietly(
     monkeypatch.setattr(lwb_build, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
 
-    assert lwb_build.tracked_files_the_build_does_not_produce(vendor, staging) == []
+    with pytest.raises(lwb_build.CannotCheckStowaways):
+        lwb_build.tracked_files_the_build_does_not_produce(vendor, staging)
+
     printed = capsys.readouterr().out
     assert "NOTHING WAS CHECKED" in printed, printed
     assert "not a pass" in printed, printed
+
+
+def test_the_exit_code_agrees_with_the_words_when_git_fails(monkeypatch, capsys):
+    """THE WORDS AND THE EXIT CODE MUST NOT DISAGREE.
+
+    The first version printed "NOTHING WAS CHECKED -- this is not a pass"
+    and then exited 0. The independent reviewer caught it and named the
+    precedent: it is the same contradiction PR #22 fixed in the `main SHA`
+    gate. Asserting the printed string alone -- which the previous version
+    of the test above did -- cannot catch this, because the string was
+    always right; it was the exit code that lied.
+
+    This repository has now answered the same question three times and the
+    answer must not vary: a shallow clone that cannot resolve `main^1`
+    FAILS (#22), an open-PR listing that cannot be resolved FAILS (#24),
+    and a stowaway check that cannot run FAILS here.
+    """
+    class _Result:
+        returncode = 1
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(lwb_build.subprocess, "run", lambda *a, **k: _Result())
+    monkeypatch.setattr(sys, "argv", ["lwb_build.py", "--check"])
+
+    assert lwb_build.main() != 0
+
+    printed = capsys.readouterr().out
+    assert "NOTHING WAS CHECKED" in printed, printed

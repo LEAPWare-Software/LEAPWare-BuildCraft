@@ -131,6 +131,10 @@
     {
       "criterion": "A git failure no longer passes in silence: the stowaway check prints NOTHING WAS CHECKED -- this is not a pass, rather than returning an empty list that reads as 'checked, found nothing'",
       "met": true
+    },
+    {
+      "criterion": "THE WORDS AND THE EXIT CODE AGREE: when the stowaway check cannot run, --check exits non-zero rather than printing THIS IS NOT A PASS and exiting 0. Same answer this repo gave in PR #22 (shallow clone) and PR #24 (unresolvable open-PR listing)",
+      "met": true
     }
   ],
   "tokens": {
@@ -151,15 +155,16 @@
     "tests/test_lwb_build_check_holes.py: five tests for the two holes, including guards on the guards and the git-unavailable degraded path",
     "docs/maintainers/proof-of-completion-plan.md: the deadlock recorded as the reason core/lwb_core/rules/ still held one rule, plus both holes",
     "scripts/lwb_build.py: stowaway membership test changed from Path.exists() to a set of built relative paths (case-insensitive filesystems); git-failure branch now prints an explicit NOTHING WAS CHECKED notice",
-    "tests/test_lwb_build_check_holes.py: two further tests, for the case variant and for the git-failure notice"
+    "tests/test_lwb_build_check_holes.py: two further tests, for the case variant and for the git-failure notice",
+    "scripts/lwb_build.py: CannotCheckStowaways signal replaces a bare empty-list return when git ls-files fails, and main() turns it into a non-zero exit"
   ],
   "unproven": [
     "PATH-TRAVERSAL IN THE WRITE HOOK, PLAUSIBLE AND PRE-EXISTING, NOT FIXED: the reviewer found 'plugins/codex/lwb/vendor/../bin/lwb_hook.py' classifies 'shared' and the write hook ALLOWS a claude Edit on it. It also found the identical shape already on main before this PR -- 'docs/../plugins/codex/lwb/bin/lwb_hook.py' was already shared+allow -- so this PR does not introduce it. CI is unaffected because the lane gate reads canonical paths from git diff-tree --name-only, and the write hook is the documented nudge, not the check of record. Normalising the path in _relativize would close it.",
     "CASE VARIANTS ARE NOT EXEMPTED BUT ARE NOT LANE-CLASSIFIED EITHER: the reviewer measured 'plugins/Codex/lwb/Vendor/x.py' as 'other', which CI REJECTS because check_lanes errors on any class that is neither shared nor the agent's own. 'plugins/codex/lwb/Vendor/x.py' stays codex. Neither is a bypass, but the behaviour is incidental rather than designed.",
-    "SYMLINKS UNDER vendor/ WERE NOT REPRODUCED. The reviewer reasoned that git stores the link itself at its own path so the gate sees a shared path, and --check follows the link and compares content so the link must match build output. Reasoned, not tested.",
     "THE STOWAWAY CHECK STILL DEPENDS ON git ls-files. If git is unavailable or the directory is not a repo it returns an empty list -- the right value, since inventing a failure would be worse -- but in that state it provides NO protection at all. It now says so explicitly (NOTHING WAS CHECKED -- this is not a pass) rather than returning silently, which is the only part of this that was fixed.",
     "THE CASE-VARIANT FIX WAS VERIFIED ON WINDOWS ONLY. The reviewer reasoned it would already have been flagged on Linux, where the filesystem is case-sensitive, and marked that PLAUSIBLE rather than run. The set comparison now makes the behaviour identical on every OS by construction, but no Linux run has confirmed it.",
     "The reviewer did not check CI on 74df39a or 5000101, and did not read the plan-doc additions.",
+    "SYMLINK COVERAGE IS PARTIAL, corrected from an earlier version of this record which said symlinks were untested. The reviewer DID test a tracked symlink at a NEW path at 5000101: it was reported as a STOWAWAY with exit 1. What remains reasoned rather than tested is a symlink that REPLACES a built file under the same name.",
     "Token accounting is cumulative across PRs 12-25, not attributable to this PR alone."
   ]
 }
