@@ -157,6 +157,38 @@ def test_repo_and_home_case_insensitive_match_produces_identical_bytes():
     assert "<path>" not in out_lower
 
 
+def test_posix_case_distinct_prefixes_are_not_conflated():
+    """The regression found by adversarial review: unconditional
+    case-insensitive matching mis-sanitised a DIFFERENT posix user's
+    directory into this session's placeholder. `/srv/Alice` and
+    `/srv/alice` are two different, genuinely distinct directories on a
+    case-sensitive filesystem (Linux) -- case-insensitive matching must
+    apply only when the prefix is WINDOWS-SHAPED (a drive letter or UNC
+    root), never for a bare posix path, and that decision must come from
+    the shape of the prefix itself, not from the host OS `sanitise()`
+    happens to run on."""
+    # The reviewer's exact scenario: repo_root and home are the same
+    # (Alice's session), and the captured text ALSO contains a DIFFERENT
+    # user's directory that merely differs in case ("alice" vs "Alice").
+    # On a case-sensitive filesystem those are two different directories;
+    # case-insensitive matching must not conflate them.
+    text = "/srv/Alice/proj/f.py and /srv/alice/other/f.py"
+    out = lwb_sanitise.sanitise(text, repo_root="/srv/Alice/proj", home="/srv/Alice")
+    # The repo (exact case) is sanitised; the different-case, genuinely
+    # different directory is NOT conflated with <repo> or <home> -- it
+    # falls through to the generic <path> rule (matching the whole
+    # remaining token, since the generic rule has no needle to stop at).
+    assert out == "<repo>/f.py and <path>"
+    assert "<repo>" not in out.split(" and ")[1]
+    assert "<home>" not in out.split(" and ")[1]
+
+
+def test_posix_prefix_still_matches_exact_case():
+    text = "/srv/alice/proj/f.py"
+    out = lwb_sanitise.sanitise(text, repo_root="/srv/alice/proj", home="/srv/alice-unused")
+    assert out == "<repo>/f.py"
+
+
 def test_default_repo_root_and_home_are_used_when_omitted():
     """Callers in this repo shouldn't have to pass repo_root/home explicitly
     every time -- sanitise() defaults them to this repo and the real home."""

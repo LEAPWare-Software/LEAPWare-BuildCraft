@@ -56,15 +56,28 @@ cleanly on a runner, three cannot, and two are conditional.
 false.** A "MEASURED AGAIN" edit at this spot once claimed **5 of 9**,
 asserting `lwb_build.py --check` "appears in the table above but no proof
 record in this repo has ever actually run it." That claim was not checked
-against the records before it was written, and it was wrong: `grep -l
-lwb_build proof/*.json` finds it in `proof/7.json`, `proof/8.json` and
-`proof/17.json`. Re-derived properly this time: **ten distinct command
+against the records before it was written, and it was wrong: `lwb_build.py
+--check` genuinely RUNS as a `commands[]` entry in `proof/7.json` and
+`proof/8.json`. Re-derived properly this time: **ten distinct command
 kinds, five re-executable** — the original count in the paragraph below,
 before that false "correction" briefly overwrote it. This is recorded
 rather than quietly restored, because a false correction silently reverted
 is itself a small act of the same dishonesty this document exists to
 catch — the reader deserves to know the number moved twice, and why the
 second move was wrong.
+
+A second, narrower false claim was made correcting the first: a commit
+message (`e2859d6`) said `grep -l lwb_build proof/*.json` finds the string
+in `proof/7.json`, `proof/8.json` AND `proof/17.json`, and reported all
+three as records that RUN the command. That conflated "the string appears
+in the file" with "the command was executed" — `proof/17.json` mentions
+`scripts/lwb_build.py` only in its `acceptance_criteria` prose (describing
+what a *different* deliverable's guard test covers) and in `mutations`
+(a file that deliverable touched); it has no `lwb_build.py` entry in its
+own `commands[]` array. `grep -l` matches a filename mentioned in prose
+exactly as readily as a command actually run, and the difference was not
+checked before the commit message asserted it. Only `proof/7.json` and
+`proof/8.json` actually run `lwb_build.py --check` as proof.
 
 An earlier draft of the count below said "five are re-executable and five
 are not." That was wrong, and it was wrong in a document written to end

@@ -49,15 +49,29 @@ def _authoritative_pr_from_filename(path: Path):
     because a record used to be trusted about its own `pr` field and a
     mismatched one went unnoticed. `proof/` has no per-PR directory, but
     this repo's own convention names every PR-tied record after its PR
-    number (`7.json` .. `19.json`), so a bare-digit filename stem is the
-    equivalent authority here: a signal that sits OUTSIDE the record's own
-    claim, exactly like the directory does for reviews/.
+    number (`7.json` .. `19.json`), so a bare-digit filename stem is
+    *compared* against the record's own claim the same way.
+
+    Read that comparison for what it actually is, though: for a file that
+    ALREADY EXISTED before this PR, the filename genuinely is external to
+    whatever a later edit claims (catches a stale/careless edit). For a
+    BRAND NEW file, the filename is exactly as attacker-controlled as the
+    `pr` field it is being compared against -- both are written by the
+    same author in the same commit. Adversarial review confirmed two
+    concrete bypasses this function alone does not catch: a slug-named
+    file (`sneaky-slug.json` declaring an old `pr`) and a SELF-CONSISTENT
+    fabricated digit filename (`007.json` declaring `"pr": 7` to match).
+    This function catches an INCONSISTENT lie, never a self-consistent
+    one -- it raises the cost of a careless mismatch, it does not detect
+    deliberate, self-consistent fabrication. See
+    `check_new_proof_records_declare_pr` for the check that closes that
+    gap where a genuinely external number exists (CI, on a `pull_request`
+    run) and the honest statement of what happens where it does not.
 
     Returns `None` for a non-digit stem -- `schema.json` documents
     `deliverable` as "an issue/step number or a short slug", so a
     slug-named file is ordinary and carries no filename-derived authority
-    either way. See `_validate_record` for the fail-closed handling of
-    that no-authority case, and the residual gap it does not close.
+    either way.
     """
     stem = path.stem
     return int(stem) if stem.isdigit() else None
@@ -140,30 +154,22 @@ def _validate_record(path: Path, data: object) -> list[str]:
     pr = data.get("pr")
     path_pr = _authoritative_pr_from_filename(path)
 
-    # Fail closed, not open: when the filename names a PR number and the
-    # record's own self-declared 'pr' disagrees with it, that disagreement
-    # is itself an error (it is either a mistake or an attempt to write a
-    # lower, more lenient number into the record to dodge the enforcement
-    # cutoffs below), AND gating uses the STRICTER of the two numbers --
-    # never the self-declared one alone, which is exactly the value under
-    # attack. Found by adversarial review: nothing previously cross-checked
-    # a record's self-declared 'pr' against anything outside the record's
-    # own content, so an ADDITIONAL record (distinct from whichever one
+    # This catches an INCONSISTENT self-declared 'pr' against the filename,
+    # never a self-consistent fabrication -- see
+    # `_authoritative_pr_from_filename`'s docstring for what this can and
+    # cannot detect for a BRAND NEW file, and `check_new_proof_records_declare_pr`
+    # for the check that uses a genuinely external number (CI, on a
+    # `pull_request` run, via `--pr`) to close that gap. When the filename
+    # names a PR number and the record's own self-declared 'pr' disagrees
+    # with it, that disagreement is itself an error, AND gating uses the
+    # STRICTER of the two numbers -- never the self-declared one alone.
+    # Found by adversarial review: nothing previously cross-checked a
+    # record's self-declared 'pr' against anything outside the record's own
+    # content, so an ADDITIONAL record (distinct from whichever one
     # satisfies `check_pr_has_record` for the real PR) could lie about its
     # own 'pr' and sail through `validate_all()`'s field requirements
     # entirely -- the identical shape of the bug PR #19 fixed in
     # `lwb_lanes.py::_review_ok`.
-    #
-    # Residual gap, stated plainly rather than silently left: a record filed
-    # under a SLUG name (no digit filename at all) carries no filename-
-    # derived authority, so a self-declared 'pr' on a slug-named file cannot
-    # be cross-checked by this mechanism -- there is nothing outside the
-    # record's own claim to check it against. Closing that fully needs
-    # either a `proof/<pr>/<slug>.json` directory convention (mirroring
-    # `reviews/<pr>/`) or CI threading the real PR number into every
-    # `validate_all()` invocation (today only `lwb-proof-pr` passes `--pr`;
-    # the plain `lwb-proof` job, which runs on every PR, does not). Both are
-    # out of scope here.
     if isinstance(path_pr, int) and isinstance(pr, int) and pr != path_pr:
         errors.append(
             f"{rel}: record's 'pr' ({pr!r}) does not match its own filename "
@@ -242,9 +248,24 @@ def _argv_has_git_range(argv: list) -> bool:
     repo's proof records uses it -- if one ever does, it needs its own
     resolved, dated equivalent, not this field.
 
-    Without resolved shas, CI re-executing any of these forms resolves a
-    different commit than the one the record proves, and an honest record
-    fails -- exactly the failure mode that gets a gate switched off."""
+    Also NOT detected, and left as a known gap rather than guessed at: git's
+    BARE two-revision form with no operator at all, e.g. `git diff
+    origin/main HEAD` (equivalent to `origin/main..HEAD` for `diff`/`log`/
+    `rev-list`). Catching it needs distinguishing "two revisions" from "one
+    revision plus a pathspec" -- `git diff HEAD file.py` is a single
+    revision limited to a file, not a range, and looks identical at the
+    argv level (a subcommand followed by two plain tokens) without actually
+    parsing which tokens resolve to revisions versus paths, which this
+    validator does not attempt. No command in this repo's proof records
+    uses the bare form today (this repo's own commands all use `--range`,
+    `--base`/`--head`, or take no revisions at all) -- if one ever does, it
+    needs deliberate handling, not a heuristic that risks flagging an
+    ordinary `<rev> <path>` invocation as a range it is not.
+
+    Without resolved shas, CI re-executing any of the DETECTED forms
+    resolves a different commit than the one the record proves, and an
+    honest record fails -- exactly the failure mode that gets a gate
+    switched off."""
     if not isinstance(argv, list):
         return False
     str_args = [a for a in argv if isinstance(a, str)]
@@ -533,6 +554,102 @@ def check_pr_has_record(pr_number: int) -> list[str]:
     return errors
 
 
+def _new_or_changed_proof_paths(rev_range: str):
+    """Repo-relative, forward-slash paths (as `git` reports them) of every
+    `proof/*.json` file ADDED or MODIFIED in `rev_range`, e.g.
+    'origin/main..HEAD'. Returns `None` -- never an empty set -- if the
+    `git diff` itself could not be run or failed (no such ref in this
+    checkout, git missing, etc.), so a caller can tell "computed, and
+    genuinely nothing changed" apart from "could not compute at all" and
+    must not treat the latter as if it were the former.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=ACMR", rev_range, "--", "proof"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
+def check_new_proof_records_declare_pr(
+    pr_number: int, rev_range: str = "origin/main..HEAD", notices: "list[str] | None" = None
+) -> list[str]:
+    """The check that closes the gap `_authoritative_pr_from_filename`
+    cannot: for a BRAND NEW proof record, the filename is exactly as
+    attacker-controlled as the `pr` field it would be compared against, so
+    filename agreement proves nothing about a file created in the same
+    commit as its own name. Adversarial review confirmed two concrete
+    bypasses this closes: a slug-named file self-declaring a stale `pr`,
+    and a SELF-CONSISTENT fabricated digit filename (`007.json` declaring
+    `"pr": 7` to match itself).
+
+    The one place a PR number IS genuinely external to every record's own
+    content is CI, on a `pull_request` run: `.github/workflows/ci.yml`'s
+    `lwb-proof-pr` step already knows `github.event.pull_request.number`
+    and passes it as `--pr N` -- no workflow change needed, the number is
+    already threaded this far. This function uses that number to check
+    every `proof/*.json` file that is NEW or CHANGED in this PR's diff
+    against `rev_range` (default `origin/main..HEAD`, resolvable in this
+    repo's CI checkout, which fetches full history): each such file must
+    self-declare `pr` == `pr_number`, independent of what its filename
+    says. A file unchanged since before this PR is never flagged just
+    because its own (historical) `pr` differs from the PR currently under
+    CI.
+
+    Degrades rather than crashing the whole gate when the diff itself
+    cannot be computed (`_new_or_changed_proof_paths` returns `None`, e.g.
+    no such ref in an unusual checkout): appends a NOTICE to `notices`
+    (never silently treated as all-clear) saying every record's `pr` field
+    in this run is self-declared and UNVERIFIED against the real PR
+    number, and returns no errors -- this is the fail-open case, and it is
+    named as such rather than disguised as a passed check.
+    """
+    if notices is None:
+        notices = []
+    changed = _new_or_changed_proof_paths(rev_range)
+    if changed is None:
+        notices.append(
+            f"pr-authority: could not compute '{rev_range}' to find proof/*.json files "
+            "new or changed in this PR (no such ref in this checkout?) -- every record's "
+            "'pr' field in this run is SELF-DECLARED and UNVERIFIED against the real PR "
+            "number; this check did not run"
+        )
+        return []
+
+    errors: list[str] = []
+    for relname in sorted(changed):
+        rel_path = Path(relname)
+        if rel_path.name in ("schema.json", "exempt.json"):
+            continue
+        full_path = REPO_ROOT / rel_path
+        if not full_path.is_file():
+            continue  # deleted in this PR -- nothing left to validate
+        try:
+            data = json.loads(full_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue  # already reported by validate_all
+        if not isinstance(data, dict):
+            continue
+        record_pr = data.get("pr")
+        if record_pr != pr_number:
+            errors.append(
+                f"{relname}: is new or changed in this PR but self-declares 'pr' "
+                f"({record_pr!r}) instead of {pr_number} (this PR's actual number, "
+                "known to CI independent of anything the record or its filename "
+                "claims) -- a record added or modified by a PR must declare that "
+                "PR's own number"
+            )
+    return errors
+
+
 def main() -> int:
     import argparse
 
@@ -555,8 +672,25 @@ def main() -> int:
     errors, count = validate_all()
     if args.rev_range:
         errors.extend(check_coverage(args.rev_range))
+    notices: list[str] = []
     if args.pr_number:
         errors.extend(check_pr_has_record(args.pr_number))
+        errors.extend(check_new_proof_records_declare_pr(args.pr_number, notices=notices))
+    else:
+        # No --pr means no authoritative PR number is available to THIS
+        # invocation (a local run, the plain `lwb-proof` job on every PR,
+        # or the post-merge `--coverage` run on push to main) -- say so
+        # rather than silently implying every record's self-declared `pr`
+        # was cross-checked against something external. See
+        # check_new_proof_records_declare_pr's docstring for the one run
+        # (`lwb-proof-pr`, which passes `--pr`) where it genuinely is.
+        notices.append(
+            "pr-authority: no --pr given -- every record's 'pr' field in this run is "
+            "SELF-DECLARED and UNVERIFIED against any number external to the record "
+            "itself (only _authoritative_pr_from_filename's filename cross-check ran)"
+        )
+    for n in notices:
+        print(f"NOTICE: {n}")
     if errors:
         for e in errors:
             print(f"FAIL: {e}")

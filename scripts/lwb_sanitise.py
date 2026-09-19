@@ -44,16 +44,29 @@ version:
   fragment leaking straight into the digest input, and an unrelated path
   corrupted. `_replace_prefix` requires the match be followed by `/` or
   end-of-string before it counts.
-- **Case-insensitive repo/home matching.** Windows paths are
-  case-insensitive on the filesystem: `C:/Work/...` and `c:/work/...`
-  name the same directory. Different tools capitalise drive letters and
-  usernames differently, so a case-sensitive match let the SAME logical
-  path sanitise to `<repo>` in one capture and fall through to the
-  generic `<path>` rule in another -- breaking the identical-bytes
-  guarantee this module exists to provide. `_replace_prefix` matches
-  case-insensitively for exactly this reason. (The generic `<path>` rule
-  below has no needle to compare case against, so this does not apply to
-  it.)
+- **Case-insensitive matching, but ONLY for a Windows-shaped prefix.**
+  Windows paths are case-insensitive on the filesystem: `C:/Work/...` and
+  `c:/work/...` name the same directory, and a UNC root (`//server/share`)
+  is the same. Different tools capitalise drive letters and usernames
+  differently, so a case-sensitive match let the SAME logical Windows path
+  sanitise to `<repo>` in one capture and fall through to the generic
+  `<path>` rule in another -- breaking the identical-bytes guarantee this
+  module exists to provide.
+
+  A first fix applied case-insensitive matching unconditionally, and
+  adversarial review found the regression: on a case-sensitive filesystem
+  (Linux), a bare posix directory and the same path spelled with different
+  casing are two DIFFERENT users' directories, and unconditional
+  case-insensitivity mis-sanitised one session's captured text about a
+  different user into this session's own `<repo>`/`<home>` placeholder --
+  wrong, not merely imprecise, on a Linux runner. So the decision is made
+  per prefix, from the SHAPE of the
+  prefix (`_is_windows_shaped`: a drive letter or a UNC root), never from
+  `os.name` or the host this call happens to run on -- the same logical
+  content must sanitise to the same bytes regardless of where `sanitise()`
+  executes, and a decision keyed on the host would violate that directly.
+  (The generic `<path>` rule below has no needle to compare case against,
+  so none of this applies to it.)
 """
 
 from __future__ import annotations
@@ -81,6 +94,16 @@ def _normalise(path: str) -> str:
     return path.replace("\\", "/")
 
 
+def _is_windows_shaped(path_norm: str) -> bool:
+    """True if `path_norm` (already NORMALISED to forward slashes) is
+    shaped like a Windows path: a drive letter (`C:/...`) or a UNC root
+    (`//server/share`). This, not `os.name` and not which OS is running
+    `sanitise()`, is what decides case-insensitive matching -- see the
+    module docstring. A bare posix path is never Windows-shaped, even
+    when `sanitise()` itself runs on Windows."""
+    return bool(re.match(r"^[A-Za-z]:/", path_norm)) or path_norm.startswith("//")
+
+
 def _replace_prefix(text: str, needle: str, placeholder: str) -> str:
     """Replace every path-boundary match of `needle` in `text` with
     `placeholder`. `needle` and `text` are both assumed already in
@@ -89,11 +112,18 @@ def _replace_prefix(text: str, needle: str, placeholder: str) -> str:
     A match only counts when it is followed by `/` or the end of the
     string -- never mid-segment -- so a sibling directory that merely
     shares `needle` as a string prefix (`.../proj` vs `.../proj2`) is left
-    alone. The match is case-insensitive: see the module docstring.
+    alone.
+
+    Case sensitivity depends on the SHAPE of `needle`: case-insensitive
+    for a Windows-shaped prefix (drive letter or UNC root), case-sensitive
+    otherwise -- see `_is_windows_shaped` and the module docstring. A bare
+    posix prefix must never conflate two genuinely different directories
+    that happen to differ only in case.
     """
     if not needle:
         return text
-    pattern = re.compile(re.escape(needle) + r"(?=/|$)", re.IGNORECASE)
+    flags = re.IGNORECASE if _is_windows_shaped(needle) else 0
+    pattern = re.compile(re.escape(needle) + r"(?=/|$)", flags)
     return pattern.sub(placeholder, text)
 
 
@@ -131,7 +161,10 @@ def sanitise(text: str, *, repo_root: str | None = None, home: str | None = None
 
     if repo_norm:
         normalised = _replace_prefix(normalised, repo_norm, "<repo>")
-    if home_norm and home_norm.lower() != repo_norm.lower():
+    same_as_repo = home_norm == repo_norm or (
+        _is_windows_shaped(home_norm) and home_norm.lower() == repo_norm.lower()
+    )
+    if home_norm and not same_as_repo:
         normalised = _replace_prefix(normalised, home_norm, "<home>")
 
     normalised = _ABS_PATH_RE.sub("<path>", normalised)

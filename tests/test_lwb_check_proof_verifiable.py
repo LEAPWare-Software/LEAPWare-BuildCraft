@@ -261,6 +261,18 @@ def test_resolved_shas_as_real_hex_shas_are_accepted():
     assert errors == []
 
 
+def test_bare_two_revision_form_is_a_documented_known_gap():
+    """`git diff origin/main HEAD` (no '..', no '^', no --base/--head) is
+    NOT detected as a range -- pinned as a known, documented gap rather
+    than a silent one: distinguishing it from `git diff HEAD file.py`
+    (one revision plus a pathspec) needs real git argument parsing this
+    validator does not attempt. If this starts failing, the detection
+    logic changed and the docstring must be updated to match."""
+    assert lwb_check_proof._argv_has_git_range(
+        ["git", "diff", "origin/main", "HEAD"]
+    ) is False
+
+
 def test_non_range_command_does_not_require_resolved_shas():
     record = _pr20_base(commands=[_cmd()])
     errors = lwb_check_proof._validate_record(Path("r.json"), record)
