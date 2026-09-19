@@ -21,9 +21,15 @@ Read it before touching a gate.
    independence is structural, not promised. Same account: separation of
    dispatch and context, NOT of interest.
 3. **IN FLIGHT.** #29 (runbook, routine specs, `.claude/` lane fix),
-   #30 (plan + D21-D27 onto main), #31 (Actions merge path), #32 (the
-   #27 provenance correction). Each needs `proof/<pr>.json` AND a review
-   record naming its CURRENT head. Re-derive every SHA.
+   #30 (plan + D21-D27 onto main), #31 (Actions merge path). #32 (the #27
+   provenance correction) is PERMANENTLY BLOCKED -- six DISAGREE reviewer
+   records from six one-shot identities that no longer exist to update
+   them, a stale HANDOFF.md baked into an old commit, and a leaked
+   private domain unrepairable without a force-push -- and is superseded
+   by a re-cut PR carrying only its four content commits. #32 itself is
+   left open, commented as superseded, not closed by this session. Each
+   open item needs `proof/<pr>.json` AND a review record naming its
+   CURRENT head. Re-derive every SHA.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    **0 armed to deny**, 4 skills. **A consuming repo installs `lwb` and
    gets a no-op.** Phase 1 is `lwbpoce`.
@@ -36,19 +42,16 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 15:06 UTC
-main SHA: f9b4deadbb441f0c1046a0d73b0434424f1cf13c
-CLI: unknown
-Session: unknown
+Generated: 2026-09-19 20:21 UTC
+main SHA: bfe850796969980545811e1ffa551b9143965faf
+CLI: claude
+Session: session_01EkvcWAEAV2sJYoN51CPrTF
 
 Open PRs:
-#32 #27's review record claims a dispatch that did not happen (lwb-correct-27-dispatch)
-#31 Re-cut the cloud merge path onto a branch the lane gate can pass (supersedes #28) (lwb-cloud-autoqueue-v2)
-#30 The plan and the decisions the cloud routines read — they are not on main (lwb-capture-d21-d22)
-#29 Cloud-only operation: the protocol, the roles, and the merge path that was broken for a routine (cloud/runbook)
+(unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-20/20 proven
+21/21 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
