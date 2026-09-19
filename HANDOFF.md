@@ -12,34 +12,44 @@ In order. Do not start step *n+1* before step *n* is done and proven.
    everything committed is world-readable, history included.
 2. **DONE; GitHub Apps DEFERRED.** Ruleset `main` (23627212) active. See
    `docs/requirements/decisions.md` for both.
-3. **DONE. Mission landed.** `docs/requirements/mission.md` carries the
-   owner-approved mission. The numbered decisions and the open-items list
-   are in `docs/requirements/decisions.md` -- READ IT FIRST; do not
-   re-decide settled questions. Environment changes this session: D14.
-   Branch tips, counts and PR state are NOT written here -- they rot in
-   minutes. Re-derive per `docs/handoff-protocol.md`; the block below is
-   a timestamped snapshot, not the truth.
-4. **IN FLIGHT. Proof of completion made mechanical**, in five small PRs
-   -- one big one is what killed #13 and #14. Two adversarial audit
-   rounds found 13 blockers; the open ones, the five-PR split and the
-   list of what this will NOT cover are in
-   `docs/maintainers/proof-of-completion-plan.md`. Read it before
-   touching any gate.
-5. Every deliverable: proof record, pushed, CI green, announced
+3. **DONE. Mission landed.** Decisions and open items:
+   `docs/requirements/decisions.md` -- READ IT FIRST, do not re-decide.
+   Branch tips, counts and PR state are NOT written here; they rot in
+   minutes. Re-derive per `docs/handoff-protocol.md`.
+4. **Proof of completion: four PRs landed, one BLOCKED.** Digests are
+   re-executed and compared in CI, report-only. Read
+   `docs/maintainers/proof-of-completion-plan.md` before touching a gate.
+5. **BLOCKED, needs the owner. PR #21 cannot satisfy its own
+   independent-review gate** -- see D20: a session cannot produce an
+   independent reviewer identity, because none exists to produce. Work
+   complete, process requirement unmet. Owner's choice: a review from a
+   GENUINELY SEPARATE session, or merge with the non-independence
+   recorded. Do NOT relabel an identifier.
+6. **AT SESSION START, before anything: verify the shipped hook fires.**
+   `hooks.json` uses `"matcher": "Agent"`, never confirmed against a live
+   tool name. Register a marker hook, START A NEW SESSION, dispatch a
+   subagent, check the marker; repeat for `"Task"`. A mid-session edit is
+   never read -- measured. If neither fires, the only hook this product
+   ships has never run.
+7. **Then:** make re-execution blocking (only after a Linux runner shows
+   digests reproducing); close the fork gap (no secrets on a fork, so no
+   outside PR can go green while `CONTRIBUTING.md` says otherwise);
+   install the plugin in this repo.
+8. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 04:08 UTC
-main SHA: a3006232574ed642e131b2eec14fbf931ffacab1
+Generated: 2026-09-19 05:15 UTC
+main SHA: f8cb7706488feb29cf6cd2a950a4f82f3dd879b7
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#20 The sanitiser and recorder become code; a record declares what can be re-executed (lwb-falsifiable-records)
+#21 CI re-executes verifiable commands — and it caught main on its first run (lwb-reexecute-digests)
 
 Deliverable proof state (from proof/):
-12/12 proven
+13/13 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

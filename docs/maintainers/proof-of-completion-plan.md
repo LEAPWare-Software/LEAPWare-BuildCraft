@@ -155,13 +155,47 @@ Nothing in (d) or (e) is built while these stand.
    `scripts/lwb_sanitise.py`, have the recorder call it, add
    `sanitiser_version` to `commands[]`, and state plainly that records
    7-16 predate the scheme.
-2. **CLOSED 2026-09-19 as to recording, OPEN as to enforcement.** A
-   command now carries `verifiable` plus a `verifiable_reason` from a
-   closed enum, so a non-deterministic command is named as such rather
-   than silently digest-matched. What does NOT yet exist is the CI job
-   that re-executes the verifiable ones and compares digests — that is
-   the next PR, and until it lands no digest in this repo has ever been
-   checked by anything.
+2. **CLOSED 2026-09-19 as to recording; PARTIALLY CLOSED as to
+   enforcement, REPORT-ONLY, 2026-09-19.** `scripts/lwb_check_proof.py
+   --reexecute` now re-runs every `verifiable: true` command, sanitises
+   its output through the running `lwb_sanitise.sanitise`, and compares
+   sha256 and exit code against the record. `.github/workflows/ci.yml`'s
+   `lwb-proof-reexecute` step runs it with `continue-on-error: true` and
+   `if: always()` -- it cannot fail a job yet. Measured locally against
+   this repo's real `proof/*.json`: 3 of 101 commands across 12 records
+   are `verifiable: true`, and one of those three -- `lwb_handoff.py
+   --check` in `proof/20.json` -- did NOT reproduce even locally on this
+   machine. Root cause confirmed, not a sanitiser defect: `HANDOFF.md`'s
+   generated block was regenerated inside the SAME squash-merge commit
+   that landed `proof/20.json`, so the record's own commit already
+   disagrees with the file it describes (2214 recorded bytes vs 2262 on
+   `main`) -- see `docs/maintainers/session-protocol.md`'s new note on
+   regenerating `HANDOFF.md` in its own commit before the records commit.
+   The other two verifiable commands (`lwb_check_prefix.py`,
+   `lwb_check_no_instruction_dep.py`) reproduced cleanly. Whether digests
+   reproduce on an actual GitHub-hosted runner (different repo root, home
+   directory, checkout layout) is still unmeasured -- that run is the
+   next open question, and this gate becomes blocking only in a separate
+   PR filed after it is answered.
+
+   **The open hole a blocking PR must close, named plainly rather than
+   fixed by a script (found by independent review of this PR):** the
+   closed `verifiable_reason` enum constrains the WORDING an author gives
+   for declaring a command unverifiable -- `nondeterministic-output`,
+   `git-range-not-reproducible`, `needs-repo-secret`, `needs-build-step` --
+   it does not and cannot constrain whether that stated reason is actually
+   TRUE of the command it labels. Nothing stops an author from marking
+   EVERY command in a record `verifiable: false` with a plausible enum
+   reason, re-executing nothing, and — once this mode is made blocking —
+   getting a green gate for a record that opted out of verification
+   entirely. `reexecute_exit_code`'s `REEXECUTE_EXIT_NOTHING_REEXECUTED`
+   (distinct from `REEXECUTE_EXIT_ALL_MATCHED`) makes that opt-out visible
+   in the exit code and in the `TOTAL` line's wording, so a blocking PR at
+   least CANNOT mistake it for a pass -- but visibility is not the same as
+   prevention, and no script can judge whether a stated reason is honest.
+   That judgement call belongs to review, not to this gate; the blocking
+   PR must say, explicitly, what (if anything) closes it, rather than
+   silently relying on the enum to have done more than constrain wording.
    Originally recorded as: **Non-deterministic commands cannot be
    digest-matched.** Either exclude
    them by name or record a normalised form — argv, exit code, and a

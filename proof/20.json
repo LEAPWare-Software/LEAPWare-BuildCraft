@@ -75,7 +75,8 @@
       ],
       "sha256": "75c03a5b153adf1686b42590fdb5ecf5e2cd1cf9ea0b307c66e7d81471224348",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
@@ -217,6 +218,7 @@
     "On a local run or a push to main there is no external PR number, so only the filename cross-check runs -- which catches an inconsistent lie, not a self-consistent one. The runtime output says so.",
     "The bare two-revision form (git diff origin/main HEAD) is not detected as a range; a well-formed but nonexistent sha passes the resolved_* pattern; and the recorder has no timeout, so a hung command hangs it. Each is named in code with a pinning test where one applies.",
     "checked_by is a subagent of the author's session and declares reviewer_was_dispatched_by_author: true. This is an audit trail, not proof of independent review.",
-    "This record was written by the author of the work it proves."
+    "This record was written by the author of the work it proves.",
+    "CORRECTED 2026-09-19 (found by independent review of a LATER PR): the 'python scripts/lwb_handoff.py --check' command above was originally marked verifiable: true. It is not. That command's own output prints the byte count of HANDOFF.md's GENERATED block, which legitimately changes with live repo state (main SHA, open-PR listing, the proof-state summary) independent of any change to tracked content -- observed printing 2262 bytes on main (f8cb770) and 2214 bytes on a feature branch (107d5f4) with the file itself unchanged. Its digest can therefore only reproduce when the byte count happens to coincide across commits, which is a coincidence, not reproducibility. verifiable is now false with reason nondeterministic-output (the closest honest enum value; none names 'embeds a generated-block byte count' directly). Only the verifiable/verifiable_reason flags and this note changed -- argv, exit, tail, and sha256 for that command are byte-for-byte identical to what PR #20 originally shipped; rewriting captured evidence, rather than correcting the author's own classification of it, would be the fabrication this record format exists to prevent."
   ]
 }

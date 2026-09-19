@@ -54,6 +54,41 @@ a proof record exists to prevent. A test asserts every exempt sha is a real
 commit in this repo's history, so the list cannot be used to excuse a
 future merge. **Adding an entry is not a substitute for writing a record.**
 
+## PR-authority: a NEW record must declare itself; a CORRECTED one must not reassign itself
+
+`--pr <N>` above checks that a record *for N* exists — it does not, by
+itself, stop a record from lying about *which* PR it is for. PR #20's
+review disclosed two bypasses: a slug-named record self-declaring a stale
+`pr`, and a self-consistent fabricated digit filename (`007.json`
+declaring `"pr": 7`) — neither trips a filename-vs-field mismatch, because
+there is nothing to disagree with when both the filename and the field are
+written for the first time in the same PR. `check_new_proof_records_declare_pr`
+(run from CI's own `--pr N`, independent of anything a record or its
+filename claims) closes this, and it treats an ADDED record differently
+from a MODIFIED one:
+
+- **A record ADDED or RENAMED in a PR** must self-declare `"pr"` equal to
+  that PR's own number. This is the unchanged rule that closes both
+  disclosed bypasses. A rename is treated as an add — once the old
+  filename is gone there is no base version of the same path to diff
+  against, so re-declaring the same `pr` under the new name is the
+  conservative requirement.
+- **A record MODIFIED in a PR** already existed on the base branch, so it
+  proves whichever earlier PR it always proved — modifying it must not
+  reassign that. Its `pr` field is checked against the base branch's own
+  version of the same path and must be unchanged; only the base version
+  being unreadable there (deleted, corrupt, not JSON) fails the check
+  closed, never silently open.
+
+`proof/20.json`'s own correction (below) is the motivating case: PR #21
+fixes a wrongly-set `verifiable` flag in a record PR #20 wrote, and that
+record must keep declaring `"pr": 20` — 20 is the PR it proves, not 21,
+the PR that corrected it. This is the same boundary the re-execution
+section below states for content: **an existing record may be corrected,
+but only a CLASSIFICATION may change — never the captured evidence, and
+now, never the `pr` it declares either.** A PR that wants a new record for
+itself adds one under a new filename; it does not repoint an old one.
+
 ## Record shape
 
 See `schema.json` for the enforced shape. In prose:
@@ -151,6 +186,110 @@ Two things cannot go in `commands[]` at all:
 - `lwb_check_proof.py --pr <N>` for the record's own PR — a record cannot
   contain proof of its own existence. Verify it after writing the record.
 - Anything printing a private-name needle, for the obvious reason.
+
+## Re-execution: `lwb_check_proof.py --reexecute`
+
+From PR #21 onward this exists: `--reexecute` re-runs every `commands[]`
+entry across every `proof/*.json` record whose `verifiable` is `true`,
+sanitises the output through the CURRENTLY RUNNING `lwb_sanitise.sanitise`,
+and compares its sha256 and exit code against what the record claims. This
+is the first thing in this repo that actually CHECKS a digest rather than
+merely attributing it to a known sanitiser version.
+
+- It is gated on the explicit `--reexecute` flag, which never appears in
+  any recorded `argv` (a pinned test asserts this), AND independently
+  skips any command whose argv resolves to `lwb_check_proof.py` itself --
+  a record cannot contain proof of its own re-execution, and re-executing
+  it anyway risks recursing into `--reexecute` from inside `--reexecute`.
+- A command whose `sanitiser_version` differs from the running
+  `SANITISER_VERSION` is reported `UNCOMPARABLE`, never silently passed or
+  failed.
+- A record with zero verifiable commands reports "0 of N re-executed",
+  never "all verified" -- the summary always carries both numbers, at the
+  per-record and the total level.
+- An exit-code mismatch fails even when the digest happens to match.
+
+**Three distinct exit codes, not two.** "Nothing was compared" and
+"everything compared matched" must never share an exit status -- otherwise
+a record that marks every command `verifiable: false` re-executes nothing
+and reads, at the exit-code level, exactly like a record that was
+genuinely checked and passed. `--reexecute` returns:
+
+- `0` (`REEXECUTE_EXIT_ALL_MATCHED`) -- at least one command was
+  re-executed, and every one matched.
+- `1` (`REEXECUTE_EXIT_MISMATCH`) -- at least one re-executed command's
+  digest or exit code did not match.
+- `2` (`REEXECUTE_EXIT_NOTHING_REEXECUTED`) -- zero commands were
+  re-executed at all (every command skipped, `UNCOMPARABLE`, marked
+  `verifiable: false`, or no proof records exist). This is harmless today
+  because the CI step is report-only (see below); it is NOT harmless once
+  a later PR makes it blocking, and the code exists now so that PR
+  inherits the distinction rather than discovering the need for it after
+  the fact. The printed `TOTAL` line also says so in words -- it is never
+  worded so as to read as a pass when nothing was re-executed.
+
+**What this does NOT check, and cannot.** The closed
+`verifiable_reason` enum constrains the WORDING an author may give for
+opting a command out of re-execution -- it does not, and cannot, check
+whether that stated reason is actually TRUE of the command it labels. An
+author can mark every command in a record `verifiable: false` with a
+plausible enum reason, re-execute nothing, and (today) get a report that
+is honest about re-executing nothing but cannot detect that the record
+itself dodged verification. See
+`docs/maintainers/proof-of-completion-plan.md`, blocker 2, for this named
+as the open hole a blocking PR must address — no script can judge whether
+a stated reason is honest.
+
+**The rule for marking a command `verifiable: true` (a mistake this repo
+has already made once):** a command is `verifiable: true` ONLY if its
+output cannot vary between the commit where it was recorded and ANY
+LATER COMMIT where it might be re-run. Note what that is not: `--reexecute`
+never checks out the recorded commit, it runs against whatever is checked
+out now, so "invariant at the recorded commit" is the wrong test and was
+not enough -- PR #20 marked a command verifiable that satisfied exactly
+that weaker wording and still could not reproduce, because the tracked
+file it measured is itself regenerated. If a machine re-executing it, at
+any commit, on any machine, could ever print something different from what
+was recorded --
+because the output embeds a byte count, a file count, a timestamp, a live
+`gh`/network result, a generated-block value, or anything else derived
+from repo STATE rather than repo CONTENT -- it is not `verifiable: true`,
+whatever the `verifiable_reason` enum would otherwise suggest. This is a
+judgement the enum cannot make for you; nothing validates it mechanically,
+so the record's author is the only check there is.
+
+`proof/20.json` originally marked `python scripts/lwb_handoff.py --check`
+`verifiable: true`. It was wrong: that command prints the byte count of
+`HANDOFF.md`'s GENERATED block (`main SHA:`, `Open PRs:`, the proof-state
+summary), which changes with live repo state independent of any change to
+the tracked file -- observed printing 2262 bytes on `main` and 2214 bytes
+on a feature branch with the file itself unchanged, so its digest can only
+reproduce when the byte count happens to coincide across commits. Found by
+independent review; corrected in `proof/20.json`'s `commands[]` entry
+(`verifiable: false`, `verifiable_reason: nondeterministic-output`) and
+its `unproven[]`, with the captured evidence -- `argv`, `exit`, `tail`,
+`sha256` -- left byte-for-byte untouched. **This is the one legitimate
+edit to a proof record after the fact: correcting the AUTHOR'S OWN
+CLASSIFICATION of a command, never the captured result.** Rewriting
+`sha256`/`tail`/`exit` instead would be exactly the fabrication this
+mechanism exists to prevent. The record's `"pr": 20` was left untouched by
+this correction, as `check_new_proof_records_declare_pr` (above) requires
+of any modified-not-added record.
+
+**Landed report-only.** `.github/workflows/ci.yml`'s `lwb-proof-reexecute`
+step runs `--reexecute` with `continue-on-error: true` and `if: always()`
+-- it cannot fail a PR. The sanitiser's cross-platform determinism has
+been verified on Windows only; a GitHub-hosted runner has a different
+repo root, home directory and checkout layout, and the first real run
+there is the experiment. It becomes blocking only in a later PR, once
+digests are observed reproducing on a runner. See
+`docs/maintainers/proof-of-completion-plan.md`, blocker 2.
+
+**As measured against this repo today: 3 of 101 `commands[]` entries
+across 12 records are `verifiable: true`.** Only `proof/20.json` carries
+verifiability flags at all; records 7-19 predate the scheme and are not
+back-filled (see above). Say the actual number, always -- never "records
+are falsifiable" or "verified".
 
 ## Acceptance criteria and token cost (PR #12 onward)
 

@@ -122,6 +122,25 @@ commands = lwb_record.run_commands([
   claim of total proof.
 - `unproven[]` is where the record says what it does NOT establish. Use it
   honestly; it is the most valuable part.
+- **Regenerate the `HANDOFF.md` block in its own commit, BEFORE the commit
+  that adds the proof record.** Adding a proof record changes the repo
+  state `HANDOFF.md`'s generated block derives from (new files under
+  `proof/`, a new PR number, a new commit to cite), so regenerating it
+  INSIDE the same commit as the records makes that commit substantive
+  rather than record-only -- it moves the reviewable head, and a review
+  record naming the pre-regeneration commit as `reviewed_commit` goes
+  stale the instant the combined commit lands. This has now happened in
+  three consecutive PRs (18, 19, 20) after being predicted in writing each
+  time, and PR #20's own `proof/20.json` demonstrates the cost directly:
+  its `lwb_handoff.py --check` entry recorded `HANDOFF.md` at 2214 bytes,
+  but the squash-merge commit that landed the record itself changed
+  `HANDOFF.md` to 2262 bytes in the same commit -- so `--reexecute`
+  (`scripts/lwb_check_proof.py --reexecute`) can never reproduce that
+  digest against `main`, even locally, even though nothing about the
+  sanitiser or the recorder is wrong. Two commits, in this order, avoids
+  it: regenerate and commit `HANDOFF.md` first (record-only, skipped when
+  computing the review head per "Review discipline" below), then write and
+  commit the proof record against the now-stable state.
 
 ## Before writing any status
 

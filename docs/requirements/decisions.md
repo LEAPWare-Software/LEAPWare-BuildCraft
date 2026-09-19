@@ -477,6 +477,53 @@ deny-capable in 1.0 under D9 and has no definition of "authorised". D19
 gives the CTO broad authority but does not define the term for a *user* of
 the plugin. That definition is required work, item 10.
 
+## D20 — A single session cannot produce an independent reviewer · 2026-09-19
+
+Established by experiment, not by argument, on PR #21 -- the PR that
+completes the proof-of-completion protocol.
+
+The lane gate's collision check (D16, hardened in PR #19) refuses a review
+record whose `reviewer_id` shares an 8-character-or-longer segment with
+`commit_author_id`. On PR #21 it refused, because the only identifier
+either reviewer could offer was the authoring session's own token.
+
+**Two reviewers were asked, separately, for a dispatch identifier distinct
+from the authoring session's. Both answered that they had none.** Neither
+could see a task, run or invocation id for its own execution; the only
+identifier in either context was the parent session's. Both were told
+explicitly that a blocked PR was preferable to an invented string, and
+both declined to construct one, each naming that as the fabrication
+`reviews/README.md` already calls this mechanism's known weakness.
+
+So the finding is not "the gate is too strict". It is:
+
+**A session dispatching its own subagents cannot generate an independent
+reviewer identity, because none exists to generate.** Earlier records
+(PRs 7-13, 19, 20) carry distinct-looking reviewer tokens only because
+those particular runs happened to surface an id; nothing about them was
+more independent in substance.
+
+Consequences, recorded so they are not relitigated:
+
+- PR #21 cannot satisfy its own review gate in this session. It is
+  complete as work and blocked as process. That is the gate doing its job
+  against the person who built it.
+- Independence in this repo requires a genuinely separate session -- a
+  different operator, a different machine, or a peer session with its own
+  token. Not a subagent, whatever id it reports.
+- `reviewer_was_dispatched_by_author: true` remains the honest disclosure
+  for every record this arrangement can produce, and the gate prints it.
+- The owner decides whether to merge such work with the
+  non-independence recorded, or to obtain a separate reviewer. Both are
+  legitimate; silently relabelling an identifier is not, and would take
+  ten seconds.
+
+Rejected: lowering `MIN_SHARED_SEGMENT_LENGTH` or exempting a declared
+subagent (both convert a true signal into a formality); using an internal
+dispatch id the reviewer itself cannot see (it would pass the gate while
+the reviewer remains unable to attest to its own identity, which is
+exactly the laundering this decision exists to name).
+
 ## Required work, not deferred · 2026-09-18
 
 The owner's rule is that nothing is deferred, with Codex (D11) the single

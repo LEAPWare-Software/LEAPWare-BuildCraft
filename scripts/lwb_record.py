@@ -98,6 +98,30 @@ def run_command(
     session cannot write an unusable field by accident. `verifiable=None`
     (the default) omits both fields from the entry, for a caller building
     the value some other way.
+
+    **The rule for `verifiable=True`, which this function cannot enforce
+    for you:** a command is verifiable ONLY if its output depends on
+    nothing that varies between the commit where it was recorded and the
+    commit where it is later re-run. `--reexecute` never checks out the
+    recorded commit -- it runs against whatever is checked out now -- so
+    "invariant at the recorded commit" is not the test and was not enough:
+    PR #20 marked a command verifiable that satisfied exactly that wording
+    and still could not reproduce, because the tracked file it measured is
+    itself regenerated.
+    Read the CAPTURED OUTPUT before setting this, not just the exit code --
+    if it embeds a byte count, a file count, a timestamp, a live
+    `gh`/network result, a resolved sha, or anything else derived from a
+    GENERATED file or from live repo/environment STATE rather than tracked
+    CONTENT, it is not verifiable, whatever a plausible-looking
+    `verifiable_reason` would otherwise suggest for a `False` you didn't
+    write. `proof/20.json` originally marked `lwb_handoff.py --check`
+    verifiable: true; it prints `HANDOFF.md`'s generated-block byte count,
+    which moves with live repo state (main SHA, open-PR listing) even when
+    the tracked file does not change, so its digest reproduces only by
+    coincidence. Found by independent review, corrected in the record
+    itself (see `proof/README.md`'s "The rule for marking a command
+    verifiable: true"). Nothing in `lwb_check_proof.py` catches this --
+    it is a judgement call for whoever writes the record, every time.
     """
     if verifiable is False:
         if verifiable_reason not in ALLOWED_VERIFIABLE_REASONS:

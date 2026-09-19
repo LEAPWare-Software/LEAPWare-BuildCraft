@@ -24,6 +24,7 @@ failure found (not just the first) and exits 1.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -32,6 +33,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PROOF_DIR = REPO_ROOT / "proof"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import lwb_sanitise  # noqa: E402
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
@@ -599,9 +603,45 @@ def _new_or_changed_proof_paths(rev_range: str):
     genuinely nothing changed" apart from "could not compute at all" and
     must not treat the latter as if it were the former.
     """
+    statuses = _proof_path_statuses(rev_range)
+    if statuses is None:
+        return None
+    return set(statuses)
+
+
+def _proof_path_statuses(rev_range: str):
+    """Like `_new_or_changed_proof_paths`, but keeps the ADDED-vs-MODIFIED
+    distinction `check_new_proof_records_declare_pr` needs: an ADDED
+    record must declare THIS PR's number, but a MODIFIED one already
+    existed on the base branch and is allowed to keep its own -- only
+    forbidden from CHANGING it. A plain path set can't carry that
+    distinction, hence this separate dict-returning helper alongside the
+    older set-returning one (kept for its own direct callers/tests).
+
+    Returns `{relname: status}` where `status` is one of 'A' (added),
+    'M' (modified) or 'R' (renamed -- see below), or `None` under the same
+    "could not compute at all" conditions as `_new_or_changed_proof_paths`.
+
+    A RENAME is reported by git as a single R-status entry naming both the
+    old and new path (`git diff --name-status` prints `R100\told\tnew`
+    rather than a separate delete+add). Renaming a proof record does not
+    change its content, so on principle a rename+content-preserving-move
+    should be free -- but a rename is also the cheapest way to make an old
+    record's `pr` value LOOK freshly declared next to unrelated new
+    content, and unlike a true MODIFY there is no "base version of this
+    exact path" to diff the `pr` field against (the old path is gone).
+    Treating it as ADDED is the conservative choice: it costs nothing to a
+    legitimate rename (just re-declare the same `pr`, which is what ADDED
+    already requires) and it closes the same kind of self-consistent-
+    filename bypass `check_new_proof_records_declare_pr`'s docstring
+    already documents for brand-new files.
+    """
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-only", "--diff-filter=ACMR", rev_range, "--", "proof"],
+            [
+                "git", "diff", "-M", "--name-status", "--diff-filter=ACMR",
+                rev_range, "--", "proof",
+            ],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -612,7 +652,61 @@ def _new_or_changed_proof_paths(rev_range: str):
         return None
     if result.returncode != 0:
         return None
-    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    statuses: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        line = line.strip("\n")
+        if not line:
+            continue
+        fields = line.split("\t")
+        status = fields[0][:1]  # 'A', 'M', or 'R100' -> 'R' (--diff-filter=ACMR: no 'C')
+        relname = fields[-1]  # for R this is the NEW path; the old path is fields[1]
+        statuses[relname.strip()] = status
+    return statuses
+
+
+def _base_ref(rev_range: str) -> str:
+    """The base side of a two-dot `rev_range` ('base..head'), e.g.
+    'origin/main' from 'origin/main..HEAD'. `rev_range` is always
+    constructed this way by this script's own callers (the
+    'origin/main..HEAD' default, or f"{base}..{head}" from --base/--head),
+    so a plain split is sufficient -- this is not a general revision-range
+    parser.
+    """
+    base, _, _ = rev_range.partition("..")
+    return base
+
+
+def _read_pr_field_at_ref(ref: str, relname: str):
+    """The `pr` field of `proof/<relname>` as it reads at git ref `ref`,
+    or `_MISSING` (a sentinel distinct from `None`, which is itself a
+    legal-if-wrong value for a JSON field) if the file can't be read at
+    that ref at all -- missing from that ref, unreadable git object, not
+    valid JSON, or not a JSON object. A caller must fail closed on
+    `_MISSING`, never treat it as "the base agrees".
+    """
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{relname}"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError:
+        return _MISSING
+    if result.returncode != 0:
+        return _MISSING
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return _MISSING
+    if not isinstance(data, dict):
+        return _MISSING
+    return data.get("pr")
+
+
+_MISSING = object()
 
 
 def check_new_proof_records_declare_pr(
@@ -631,18 +725,36 @@ def check_new_proof_records_declare_pr(
     content is CI, on a `pull_request` run: `.github/workflows/ci.yml`'s
     `lwb-proof-pr` step already knows `github.event.pull_request.number`
     and passes it as `--pr N` -- no workflow change needed, the number is
-    already threaded this far. This function uses that number to check
-    every `proof/*.json` file that is NEW or CHANGED in this PR's diff
-    against `rev_range` (default `origin/main..HEAD`, resolvable in this
-    repo's CI checkout, which fetches full history): each such file must
-    self-declare `pr` == `pr_number`, independent of what its filename
-    says. A file unchanged since before this PR is never flagged just
-    because its own (historical) `pr` differs from the PR currently under
-    CI.
+    already threaded this far. This function uses that number against
+    `rev_range` (default `origin/main..HEAD`, resolvable in this repo's CI
+    checkout, which fetches full history), and the two DIFFER by how the
+    file changed:
+
+    - ADDED (or RENAMED -- see `_proof_path_statuses`'s docstring for why
+      a rename is treated as an add): the record is new, so it must
+      self-declare `pr` == `pr_number`. This is the original rule and the
+      one that closes the two disclosed bypasses above -- a NEW record's
+      filename and `pr` field are both entirely attacker-controlled in
+      the same PR, so nothing about the file itself can be trusted.
+    - MODIFIED: the record already existed on the base branch (it proves
+      SOME earlier PR, not this one) and PR #21's own history is the
+      motivating case -- correcting a wrongly-set `verifiable` flag on
+      `proof/20.json` without pretending record 20 suddenly proves PR 21.
+      Such a record is allowed to keep declaring its original `pr`; what
+      it may never do is CHANGE that field, which is checked by reading
+      the base version of the same path with `git show <base>:<path>`
+      and comparing `pr` fields. If the base version can't be read at all
+      (deleted from base, unusual ref, not valid JSON there), this fails
+      CLOSED with an explicit error -- never a silent pass, because
+      "can't prove it didn't change" is not the same claim as "provably
+      unchanged".
+
+    A file unchanged since before this PR is never flagged at all --
+    `rev_range` itself excludes it, regardless of what its `pr` says.
 
     Degrades rather than crashing the whole gate when the diff itself
-    cannot be computed (`_new_or_changed_proof_paths` returns `None`, e.g.
-    no such ref in an unusual checkout): appends a NOTICE to `notices`
+    cannot be computed (`_proof_path_statuses` returns `None`, e.g. no
+    such ref in an unusual checkout): appends a NOTICE to `notices`
     (never silently treated as all-clear) saying every record's `pr` field
     in this run is self-declared and UNVERIFIED against the real PR
     number, and returns no errors -- this is the fail-open case, and it is
@@ -650,8 +762,8 @@ def check_new_proof_records_declare_pr(
     """
     if notices is None:
         notices = []
-    changed = _new_or_changed_proof_paths(rev_range)
-    if changed is None:
+    statuses = _proof_path_statuses(rev_range)
+    if statuses is None:
         notices.append(
             f"pr-authority: could not compute '{rev_range}' to find proof/*.json files "
             "new or changed in this PR (no such ref in this checkout?) -- every record's "
@@ -660,8 +772,9 @@ def check_new_proof_records_declare_pr(
         )
         return []
 
+    base_ref = _base_ref(rev_range)
     errors: list[str] = []
-    for relname in sorted(changed):
+    for relname in sorted(statuses):
         rel_path = Path(relname)
         if rel_path.name in ("schema.json", "exempt.json"):
             continue
@@ -688,15 +801,264 @@ def check_new_proof_records_declare_pr(
         if not isinstance(data, dict):
             continue
         record_pr = data.get("pr")
-        if record_pr != pr_number:
+        status = statuses[relname]
+        if status in ("A", "R"):
+            if record_pr != pr_number:
+                errors.append(
+                    f"{relname}: is new in this PR but self-declares 'pr' "
+                    f"({record_pr!r}) instead of {pr_number} (this PR's actual number, "
+                    "known to CI independent of anything the record or its filename "
+                    "claims) -- a NEW record added by a PR must declare that PR's own "
+                    "number"
+                )
+            continue
+        # status == "M": the record already existed on the base branch, so
+        # it is allowed to keep declaring whatever PR it originally proved
+        # -- the motivating case is exactly this: correcting a wrongly-set
+        # classification (e.g. `verifiable`) on an existing record without
+        # that correction silently reassigning which PR the record proves.
+        # What it may NOT do is CHANGE its own `pr` field; check that
+        # against the base branch's version of the same path, which is the
+        # one place genuinely external to this PR's own content.
+        base_pr = _read_pr_field_at_ref(base_ref, relname)
+        if base_pr is _MISSING:
             errors.append(
-                f"{relname}: is new or changed in this PR but self-declares 'pr' "
-                f"({record_pr!r}) instead of {pr_number} (this PR's actual number, "
-                "known to CI independent of anything the record or its filename "
-                "claims) -- a record added or modified by a PR must declare that "
-                "PR's own number"
+                f"{relname}: modified in this PR but its base version "
+                f"('{base_ref}:{relname}') could not be read to verify its 'pr' field "
+                "was not changed -- deleted from the base branch, an unreadable git "
+                "object, or not valid JSON there; failing closed rather than assuming "
+                "it is unchanged"
+            )
+            continue
+        if record_pr != base_pr:
+            errors.append(
+                f"{relname}: modified in this PR and its 'pr' field changed from "
+                f"{base_pr!r} (on '{base_ref}') to {record_pr!r} -- an existing record "
+                "may be corrected, but it must keep declaring the PR it originally "
+                "proved; a PR that wants to add a NEW record for itself must do so "
+                "under a new filename, not by repointing an old one"
             )
     return errors
+
+
+# `--reexecute` has three distinct exit codes, not two -- "nothing was
+# compared" must never share a value with "everything compared matched".
+# A record that marks every command `verifiable: false` (a legal opt-out;
+# the closed enum constrains the WORDING of a stated reason, never whether
+# that reason is actually TRUE of the command it labels -- no script can
+# judge that) re-executes nothing and must not look, at the exit-code
+# level, identical to a record that was genuinely re-executed and matched.
+# This is documented here so a later PR that makes this mode BLOCKING
+# inherits the distinction rather than re-discovering the need for it:
+#   0  REEXECUTE_EXIT_ALL_MATCHED        -- at least one command was
+#      re-executed, and every one of them matched (digest and exit code).
+#   1  REEXECUTE_EXIT_MISMATCH           -- at least one re-executed
+#      command's digest or exit code did not match the record.
+#   2  REEXECUTE_EXIT_NOTHING_REEXECUTED -- zero commands were re-executed
+#      (every command was skipped as self-referencing, UNCOMPARABLE due to
+#      sanitiser drift, marked verifiable: false, or there were no proof
+#      records at all). This is NOT a pass: nothing was checked.
+REEXECUTE_EXIT_ALL_MATCHED = 0
+REEXECUTE_EXIT_MISMATCH = 1
+REEXECUTE_EXIT_NOTHING_REEXECUTED = 2
+
+
+def reexecute_exit_code(report: dict) -> int:
+    """The exit code `--reexecute` reports for `report` (as returned by
+    `reexecute_verifiable_commands`) -- see the three `REEXECUTE_EXIT_*`
+    constants above for what each means and why they are distinct.
+    """
+    if report["failures"]:
+        return REEXECUTE_EXIT_MISMATCH
+    if report["total_reexecuted"] == 0:
+        return REEXECUTE_EXIT_NOTHING_REEXECUTED
+    return REEXECUTE_EXIT_ALL_MATCHED
+
+
+def _command_resolves_to_self(argv) -> bool:
+    """True if `argv` names `lwb_check_proof.py` itself, by basename match
+    on any token (so `python scripts/lwb_check_proof.py`, an absolute path,
+    and `... lwb_check_proof.py --pr 20` are all caught).
+
+    This is the second half of the recursion guard `--reexecute` needs --
+    see `reexecute_verifiable_commands`. Every proof record lists
+    `lwb_check_proof.py` among its commands (it is one of CI's own gates),
+    so re-executing it as an ordinary verifiable command would re-enter
+    validation from inside `--reexecute` itself. The FIRST half of the
+    guard is that `--reexecute` is an explicit CLI flag that never appears
+    in a recorded `argv` (see `tests/test_lwb_check_proof_reexecute.py`),
+    so a re-executed command never inherits it and recurses into ITS OWN
+    `--reexecute` mode; this function additionally refuses to launch the
+    self-referencing command at all, belt and braces, independent of
+    whether that first guard holds.
+    """
+    if not isinstance(argv, list):
+        return False
+    return any(isinstance(a, str) and Path(a).name == "lwb_check_proof.py" for a in argv)
+
+
+def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
+    """Re-run every `commands[]` entry across `records` whose `verifiable`
+    is `True`, sanitise its combined stdout+stderr through the CURRENTLY
+    RUNNING `lwb_sanitise.sanitise`, and compare the resulting sha256 (and
+    exit code) against what the record claims.
+
+    `records` is a list of `(label, data)` pairs -- `label` is whatever the
+    caller wants printed (a relative path, in `main`'s real use), `data` is
+    a parsed proof record dict. This shape, rather than reading `PROOF_DIR`
+    directly, is what lets every guard above be tested without touching
+    disk or spawning a real process (`run` is injectable for the same
+    reason -- production passes `subprocess.run`, tests pass a spy).
+
+    Four failure modes this function exists to prevent becoming theatre:
+
+    1. Recursion -- every proof record lists `lwb_check_proof.py` among its
+       own commands, so blindly re-executing it would re-enter validation
+       (and, under an env-gated design, recurse into its own re-execution
+       forever). `_command_resolves_to_self` skips any command naming
+       `lwb_check_proof.py`, reported `SKIPPED-SELF`, never invoked -- on
+       top of `--reexecute` being a CLI flag that never appears in a
+       recorded `argv`, so a re-executed command never inherits it either.
+    2. Sanitiser drift -- a command whose `sanitiser_version` differs from
+       `lwb_sanitise.SANITISER_VERSION` is reported `UNCOMPARABLE` and is
+       not re-run at all: comparing its digest under different rules would
+       prove nothing, so this is neither a pass nor a failure.
+    3. Empty is not success -- every record's line and the final `TOTAL`
+       line always carry both the re-executed count and the total command
+       count, even when the re-executed count is 0, and the TOTAL line
+       says so in words (see `reexecute_exit_code`'s
+       `REEXECUTE_EXIT_NOTHING_REEXECUTED`). There is no "all verified"
+       message anywhere in this function.
+    4. Exit codes -- a re-run whose exit code differs from the recorded
+       `exit` is a failure, checked BEFORE the digest comparison, even if
+       the digest happens to match anyway.
+
+    Returns `{"lines": [...], "failures": [...], "total_commands": M,
+    "total_reexecuted": N}`. `failures` is empty exactly when every
+    attempted re-execution passed (an empty `failures` list with
+    `total_reexecuted == 0` is the explicit "0 of N" case above, not a
+    claim that anything was verified) -- pass this dict to
+    `reexecute_exit_code` for the exit status, which distinguishes
+    "nothing was re-executed" from "everything re-executed matched" as two
+    DIFFERENT values, not the same one.
+    """
+    lines: list[str] = []
+    failures: list[str] = []
+    total_commands = 0
+    total_reexecuted = 0
+
+    for label, data in records:
+        commands = data.get("commands") if isinstance(data, dict) else None
+        if not isinstance(commands, list):
+            continue
+        record_total = len(commands)
+        record_reexecuted = 0
+        record_lines: list[str] = []
+
+        for cmd in commands:
+            if not isinstance(cmd, dict):
+                continue
+            argv = cmd.get("argv")
+            name = " ".join(argv) if isinstance(argv, list) and all(isinstance(a, str) for a in argv) else repr(argv)
+
+            if _command_resolves_to_self(argv):
+                record_lines.append(
+                    f"    SKIPPED-SELF {name} -- a proof record cannot contain proof of its own re-execution"
+                )
+                continue
+
+            if cmd.get("verifiable") is not True:
+                continue  # not claimed re-executable; not counted as attempted
+
+            sanitiser_version = cmd.get("sanitiser_version")
+            if sanitiser_version != lwb_sanitise.SANITISER_VERSION:
+                record_lines.append(
+                    f"    UNCOMPARABLE {name} -- record sanitiser_version={sanitiser_version!r}, "
+                    f"running SANITISER_VERSION={lwb_sanitise.SANITISER_VERSION!r}"
+                )
+                continue
+
+            record_reexecuted += 1
+            total_reexecuted += 1
+            try:
+                proc = run(argv, cwd=str(REPO_ROOT), capture_output=True, encoding="utf-8", errors="replace")
+            except OSError as exc:
+                msg = f"{label}: {name}: could not re-execute: {exc}"
+                failures.append(msg)
+                record_lines.append(f"    FAIL {name} (could not re-execute: {exc})")
+                continue
+
+            combined = proc.stdout + proc.stderr
+            sanitised = lwb_sanitise.sanitise(combined)
+            digest = hashlib.sha256(sanitised.encode("utf-8")).hexdigest()
+            recorded_digest = cmd.get("sha256")
+            recorded_exit = cmd.get("exit")
+
+            if proc.returncode != recorded_exit:
+                msg = (
+                    f"{label}: {name}: exit mismatch -- recorded exit {recorded_exit!r}, "
+                    f"re-run exit {proc.returncode!r}"
+                )
+                failures.append(msg)
+                record_lines.append(f"    FAIL {name} (exit {proc.returncode!r} != recorded {recorded_exit!r})")
+            elif digest != recorded_digest:
+                msg = (
+                    f"{label}: {name}: digest mismatch -- recorded sha256 {recorded_digest!r}, "
+                    f"re-run sha256 {digest!r}"
+                )
+                failures.append(msg)
+                record_lines.append(f"    FAIL {name} (sha256 {digest} != recorded {recorded_digest})")
+            else:
+                record_lines.append(f"    PASS {name}")
+
+        total_commands += record_total
+        lines.append(f"{label}: {record_reexecuted} of {record_total} commands re-executed")
+        lines.extend(record_lines)
+
+    if failures:
+        suffix = f" -- MISMATCH: {len(failures)} command(s) did not match"
+    elif total_reexecuted == 0:
+        suffix = " -- NOTHING WAS RE-EXECUTED, THIS PROVES NOTHING (not success, not a check)"
+    else:
+        suffix = " -- ALL RE-EXECUTED COMMANDS MATCHED"
+    lines.append(
+        f"TOTAL: {total_reexecuted} of {total_commands} commands re-executed "
+        f"across {len(records)} records{suffix}"
+    )
+
+    return {
+        "lines": lines,
+        "failures": failures,
+        "total_commands": total_commands,
+        "total_reexecuted": total_reexecuted,
+    }
+
+
+def _load_records_for_reexecute() -> list[tuple[str, dict]]:
+    """Every real `proof/*.json` record, as `(relative-path-string, data)`
+    pairs -- `reexecute_verifiable_commands`'s disk-facing input. A record
+    that fails to parse is skipped here (already reported by
+    `validate_all`); this function's only job is to hand back what CAN be
+    re-executed.
+    """
+    records: list[tuple[str, dict]] = []
+    if not PROOF_DIR.is_dir():
+        return records
+    for path in sorted(PROOF_DIR.glob("*.json")):
+        if path.name in ("schema.json", "exempt.json"):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        try:
+            label = str(path.relative_to(REPO_ROOT))
+        except ValueError:
+            label = str(path)
+        records.append((label, data))
+    return records
 
 
 def main() -> int:
@@ -729,7 +1091,30 @@ def main() -> int:
     # non-CI use (a real checkout of main plus a local branch).
     parser.add_argument("--base", default=None, help="base ref/sha for the pr-authority check")
     parser.add_argument("--head", default=None, help="head ref/sha for the pr-authority check")
+    parser.add_argument(
+        "--reexecute",
+        action="store_true",
+        help=(
+            "re-run every commands[] entry whose verifiable is true across all "
+            "proof/*.json records, sanitise its output, and compare the sha256 "
+            "against the recorded digest. Mutually exclusive with every other mode: "
+            "run alone, prints a re-execution report, and exits with one of THREE "
+            "distinct codes -- see REEXECUTE_EXIT_ALL_MATCHED (0), "
+            "REEXECUTE_EXIT_MISMATCH (1), REEXECUTE_EXIT_NOTHING_REEXECUTED (2) -- "
+            "'nothing was re-executed' is never the same exit code as 'everything "
+            "re-executed matched'."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.reexecute:
+        records = _load_records_for_reexecute()
+        report = reexecute_verifiable_commands(records)
+        for line in report["lines"]:
+            print(line)
+        for f in report["failures"]:
+            print(f"FAIL: {f}")
+        return reexecute_exit_code(report)
 
     errors, count = validate_all()
     errors.extend(check_flat_proof_layout())
