@@ -189,6 +189,78 @@ def test_range_command_via_separate_base_head_flags_requires_resolved_shas():
     assert any("resolved_base" in e and "lwb_lanes.py" in e for e in errors)
 
 
+def test_range_command_via_equals_form_base_head_flags_is_detected():
+    """lwb_lanes.py's own argparse accepts --base=X / --head=Y (equals
+    form), not just separate tokens -- both must be recognised as a range."""
+    record = _pr20_base(
+        commands=[
+            _cmd(
+                argv=[
+                    "python", "scripts/lwb_lanes.py",
+                    "--base=origin/main", "--head=HEAD",
+                ],
+                verifiable=False,
+                verifiable_reason="git-range-not-reproducible",
+            )
+        ]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("resolved_base" in e and "lwb_lanes.py" in e for e in errors)
+
+
+def test_range_command_via_caret_exclusion_syntax_is_detected():
+    """git's '^ref' exclusion syntax (e.g. `git log A ^B`) names a range
+    just as much as 'A..B' does."""
+    record = _pr20_base(
+        commands=[
+            _cmd(
+                argv=["git", "log", "HEAD", "^origin/main"],
+                verifiable=False,
+                verifiable_reason="git-range-not-reproducible",
+            )
+        ]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("resolved_base" in e for e in errors)
+
+
+def test_resolved_base_must_look_like_a_sha_not_a_symbolic_ref():
+    """A record writing the UNRESOLVED symbolic ref itself
+    ('origin/main', 'HEAD') into resolved_base/resolved_head defeats the
+    field's entire purpose -- it must be a real sha, matching
+    lwb_check_proof.py's existing COMMIT_RE convention for 'commit'."""
+    record = _pr20_base(
+        commands=[
+            _cmd(
+                argv=["python", "scripts/lwb_check_env_leak.py", "--range", "origin/main..HEAD"],
+                verifiable=False,
+                verifiable_reason="git-range-not-reproducible",
+                resolved_base="origin/main",
+                resolved_head="HEAD",
+            )
+        ]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("resolved_base" in e and "origin/main" in e for e in errors)
+    assert any("resolved_head" in e and "HEAD" in e for e in errors)
+
+
+def test_resolved_shas_as_real_hex_shas_are_accepted():
+    record = _pr20_base(
+        commands=[
+            _cmd(
+                argv=["python", "scripts/lwb_check_env_leak.py", "--range", "origin/main..HEAD"],
+                verifiable=False,
+                verifiable_reason="git-range-not-reproducible",
+                resolved_base="a" * 40,
+                resolved_head="b" * 7,
+            )
+        ]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert errors == []
+
+
 def test_non_range_command_does_not_require_resolved_shas():
     record = _pr20_base(commands=[_cmd()])
     errors = lwb_check_proof._validate_record(Path("r.json"), record)
@@ -233,3 +305,98 @@ def test_pr19_record_without_new_fields_still_passes():
     }
     errors = lwb_check_proof._validate_record(Path("r.json"), record)
     assert errors == []
+
+
+# --- The self-declared 'pr' bypass, found by adversarial review of PR #19's
+# own claim that lwb_check_proof.py was checked and safe. check_pr_has_record
+# reconciles the record that CLAIMS a given PR (exact-match only), but
+# nothing previously stopped an ADDITIONAL record from lying about its own
+# 'pr' to dodge the pr >= 12 / pr >= 20 enforcement cutoffs entirely.
+# reviews/<pr>/ derives its authoritative PR number from the DIRECTORY, not
+# the record's own content (see lwb_lanes.py::_review_ok); proof/ has no
+# per-PR directory, but this repo's own convention names every PR-tied
+# record after its PR number (7.json .. 19.json), so a bare-digit FILENAME
+# is the equivalent external-to-content authority here. A mismatch between
+# a bare-digit filename and the record's self-declared 'pr' is rejected,
+# and gating uses the STRICTER (higher) of the two -- fail closed on
+# disagreement, never fail open onto the lower, exploitable number.
+
+
+def test_digit_filename_disagreeing_with_self_declared_pr_is_rejected():
+    """The exact bypass: a record filed as 20.json (this PR's own natural
+    name) but self-declaring 'pr': 19 to dodge the pr >= 20 field
+    requirements -- carrying a git-range command with no resolved_*, no
+    sanitiser_version, and a non-boolean 'verifiable'."""
+    record = _pr20_base(
+        pr=19,
+        commands=[
+            {
+                "argv": ["python", "scripts/lwb_check_env_leak.py", "--range", "origin/main..HEAD"],
+                "exit": 0,
+                "expect_exit": 0,
+                "tail": ["ok"],
+                "sha256": "b" * 64,
+                "verifiable": "yes",  # non-boolean
+            }
+        ],
+    )
+    errors = lwb_check_proof._validate_record(Path("proof/20.json"), record)
+    assert any(
+        "does not match" in e and "20" in e and "19" in e for e in errors
+    ), errors
+    # Fail closed: gating still applies at the STRICTER number (20), so the
+    # missing verifiability fields on the smuggled command are caught too.
+    assert any("sanitiser_version" in e for e in errors), errors
+    assert any("'verifiable' must be a boolean" in e for e in errors), errors
+    assert any("resolved_base" in e for e in errors), errors
+
+
+def test_digit_filename_agreeing_with_self_declared_pr_passes():
+    record = _pr20_base()
+    errors = lwb_check_proof._validate_record(Path("proof/20.json"), record)
+    assert errors == []
+
+
+def test_non_digit_filename_is_not_treated_as_authoritative():
+    """schema.json documents 'deliverable' as an issue/step number OR a
+    short slug -- a non-digit filename carries no filename-derived
+    authority, so no mismatch is manufactured against it."""
+    record = _pr20_base()
+    errors = lwb_check_proof._validate_record(Path("proof/falsifiable-records.json"), record)
+    assert errors == []
+
+
+def test_digit_filename_below_cutoff_agreeing_with_pr_field_passes():
+    """A genuinely historical record (7.json, pr: 7) must not be flagged --
+    filename and self-declared pr agree, and neither crosses the cutoff."""
+    record = {
+        "deliverable": "7",
+        "author": "claude",
+        "checked_by": "codex",
+        "commit": "a" * 40,
+        "pr": 7,
+        "commands": [],
+        "mutations": [],
+        "unproven": [],
+    }
+    errors = lwb_check_proof._validate_record(Path("proof/7.json"), record)
+    assert errors == []
+
+
+def test_digit_filename_with_no_self_declared_pr_is_gated_by_the_filename_alone():
+    """Fail closed: omitting 'pr' entirely would be an even easier dodge
+    than lying about it, so a numeric filename with NO 'pr' field still
+    gates on the filename's number -- there is no disagreement to report
+    (nothing to compare against), but the strict requirements still apply."""
+    record = {
+        "deliverable": "20",
+        "author": "claude",
+        "checked_by": "codex",
+        "commit": "a" * 40,
+        "commands": [],
+        "mutations": [],
+        "unproven": [],
+    }
+    errors = lwb_check_proof._validate_record(Path("proof/20.json"), record)
+    assert any("does not match" in e for e in errors) is False  # no pr to disagree with
+    assert any("acceptance_criteria" in e for e in errors), errors

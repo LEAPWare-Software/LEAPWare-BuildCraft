@@ -52,23 +52,29 @@ script over every `commands[].argv` in `proof/*.json`, normalising numeric
 arguments, there are **ten distinct command kinds**: five re-execute
 cleanly on a runner, three cannot, and two are conditional.
 
-**MEASURED AGAIN 2026-09-19, and the number moved.** Running the real
-recorder (`scripts/lwb_record.py`) against this repo gives **5 of 9**,
-not 5 of 10. The tenth kind, `lwb_build.py --check`, appears in the table
-above but no proof record in this repo has ever actually run it — it was
-counted from the table rather than from the records. The split that
-matters is therefore: five verifiable, four not
-(`pytest` as nondeterministic-output, `lwb_check_env_leak.py` as
-needs-repo-secret, and both git-range commands as
-git-range-not-reproducible). Say "5 of 9" when describing this repo.
+**MEASURED AGAIN 2026-09-19, TWICE, and the second measurement was itself
+false.** A "MEASURED AGAIN" edit at this spot once claimed **5 of 9**,
+asserting `lwb_build.py --check` "appears in the table above but no proof
+record in this repo has ever actually run it." That claim was not checked
+against the records before it was written, and it was wrong: `grep -l
+lwb_build proof/*.json` finds it in `proof/7.json`, `proof/8.json` and
+`proof/17.json`. Re-derived properly this time: **ten distinct command
+kinds, five re-executable** — the original count in the paragraph below,
+before that false "correction" briefly overwrote it. This is recorded
+rather than quietly restored, because a false correction silently reverted
+is itself a small act of the same dishonesty this document exists to
+catch — the reader deserves to know the number moved twice, and why the
+second move was wrong.
 
-An earlier draft of this paragraph said "five are re-executable and five
+An earlier draft of the count below said "five are re-executable and five
 are not." That was wrong, and it was wrong in a document written to end
 false claims — caught by an independent review of PR #17. The review's own
 correction was also wrong: it counted nine kinds, merging
 `lwb_check_proof.py` with its `--pr N` form. Neither of us had run the
-count. The numbers above are measured, and the measurement is the only
-reason this sentence is trustworthy.
+count at that point. The table below is measured, checked against a real
+`grep` over `proof/*.json` rather than against the table's own memory of
+itself, and that check is the only reason this paragraph is trustworthy
+now.
 
 | Command | Re-executable | Why not |
 |---|---|---|

@@ -40,6 +40,29 @@ REQUIRED_TOP = ("deliverable", "author", "checked_by", "commit", "commands", "mu
 REQUIRED_COMMAND = ("argv", "exit", "expect_exit", "tail", "sha256")
 
 
+def _authoritative_pr_from_filename(path: Path):
+    """The PR number this record's own FILENAME claims, or None.
+
+    `reviews/<pr>/<file>.json` derives its authoritative PR number from the
+    DIRECTORY the record is found under, never from the record's own
+    content -- see `lwb_lanes.py::_review_ok`, which exists precisely
+    because a record used to be trusted about its own `pr` field and a
+    mismatched one went unnoticed. `proof/` has no per-PR directory, but
+    this repo's own convention names every PR-tied record after its PR
+    number (`7.json` .. `19.json`), so a bare-digit filename stem is the
+    equivalent authority here: a signal that sits OUTSIDE the record's own
+    claim, exactly like the directory does for reviews/.
+
+    Returns `None` for a non-digit stem -- `schema.json` documents
+    `deliverable` as "an issue/step number or a short slug", so a
+    slug-named file is ordinary and carries no filename-derived authority
+    either way. See `_validate_record` for the fail-closed handling of
+    that no-authority case, and the residual gap it does not close.
+    """
+    stem = path.stem
+    return int(stem) if stem.isdigit() else None
+
+
 def _validate_record(path: Path, data: object) -> list[str]:
     errors: list[str] = []
     try:
@@ -115,10 +138,44 @@ def _validate_record(path: Path, data: object) -> list[str]:
     # honest. See docs/requirements/mission.md quality floor items 1 and the
     # efficiency section.
     pr = data.get("pr")
-    if isinstance(pr, int) and pr >= 12:
+    path_pr = _authoritative_pr_from_filename(path)
+
+    # Fail closed, not open: when the filename names a PR number and the
+    # record's own self-declared 'pr' disagrees with it, that disagreement
+    # is itself an error (it is either a mistake or an attempt to write a
+    # lower, more lenient number into the record to dodge the enforcement
+    # cutoffs below), AND gating uses the STRICTER of the two numbers --
+    # never the self-declared one alone, which is exactly the value under
+    # attack. Found by adversarial review: nothing previously cross-checked
+    # a record's self-declared 'pr' against anything outside the record's
+    # own content, so an ADDITIONAL record (distinct from whichever one
+    # satisfies `check_pr_has_record` for the real PR) could lie about its
+    # own 'pr' and sail through `validate_all()`'s field requirements
+    # entirely -- the identical shape of the bug PR #19 fixed in
+    # `lwb_lanes.py::_review_ok`.
+    #
+    # Residual gap, stated plainly rather than silently left: a record filed
+    # under a SLUG name (no digit filename at all) carries no filename-
+    # derived authority, so a self-declared 'pr' on a slug-named file cannot
+    # be cross-checked by this mechanism -- there is nothing outside the
+    # record's own claim to check it against. Closing that fully needs
+    # either a `proof/<pr>/<slug>.json` directory convention (mirroring
+    # `reviews/<pr>/`) or CI threading the real PR number into every
+    # `validate_all()` invocation (today only `lwb-proof-pr` passes `--pr`;
+    # the plain `lwb-proof` job, which runs on every PR, does not). Both are
+    # out of scope here.
+    if isinstance(path_pr, int) and isinstance(pr, int) and pr != path_pr:
+        errors.append(
+            f"{rel}: record's 'pr' ({pr!r}) does not match its own filename "
+            f"({path_pr}) -- a proof record must not self-declare a PR number "
+            "that disagrees with the number its filename names"
+        )
+    effective_pr = max((n for n in (pr, path_pr) if isinstance(n, int)), default=None)
+
+    if isinstance(effective_pr, int) and effective_pr >= 12:
         errors.extend(_validate_acceptance_criteria(rel, data.get("acceptance_criteria")))
         errors.extend(_validate_tokens(rel, data.get("tokens")))
-    if isinstance(pr, int) and pr >= VERIFIABILITY_CUTOFF_PR and isinstance(commands, list):
+    if isinstance(effective_pr, int) and effective_pr >= VERIFIABILITY_CUTOFF_PR and isinstance(commands, list):
         errors.extend(_validate_verifiability(rel, commands))
 
     return errors
@@ -167,18 +224,45 @@ ALLOWED_VERIFIABLE_REASONS = (
 
 
 def _argv_has_git_range(argv: list) -> bool:
-    """True if `argv` names a git revision range, by either spelling seen
-    in this repo's own proof records: a single 'a..b' token (e.g.
-    `--range origin/main..HEAD`), or separate `--base`/`--head` flags (e.g.
-    `lwb_lanes.py --base origin/main --head HEAD`). Without resolved shas,
-    CI re-executing either form resolves a different commit than the one
-    the record proves and an honest record fails -- exactly the failure
-    mode that gets a gate switched off."""
+    """True if `argv` names a git revision range, by any spelling seen (or
+    reachable via `argparse`'s own equals-form) in this repo's own proof
+    records:
+
+    - a single 'a..b' token (e.g. `--range origin/main..HEAD`);
+    - separate `--base`/`--head` flags, space or `=` form (`--base X
+      --head Y`, or `--base=X --head=Y` -- `lwb_lanes.py`'s own argparse
+      accepts both, and only the space form was detected before, found by
+      adversarial review);
+    - git's `^ref` exclusion syntax (`git log HEAD ^origin/main`), which
+      names a range just as much as `A..B` does.
+
+    `--since=` (a relative-time filter some git commands accept) is
+    deliberately NOT treated as a range here: it does not pin a specific
+    commit the way `..`/`^`/`--base`+`--head` do, and no command in this
+    repo's proof records uses it -- if one ever does, it needs its own
+    resolved, dated equivalent, not this field.
+
+    Without resolved shas, CI re-executing any of these forms resolves a
+    different commit than the one the record proves, and an honest record
+    fails -- exactly the failure mode that gets a gate switched off."""
     if not isinstance(argv, list):
         return False
-    if any(isinstance(a, str) and ".." in a for a in argv):
+    str_args = [a for a in argv if isinstance(a, str)]
+    if any(".." in a for a in str_args):
         return True
-    return "--base" in argv and "--head" in argv
+    if any(a.startswith("^") and len(a) > 1 for a in str_args):
+        return True
+    has_base = any(a == "--base" or a.startswith("--base=") for a in str_args)
+    has_head = any(a == "--head" or a.startswith("--head=") for a in str_args)
+    return has_base and has_head
+
+
+# Same convention as `COMMIT_RE` above: a resolved sha must look like a real
+# git object name, never the unresolved symbolic ref itself ('origin/main',
+# 'HEAD') -- writing the symbolic ref into resolved_base/resolved_head would
+# defeat the field's entire purpose, since CI would be no better off than
+# with the original unresolved argv.
+RESOLVED_SHA_RE = COMMIT_RE
 
 
 def _validate_verifiability(rel, commands: list) -> list[str]:
@@ -211,11 +295,19 @@ def _validate_verifiability(rel, commands: list) -> list[str]:
         if _argv_has_git_range(argv):
             resolved_base = cmd.get("resolved_base")
             resolved_head = cmd.get("resolved_head")
-            if not isinstance(resolved_base, str) or not resolved_base or not isinstance(resolved_head, str) or not resolved_head:
+            if not isinstance(resolved_base, str) or not RESOLVED_SHA_RE.match(resolved_base):
                 errors.append(
-                    f"{prefix}: argv names a git revision range but is missing "
-                    "'resolved_base'/'resolved_head' -- without the shas actually run "
-                    "against, a CI re-execution resolves a different commit"
+                    f"{prefix}: argv names a git revision range but 'resolved_base' "
+                    f"{resolved_base!r} does not look like a resolved sha -- the "
+                    "UNRESOLVED symbolic ref itself defeats the field's purpose; "
+                    "resolve it with e.g. `git rev-parse` before writing the record"
+                )
+            if not isinstance(resolved_head, str) or not RESOLVED_SHA_RE.match(resolved_head):
+                errors.append(
+                    f"{prefix}: argv names a git revision range but 'resolved_head' "
+                    f"{resolved_head!r} does not look like a resolved sha -- the "
+                    "UNRESOLVED symbolic ref itself defeats the field's purpose; "
+                    "resolve it with e.g. `git rev-parse` before writing the record"
                 )
     return errors
 

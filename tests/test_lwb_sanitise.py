@@ -37,7 +37,7 @@ def test_replaces_home_with_placeholder():
 
 
 def test_replaces_other_absolute_paths_with_generic_placeholder():
-    text = "leaked C:\\Users\\someoneelse\\stuff\\file.txt"
+    text = "leaked C:\\Work\\someoneelse\\stuff\\file.txt"
     out = lwb_sanitise.sanitise(text, repo_root=str(REPO_ROOT), home=str(Path.home()))
     assert "<path>" in out
     assert "someoneelse" not in out
@@ -74,7 +74,7 @@ def test_windows_and_posix_separators_sanitise_to_identical_bytes():
 
 def test_deterministic_across_repeated_calls():
     repo = str(REPO_ROOT)
-    text = f"{repo}\\a {repo}/b C:\\Users\\other\\c"
+    text = f"{repo}\\a {repo}/b C:\\Work\\other\\c"
     out1 = lwb_sanitise.sanitise(text, repo_root=repo, home=str(Path.home()))
     out2 = lwb_sanitise.sanitise(text, repo_root=repo, home=str(Path.home()))
     assert out1 == out2
@@ -89,6 +89,72 @@ def test_text_with_no_absolute_paths_is_unchanged_besides_separators():
 def test_sanitiser_version_constant_exists_and_is_a_string():
     assert isinstance(lwb_sanitise.SANITISER_VERSION, str)
     assert lwb_sanitise.SANITISER_VERSION
+
+
+def test_sibling_directory_sharing_repo_prefix_is_not_corrupted():
+    """The load-bearing bug found by adversarial review: a naive
+    `.replace(repo_norm, "<repo>")` has no boundary check, so
+    `.../proj2/file.py` (a SIBLING of `.../proj`, not the repo itself)
+    gets mangled into `.../<repo>2/file.py` -- a path fragment leaks into
+    the digest input and an unrelated path is corrupted."""
+    repo = "C:\\Work\\alice\\proj"
+    text = "see C:/Work/alice/proj2/file.py and C:/Work/alice/proj/file.py"
+    out = lwb_sanitise.sanitise(text, repo_root=repo, home="C:\\Work\\alice\\home-unused")
+    assert "<repo>2" not in out
+    assert out.count("<repo>") == 1
+    # The sibling must not be corrupted by the repo-prefix rule; it still
+    # gets sanitised, but by the generic <path> rule, not mangled into
+    # "<repo>2".
+    assert "proj2" not in out
+    assert out == "see <path> and <repo>/file.py"
+
+
+def test_repo_prefix_exact_match_is_replaced():
+    repo = "C:\\Work\\alice\\proj"
+    text = "C:/Work/alice/proj"
+    out = lwb_sanitise.sanitise(text, repo_root=repo, home="C:\\Work\\alice\\home-unused")
+    assert out == "<repo>"
+
+
+def test_repo_prefix_followed_by_separator_is_replaced():
+    repo = "C:\\Work\\alice\\proj"
+    text = "C:/Work/alice/proj/file.py"
+    out = lwb_sanitise.sanitise(text, repo_root=repo, home="C:\\Work\\alice\\home-unused")
+    assert out == "<repo>/file.py"
+
+
+def test_repo_prefix_at_end_of_string_is_replaced():
+    repo = "C:\\Work\\alice\\proj"
+    text = "cloned into C:/Work/alice/proj"
+    out = lwb_sanitise.sanitise(text, repo_root=repo, home="C:\\Work\\alice\\home-unused")
+    assert out == "cloned into <repo>"
+
+
+def test_sibling_directory_sharing_home_prefix_is_not_corrupted():
+    home = "C:\\Work\\alice"
+    text = "see C:/Work/alice2/file.py and C:/Work/alice/file.py"
+    out = lwb_sanitise.sanitise(text, repo_root="C:\\Work\\alice\\repo-unused", home=home)
+    assert "<home>2" not in out
+    assert out.count("<home>") == 1
+    assert "alice2" not in out
+    assert out == "see <path> and <home>/file.py"
+
+
+def test_repo_and_home_case_insensitive_match_produces_identical_bytes():
+    """The next PR's CI re-execution depends on identical bytes for the
+    same logical content -- if `C:\\Work\\...` sanitises to `<repo>` but
+    `c:\\work\\...` (same directory, different case) falls through to the
+    generic `<path>` rule, the guarantee breaks. Repo/home prefixes match
+    case-insensitively -- Windows paths are case-insensitive on the
+    filesystem, so the two spellings name the same directory."""
+    repo = "C:\\Work\\Alice\\Proj"
+    text_upper = "FAIL at C:\\Work\\Alice\\Proj\\scripts\\lwb_build.py:42"
+    text_lower = "FAIL at c:\\work\\alice\\proj\\scripts\\lwb_build.py:42"
+    out_upper = lwb_sanitise.sanitise(text_upper, repo_root=repo, home="C:\\Work\\Alice\\home-unused")
+    out_lower = lwb_sanitise.sanitise(text_lower, repo_root=repo, home="C:\\Work\\Alice\\home-unused")
+    assert out_upper == out_lower
+    assert "<path>" not in out_upper
+    assert "<path>" not in out_lower
 
 
 def test_default_repo_root_and_home_are_used_when_omitted():
