@@ -3,7 +3,7 @@
   "pr": 35,
   "author": "conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
-  "commit": "b8ab088",
+  "commit": "78582c9",
   "commands": [
     {
       "argv": [
@@ -16,18 +16,17 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 41%]",
+        "........................................................................ [ 55%]",
         "........................................................................ [ 68%]",
         "........................................................................ [ 82%]",
         "........................................................................ [ 96%]",
         "..................                                                       [100%]",
-        "=============================== warnings summary ===============================",
-        "tests/test_lwb_check_proof_reexecute.py:248",
-        "  <repo>/tests/test_lwb_check_proof_reexecute.py:248: DeprecationWarning: invalid escape sequence '<path>'",
-        "    _assert_argv_is_skipped_as_self([\"cmd\", \"<path>\", \"python scripts/lwb_check_proof.py --reexecute\"])",
-        "-- Docs: http<path>",
-        "522 passed, 1 warning in 20.22s"
+        "522 passed in 21.03s"
       ],
-      "sha256": "7c4bfe07aec906a132c9f97bbec9748a1f2f8720bfb0bcb43d093c7d67992a9a",
+      "sha256": "3453ccd8a3e128ddf06738282f024abd747140373ead4d1e4415493a63b28d3f",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -42,10 +41,10 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "HANDOFF.md:44: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 16:25 UTC",
+        "HANDOFF.md:44: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 16:47 UTC",
         "lwb-check-state-claims check passed"
       ],
-      "sha256": "1fe9d188c3d33a73eb91385040e0c6c7d770f0c7cd67ca32f92d68c31e7391ac",
+      "sha256": "d7512e0504ff3c198cd3b432ecc79c3b9f52b379b1d810782ffeb614d88f1f39",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -58,9 +57,9 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "OK: <repo>/HANDOFF.md passes all checks (2770 bytes)"
+        "OK: <repo>/HANDOFF.md passes all checks (2860 bytes)"
       ],
-      "sha256": "f5b6c17e7d1e5581cdbc268573cf034b154ce1de026fcf3225275ec940db1586",
+      "sha256": "666eabef8846f97dd50209f1009bb0f07e519e65576f3463c92dd23a169a373d",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -125,6 +124,10 @@
     {
       "criterion": "python -m pytest tests/ -q is 522 passed (up from 487 at the previous record, reflecting main's #25-#27/#31/#34 landing since).",
       "met": true
+    },
+    {
+      "criterion": "Independent cloud review (reviews/35/cloud-reviewer.json, DISAGREE at b8ab0888) named exactly two text edits as sufficient for AGREE, both now fixed: HANDOFF.md no longer asserts 'main green' (main's tip #34 fails lwb-proof-coverage, reproduced with `python scripts/lwb_check_proof.py --coverage de27f723..origin/main`), and item 3 no longer calls #30 'this PR' -- it names #35 and marks #30 dead. The review's findings 3 and 4 (a structural reviewer/author identifier collision on the segment 'buildcraft', and `_review_ok` testing verdict before staleness) are explicitly NOT addressed here -- both are outside a HANDOFF.md fix's scope and the review itself says they need an owner decision or a lwb_lanes.py fix, not another review.",
+      "met": true
     }
   ],
   "tokens": {
@@ -150,6 +153,7 @@
     "THE COMMANDS RAN ON LINUX ONLY (this container). CI runs the same gates on ubuntu, macos and windows across 3.10 and 3.12; I did not run the other five legs.",
     "THE PLAN'S CONTENT IS NOT PROVEN BY ANY COMMAND, as the previous record already noted; this fix touches only HANDOFF.md and this proof record, not the plan or decisions documents themselves.",
     "THE CONDUCTOR'S FALLBACK IS UNTESTED IN THE FAILING DIRECTION, as the previous record already noted; not re-verified here.",
-    "NON-BLOCKING FINDING 4 (reviews/30/cloud-reviewer-b.json): D25's own justification overstates what is measurable (\"one figure for sixteen deliverables\" vs. 14 distinct cumulative figures plus two 'unknown' records plus one non-cumulative outlier). Not corrected here -- D25's substantive conclusion is unaffected and the reviewer marked this non-blocking; left for whoever next touches decisions.md."
+    "NON-BLOCKING FINDING 4 (reviews/30/cloud-reviewer-b.json): D25's own justification overstates what is measurable (\"one figure for sixteen deliverables\" vs. 14 distinct cumulative figures plus two 'unknown' records plus one non-cumulative outlier). Not corrected here -- D25's substantive conclusion is unaffected and the reviewer marked this non-blocking; left for whoever next touches decisions.md.",
+    "python scripts/lwb_check_proof.py --reexecute WAS RUN THIS TIME (the previous record on this branch had not, which the same reviewer flagged as the gap they would close first): TOTAL 25 of 146 commands re-executed, 0 uncomparable, 17 skipped-self, across 21 records -- ALL RE-EXECUTED COMMANDS MATCHED, confirming this record's own commands[] digests are genuine and not just self-consistent."
   ]
 }
