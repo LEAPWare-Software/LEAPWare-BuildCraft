@@ -1,0 +1,171 @@
+{
+  "deliverable": "plugin-proven-in-a-repo-that-is-not-this-one",
+  "pr": 27,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-claude-3b64530b-2026-09-19",
+  "commit": "b04f939",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 14%]",
+        "........................................................................ [ 29%]",
+        "........................................................................ [ 44%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 73%]",
+        "........................................................................ [ 88%]",
+        "........................................................                 [100%]",
+        "488 passed in 37.31s"
+      ],
+      "sha256": "435786aec7466fe79ec6f687688b2e5c6266672f5672c3bfee9737f6616ddc8a",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_foreign_repo.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "TOTAL: 7 of 7 cases exercised against a scratch repo OUTSIDE this checkout -- 3 expected a proof-required warning, 4 expected silence, all matched",
+        "    the command hooks.json registers for Bash was launched as a subprocess for every case, with CLAUDE_PLUGIN_ROOT set and cwd in the scratch repo -- not imported in-process, and not a hardcoded path",
+        "lwb-foreign-repo check passed"
+      ],
+      "sha256": "9c10490cc03cb4b58b0b1950253742b5e9afe2aed07fcbf2c48961863684948d",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_hook_launch.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-portable check passed"
+      ],
+      "sha256": "b48fc74400ced6df61ac28ff5edec0a81eb23026b48768bb20d1e52c93f08d7d",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "A CI job drives the SHIPPED plugin against a scratch git repo created OUTSIDE this checkout, on windows, macos and ubuntu -- before this, nothing had ever proven the plugin works in a repo that is not this one",
+      "met": true
+    },
+    {
+      "criterion": "It runs the command hooks.json REGISTERS for Bash, not a hardcoded path to bin/lwb_hook.py, so a matcher that cannot fire is a failure rather than invisible",
+      "met": true
+    },
+    {
+      "criterion": "A rule that RAISES is a failure in every case, warn-expecting and silence-expecting alike, rather than reading as a clean pass",
+      "met": true
+    },
+    {
+      "criterion": "ENGINE FIX: a crashing rule now reaches the user. core/lwb_core/engine.py appended the crash Finding to findings but never to warnings, and render_decision builds the reason only from warnings -- so a rule crashing on EVERY event produced output identical to one that found nothing wrong",
+      "met": true
+    },
+    {
+      "criterion": "The seven-case matrix covers the slash-branch round trip end to end in a foreign repo -- the exact defect that shipped broken in #26 -- rather than only in a unit test",
+      "met": true
+    },
+    {
+      "criterion": "Every case asserts decision=allow AND exit 0, so the rule being armed to deny by accident would fail the check",
+      "met": true
+    },
+    {
+      "criterion": "The check reports what it proved -- 7 of 7 cases with the warn/silent split -- rather than a single cheerful pass line",
+      "met": true
+    },
+    {
+      "criterion": "NON-VACUOUS, tested in both directions by author and reviewer: 9 distinct breakages of the plugin were attempted; all 9 now fail the check, including the 2 that previously passed",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 1079446631,
+    "cached_input": 1072299076,
+    "uncached_input": 7147555,
+    "output": 2801867,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 138710.347,
+    "source": "transcript message.usage summed across this session's 2594 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T11:34:03.935Z). Cumulative across PRs 12-27 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
+  },
+  "mutations": [
+    "scripts/lwb_check_foreign_repo.py: new -- scratch repo outside the checkout, seven cases, reads the Bash command from hooks.json, fails on a raised rule, asserts the scratch path is genuinely outside REPO_ROOT",
+    "core/lwb_core/engine.py: a caught rule exception now reaches Decision.warnings, so the hook's permissionDecisionReason actually carries it",
+    "plugins/*/lwb/vendor/lwb_core/engine.py: regenerated -- the shipped hook reads vendor/, not core/, so the fix was inert until rebuilt",
+    ".github/workflows/ci.yml: lwb-foreign-repo job, matrixed over windows/macos/ubuntu, timeout-minutes 10",
+    "tests/test_lwb_check_foreign_repo.py: runs the script so the suite covers it locally"
+  ],
+  "unproven": [
+    "CLAUDE CODE ITSELF DISPATCHING THE MATCHER IS STILL NOT TESTED, and this is the honest limit of the whole PR. The check now runs the command hooks.json REGISTERS, which is much closer than the hardcoded path it replaced, but it is still this script invoking that command rather than Claude Code matching a live tool event and invoking it. The docstring claimed otherwise and was corrected. The 'Agent' matcher has never been observed to fire in this product's life.",
+    "THE ENGINE DEFECT FIXED HERE WAS LIVE IN EVERY SHIPPED BUILD UNTIL NOW. A rule crashing on every event was indistinguishable from a rule finding nothing. It was found only because an independent reviewer tried breaking the rule on purpose; no test covered it, and the foreign-repo check as first written did not catch it either.",
+    "The check drives plugins/claude only. The codex plugin is not exercised, and lwb_proof_required is inert there regardless because adapters/codex/hook_io.py supplies no RepoFacts.",
+    "The reviewer ran its nine breakage probes on Windows only. The CI job runs on three OSes, but the adversarial breaking was single-platform.",
+    "A symlinked .git and PowerShell-native invocation forms beyond '& git push' are untested, carried forward from #26.",
+    "Token accounting is cumulative across PRs 12-27, not attributable to this PR alone."
+  ]
+}
