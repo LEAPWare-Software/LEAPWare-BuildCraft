@@ -61,11 +61,49 @@ def _build_one(host: str, vendor_dir: Path, tmp_root: Path) -> Path:
     return staging
 
 
+_BUILD_NOISE_DIRS = ("__pycache__",)
+_IGNORED_SUFFIXES = (".pyc", ".pyo")
+
+
+def _is_build_noise(name: str) -> bool:
+    """True for interpreter-generated files that are not build output.
+
+    `_build_one` already excludes these when it copies (`_IGNORE_PATTERNS`),
+    but the COMPARISON did not, and that asymmetry made `--check` report
+    drift that no rebuild could ever fix. Importing anything under
+    `vendor/` writes bytecode beside it, and the test suite imports from
+    vendor -- so running the tests poisoned the very check that guards
+    them. A gate whose own prerequisites break it gets ignored, and this
+    one was: the failure was carried for at least two PRs as "pre-existing,
+    environment-dependent, not mine".
+    """
+    return name in _BUILD_NOISE_DIRS or name.endswith(_IGNORED_SUFFIXES)
+
+
 def _trees_equal(a: Path, b: Path) -> bool:
-    """True iff every file under `a` and `b` matches, recursively, by content."""
-    comparison = filecmp.dircmp(a, b)
-    if comparison.left_only or comparison.right_only or comparison.diff_files:
+    """True iff every file under `a` and `b` matches, recursively, by content.
+
+    Interpreter bytecode is ignored on both sides -- see `_is_build_noise`.
+    """
+    comparison = filecmp.dircmp(a, b, ignore=list(_BUILD_NOISE_DIRS))
+    left_only = [n for n in comparison.left_only if not _is_build_noise(n)]
+    right_only = [n for n in comparison.right_only if not _is_build_noise(n)]
+    if left_only or right_only:
         return False
+
+    # Compare CONTENT, not stat(). `dircmp.diff_files` is shallow: two files
+    # with the same size and mtime are called equal without being read. A
+    # hand-edit to a vendored file that happens to preserve its length --
+    # `mode = "warn"` to `mode = "deny"`, a digit changed, a boolean flipped
+    # -- was therefore invisible to this check, which exists precisely to
+    # stop a hand-edited vendor tree from shipping. Found by a test written
+    # to prove the bytecode exemption had not widened into blindness; the
+    # exemption was fine, the comparison underneath it never worked.
+    for name in comparison.common_files:
+        if _is_build_noise(name):
+            continue
+        if not filecmp.cmp(a / name, b / name, shallow=False):
+            return False
     for sub in comparison.common_dirs:
         if not _trees_equal(a / sub, b / sub):
             return False

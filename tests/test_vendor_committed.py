@@ -119,3 +119,40 @@ def _diff_recursive(comparison: filecmp.dircmp) -> list[str]:
 
 if __name__ == "__main__":
     sys.exit(0)
+
+
+def test_build_check_ignores_interpreter_bytecode(tmp_path):
+    """`--check` must not call a `.pyc` drift. It used to, and that hid a bug.
+
+    `_build_one` excludes `__pycache__` when copying, but `_trees_equal` did
+    not exclude it when comparing. Importing anything under `vendor/` writes
+    bytecode beside it, and the test suite imports from vendor -- so running
+    the tests made the check report drift no rebuild could fix. The failure
+    was then carried across two PRs as "pre-existing, environment-dependent",
+    which is how a gate whose prerequisites break it stops being read.
+    """
+    a = tmp_path / "built"
+    b = tmp_path / "ondisk"
+    for root in (a, b):
+        (root / "pkg").mkdir(parents=True)
+        (root / "pkg" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+
+    # Only the on-disk side carries bytecode, exactly as a local test run leaves it.
+    cache = b / "pkg" / "__pycache__"
+    cache.mkdir()
+    (cache / "mod.cpython-312.pyc").write_bytes(b"\x00\x01binary")
+    (b / "pkg" / "stray.pyc").write_bytes(b"\x00\x01binary")
+
+    assert lwb_build._trees_equal(a, b), "bytecode must not register as vendor drift"
+
+
+def test_build_check_still_catches_a_real_difference(tmp_path):
+    """The bytecode exemption must not have widened into blindness."""
+    a = tmp_path / "built"
+    b = tmp_path / "ondisk"
+    for root in (a, b):
+        (root / "pkg").mkdir(parents=True)
+    (a / "pkg" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+    (b / "pkg" / "mod.py").write_text("x = 2\n", encoding="utf-8")
+
+    assert not lwb_build._trees_equal(a, b), "a real content difference must still be drift"
