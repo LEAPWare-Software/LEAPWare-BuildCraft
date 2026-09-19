@@ -44,10 +44,25 @@ and carried into the requirements package as an owner decision.
 ```
 
 `pr: 20` here is `>= scripts/lwb_lanes.REVIEWER_ID_FORMAT_CUTOFF_PR` (19), so both id fields
-must parse as `<role>-<model>-<session-token>-<date>` and
+must parse as `<role-and-model>-<session-token>-<date>` and
 `reviewer_was_dispatched_by_author` is required. A record for a PR below 19
 is exempt from both and may keep the free-form style records 7-18 already
 used.
+
+**The `pr` field is authoritative only when it agrees with the directory the
+record was found under.** An adversarial review filed
+`reviews/19/sneaky.json` with `"pr": 18`, free-form ids, and no
+`reviewer_was_dispatched_by_author` — `scripts/lwb_lanes.py` used to read
+`pr` out of the record itself to decide whether the PR #19 rules applied,
+so a record sitting in the `reviews/19/` directory could self-declare its
+way out of every one of them by simply writing a smaller number inside the
+file. `_review_ok` now takes the PR number from the caller (the directory
+`independent_reviews` actually globbed, not the file's own claim), gates
+the cutoff on THAT, and separately rejects a record whose `pr` field
+disagrees with it — naming both numbers in the error. `"pr": "19"` (a
+string) and `"pr": 19.0` (a float) are rejected the same way, both by this
+reconciliation check and by the schema's `"type": "integer"` now actually
+being enforced (see below).
 
 - The **filename does not matter** and `reviewer_agent` is informational
   (it names who filed the record, not a gate condition). This file used to
@@ -64,7 +79,12 @@ used.
   descriptions of the record shape was worse than one; deleting
   `schema.json` was the other option considered and rejected because the
   shape it describes is real and worth checking mechanically, not just
-  in prose.
+  in prose. `"type"` is enforced too — the first version of the wiring
+  checked `required`/`enum`/`pattern` but not `type`, so `schema.json`'s
+  `"pr": {"type": "integer"}` was decorative and `"pr": "19"` (a string)
+  passed. `"integer"` specifically rejects a Python `bool`
+  (`isinstance(True, int)` is `True`, a real trap for a naive check), so
+  `"pr": true` cannot pass as an integer either.
 - **KNOWN WEAKNESS, flagged by the independent review of PR #6, MEASURED by
   the PR that added this section:** `reviewer_id` and `commit_author_id`
   are self-attested strings. An audit wrote `reviews/999999/fake.json`
@@ -98,15 +118,27 @@ used.
   inequality; it is on the reviewer to give the two fields genuinely
   distinct values, not merely different-looking ones.
 - **The format, required from `scripts/lwb_lanes.REVIEWER_ID_FORMAT_CUTOFF_PR`
-  (PR #19) onward:** `<role>-<model>-<session-token>-<date>`, where `role`,
-  `model` and `session-token` are each a single dash-free segment and
-  `date` is an ISO `YYYY-MM-DD` tail (e.g.
-  `verifier-sonnet-a1b2c3d4-2026-09-20`). `reviews/schema.json` no longer
-  describes a format nothing enforces — `scripts/lwb_lanes.py` parses both
-  ids against this pattern and rejects a record where either one fails to
-  parse. Records 7-18 predate this format and stay valid without being
-  rewritten to fit it: retroactively editing a historical record to satisfy
-  a new validator is falsifying evidence, not honesty.
+  (PR #19) onward:** `<role-and-model>-<session-token>-<date>`, **parsed
+  from the RIGHT**: the trailing `-YYYY-MM-DD` is the date, the segment
+  before it (up to the next dash) is the session-token, and everything
+  left over — hyphens and all — is role-and-model (e.g.
+  `lw-verifier-claude-opus-5-a1b2c3d4-2026-09-20` parses to
+  role-and-model `lw-verifier-claude-opus-5`, token `a1b2c3d4`, date
+  `2026-09-20`). An earlier version of this format required role, model
+  and session-token to each be a single dash-free segment, parsed left to
+  right — which hard-failed real identifiers this repo actually uses
+  (`lw-verifier`, its own agent name; `claude-sonnet-5`, a real model id),
+  pushing authors toward writing degraded ids purely to satisfy the
+  validator, the exact falsification pressure this format exists to
+  remove, just relocated to id construction. Parsing from the right does
+  not need to tell role and model apart at all. `reviews/schema.json` no
+  longer describes a format nothing enforces — `scripts/lwb_lanes.py`
+  parses both ids against this pattern and rejects a record where either
+  one fails to parse (no trailing date, no token segment before it, or a
+  token that is itself empty or date-shaped). Records 7-18 predate this
+  format and stay valid without being rewritten to fit it: retroactively
+  editing a historical record to satisfy a new validator is falsifying
+  evidence, not honesty.
 - **From PR #19 onward, a record whose `reviewer_id` and `commit_author_id`
   share the same `session-token` field is REJECTED** as a self-review — the
   literal case measured above (3 of 10 records). This is a narrower,

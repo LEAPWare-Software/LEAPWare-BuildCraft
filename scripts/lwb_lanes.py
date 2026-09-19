@@ -108,16 +108,26 @@ BOOTSTRAP_EXEMPT_PRS = frozenset({1, 5})
 # acceptance_criteria/tokens cutoff at PR #12.
 REVIEWER_ID_FORMAT_CUTOFF_PR = 19
 
-# "<role>-<model>-<session-token>-<date>": role, model and session-token are
-# each a single dash-free segment (this is a NEW convention adopted from
-# REVIEWER_ID_FORMAT_CUTOFF_PR onward, not a retrofit onto existing ids,
-# which is exactly why it can require this), and date is an ISO YYYY-MM-DD
-# tail. session-token is structurally guaranteed distinct from date by this
-# pattern (a date always contains dashes; a session-token never does), but
-# see _parse_identity for the explicit check the spec also asks for.
-IDENTITY_FORMAT_RE = re.compile(
-    r"^(?P<role>[^-]+)-(?P<model>[^-]+)-(?P<session_token>[^-]+)-(?P<date>\d{4}-\d{2}-\d{2})$"
-)
+# "<role-and-model>-<session-token>-<date>", parsed from the RIGHT: the
+# trailing "-YYYY-MM-DD" is the date, the segment before that (up to the
+# next dash) is the session-token, and everything left over is
+# role-and-model -- hyphens and all. This used to require role, model and
+# session-token to each be a single dash-free segment
+# ("<role>-<model>-<session-token>-<date>", parsed left to right), which
+# hard-failed real identifiers this repo actually uses: "lw-verifier" (this
+# repo's own agent name) and "claude-sonnet-5" (a real model id) both
+# contain hyphens. That pushed authors toward writing degraded ids purely
+# to satisfy the validator -- the exact falsification pressure this format
+# exists to remove, just relocated to id construction. Parsing from the
+# right instead means role and model no longer need to be told apart at
+# all; only the date (fixed shape, unambiguous) and the session-token
+# (the one segment adjacent to it) need to be isolated.
+_DATE_SUFFIX_RE = re.compile(r"-(\d{4}-\d{2}-\d{2})$")
+# A session-token must not itself be shaped like a date -- covers both the
+# hyphenated form (impossible here in practice, since a token is defined as
+# a single dash-free segment by construction) and a compact 8-digit
+# YYYYMMDD, so a token cannot smuggle in a second, disguised date field.
+_DATE_SHAPED_RE = re.compile(r"^\d{4}-?\d{2}-?\d{2}$")
 
 # How many DISTINCT independent reviewers a shared-path change needs. The
 # old rule was "one record per CLI vendor", which read as two but was really
@@ -320,12 +330,43 @@ def _load_review_schema() -> dict:
     return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
+# Types this repo's hand-rolled schema check understands, mapped from a
+# JSON Schema "type" name to a predicate. `bool` is deliberately NOT
+# accepted for "integer": `isinstance(True, int)` is True in Python (bool
+# is an int subclass), so a naive `isinstance(value, int)` check would
+# silently accept `"pr": true` as an integer. Checked as its own branch,
+# ahead of the general int check, rather than folded into it.
+def _type_matches(value: object, type_name: str) -> bool:
+    if type_name == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if type_name == "string":
+        return isinstance(value, str)
+    if type_name == "boolean":
+        return isinstance(value, bool)
+    if type_name == "array":
+        return isinstance(value, list)
+    if type_name == "object":
+        return isinstance(value, dict)
+    # An unrecognised type name in the schema is not this function's to
+    # judge -- reviews/schema.json only ever uses the five above -- so an
+    # unknown name is treated as unconstrained rather than guessed at.
+    return True
+
+
 def _validate_against_schema(data: dict, rel, errors: list[str]) -> None:
     """Hand-rolled subset of JSON Schema validation: required-field
-    presence, `enum`, and `pattern` on string properties -- the only
-    constructs reviews/schema.json actually uses. Appends to `errors`;
-    does not return anything, since callers already track validity via
-    the presence/absence of new error strings."""
+    presence, `type`, `enum`, and `pattern` -- the only constructs
+    reviews/schema.json actually uses. Appends to `errors`; does not
+    return anything, since callers already track validity via the
+    presence/absence of new error strings.
+
+    `type` used to be checked by nothing -- reviews/schema.json declared
+    `"pr": {"type": "integer"}` and the code never looked at it, so a
+    record with `"pr": "19"` (a string) passed straight through. Checked
+    FIRST, ahead of enum/pattern: a value of the wrong type failing an
+    enum or pattern check too is not useful extra information, just noise
+    on top of the real problem.
+    """
     schema = _load_review_schema()
     for field in schema.get("required", ()):
         if field not in data:
@@ -334,6 +375,13 @@ def _validate_against_schema(data: dict, rel, errors: list[str]) -> None:
         if field not in data:
             continue
         value = data[field]
+        type_name = spec.get("type")
+        if type_name is not None and not _type_matches(value, type_name):
+            errors.append(
+                f"{rel}: '{field}' = {value!r} has type {type(value).__name__}, "
+                f"want {type_name!r} (reviews/schema.json)"
+            )
+            continue
         enum = spec.get("enum")
         if enum is not None and value not in enum:
             errors.append(
@@ -349,42 +397,80 @@ def _validate_against_schema(data: dict, rel, errors: list[str]) -> None:
 
 def _parse_identity(
     value: object, field_label: str, rel, errors: list[str]
-) -> Optional[tuple[str, str, str, str]]:
-    """Parse an identity string into (role, model, session_token, date) per
-    the "<role>-<model>-<session-token>-<date>" format. Returns None (and
-    appends to `errors`) when `value` is not a string, does not match the
-    format, or its session-token field is identical to its date field (the
-    format already makes this structurally near-impossible -- a date
-    contains dashes, a session-token cannot -- but the spec calls for the
-    check explicitly, so it is made explicit rather than left implicit in
-    the regex)."""
+) -> Optional[tuple[str, str, str]]:
+    """Parse an identity string into (role_and_model, session_token, date)
+    per the "<role-and-model>-<session-token>-<date>" format, parsed from
+    the RIGHT: the trailing "-YYYY-MM-DD" is the date, the segment before
+    it (up to the next dash) is the session-token, and everything left
+    over -- hyphens and all -- is role-and-model.
+
+    This used to parse left-to-right with role, model and session-token
+    each required to be a single dash-free segment, which hard-failed real
+    identifiers this repo uses (`lw-verifier`, `claude-sonnet-5`) and
+    pushed authors toward writing degraded ids just to satisfy the
+    validator. Parsing from the right needs no opinion on where "role"
+    ends and "model" begins -- only the date (a fixed, unambiguous shape)
+    and the token (the one segment next to it) need to be isolated.
+
+    Returns None (and appends to `errors`) when `value` is not a
+    non-empty string, has no trailing date, has no token segment before
+    the date, or its session-token is empty or itself date-shaped (a
+    literal duplicate date, or a token trying to double as one)."""
     if not isinstance(value, str) or not value:
         errors.append(f"{rel}: {field_label} must be a non-empty string")
         return None
-    m = IDENTITY_FORMAT_RE.match(value)
+    m = _DATE_SUFFIX_RE.search(value)
     if not m:
         errors.append(
-            f"{rel}: {field_label} {value!r} does not match the required "
-            "'<role>-<model>-<session-token>-<date>' format "
-            f"(each field non-empty; required from PR #{REVIEWER_ID_FORMAT_CUTOFF_PR})"
+            f"{rel}: {field_label} {value!r} does not end in a '-YYYY-MM-DD' date "
+            "(required '<role-and-model>-<session-token>-<date>' format, parsed from "
+            f"the right; required from PR #{REVIEWER_ID_FORMAT_CUTOFF_PR})"
         )
         return None
-    role, model, token, date = m.group("role"), m.group("model"), m.group("session_token"), m.group("date")
-    if token == date:
+    date = m.group(1)
+    remainder = value[: m.start()]
+    if "-" not in remainder:
         errors.append(
-            f"{rel}: {field_label} {value!r}: session-token must differ from date"
+            f"{rel}: {field_label} {value!r} has no session-token segment before the "
+            "date (required '<role-and-model>-<session-token>-<date>' format)"
         )
         return None
-    return (role, model, token, date)
+    role_and_model, _, token = remainder.rpartition("-")
+    if not role_and_model or not token:
+        errors.append(
+            f"{rel}: {field_label} {value!r}: role-and-model and session-token must "
+            "both be non-empty"
+        )
+        return None
+    if token == date or _DATE_SHAPED_RE.match(token):
+        errors.append(
+            f"{rel}: {field_label} {value!r}: session-token must not itself be "
+            "date-shaped"
+        )
+        return None
+    return (role_and_model, token, date)
 
 
 def _review_ok(
     review_path: Path,
     head_sha: str,
+    pr_number: int,
     errors: list[str],
     notices: Optional[list[str]] = None,
 ) -> Optional[str]:
     """Validate one review record. Returns its reviewer_id, or None if invalid.
+
+    `pr_number` is the AUTHORITATIVE PR number -- the one `independent_reviews`
+    globbed `reviews/<pr_number>/` for -- not something read out of the
+    record. This used to read `data.get("pr")` from inside the file and
+    gate the whole REVIEWER_ID_FORMAT_CUTOFF_PR path on THAT self-declared
+    value: a record filed at `reviews/19/sneaky.json` claiming `"pr": 18`
+    was judged as a pre-cutoff, free-form-ok record purely because it said
+    so, skipping the parseable-format check, the session-token check and
+    the required dispatched-boolean entirely -- found by adversarial
+    review. `pr_number` is compared against the record's own `pr` field
+    below (a mismatch is an error naming both), and the cutoff decision
+    is made on `pr_number`, never on `data.get("pr")`.
 
     Vendor-agnostic on purpose. This used to take an `agent` and look for
     exactly `reviews/<pr>/<agent>-cto.json`, and `check_lanes` called it
@@ -416,6 +502,24 @@ def _review_ok(
     _validate_against_schema(data, rel, errors)
     if len(errors) > schema_errors_before:
         return None
+
+    # The record's own `pr` must agree with the directory it was found
+    # under. A mismatch (wrong number, wrong type -- "19" the string,
+    # 19.0 the float, missing, null) is rejected outright: it is either a
+    # mistake or an attempt to borrow a lower PR's exemption from a higher
+    # one's rules, and both deserve to fail the same way. `_type_matches`
+    # above already flags a non-integer `pr` via the schema's declared
+    # "integer" type, so this is a second, independent check on the VALUE,
+    # not just the shape.
+    record_pr = data.get("pr")
+    if record_pr != pr_number:
+        errors.append(
+            f"{rel}: record's 'pr' ({record_pr!r}) does not match the PR this record "
+            f"was found under (reviews/{pr_number}/) -- a review record must name the "
+            "PR it actually belongs to"
+        )
+        return None
+
     if data.get("verdict") != "AGREE":
         errors.append(f"{rel}: verdict is {data.get('verdict')!r}, want 'AGREE'")
         return None
@@ -431,7 +535,19 @@ def _review_ok(
         )
         return None
     reviewed_commit = data.get("reviewed_commit")
-    if not reviewed_commit or len(reviewed_commit) < 7 or not head_sha.startswith(reviewed_commit):
+    # isinstance guard, not just truthiness: a non-string reviewed_commit
+    # (e.g. the integer 1234567890) used to reach `len(reviewed_commit)`
+    # below and crash the whole script with an uncaught TypeError. The
+    # schema's "string" type on reviewed_commit now also catches this
+    # earlier, via `_validate_against_schema` above, for the common case
+    # -- this guard is the direct, load-bearing fix at the point of the
+    # actual crash, kept so this check does not depend on schema
+    # validation having run first to stay safe.
+    if (
+        not isinstance(reviewed_commit, str)
+        or len(reviewed_commit) < 7
+        or not head_sha.startswith(reviewed_commit)
+    ):
         errors.append(
             f"{rel}: STALE — this record reviewed {reviewed_commit!r}, but the "
             f"current REVIEWABLE head is {head_sha!r} (record-only commits "
@@ -446,17 +562,19 @@ def _review_ok(
     # record must honestly declare whether the reviewer was dispatched by
     # the author's own session. This CANNOT establish genuine independence
     # -- a subagent the author dispatched itself can declare `false` -- so
-    # it is recorded and surfaced, never trusted as proof.
-    pr = data.get("pr")
-    if isinstance(pr, int) and pr >= REVIEWER_ID_FORMAT_CUTOFF_PR:
+    # it is recorded and surfaced, never trusted as proof. Gated on
+    # `pr_number` (authoritative), never on `record_pr` (self-declared,
+    # already reconciled with `pr_number` above, but the gate condition
+    # itself must read the trusted value).
+    if pr_number >= REVIEWER_ID_FORMAT_CUTOFF_PR:
         reviewer_parsed = _parse_identity(reviewer_id, "reviewer_id", rel, errors)
         author_parsed = _parse_identity(author_id, "commit_author_id", rel, errors)
         if reviewer_parsed is None or author_parsed is None:
             return None
-        if reviewer_parsed[2] == author_parsed[2]:
+        if reviewer_parsed[1] == author_parsed[1]:
             errors.append(
                 f"{rel}: reviewer_id and commit_author_id share session-token "
-                f"{reviewer_parsed[2]!r} -- this is a subagent reviewing the work of "
+                f"{reviewer_parsed[1]!r} -- this is a subagent reviewing the work of "
                 "the session that dispatched it, not an independent reviewer"
             )
             return None
@@ -493,7 +611,7 @@ def independent_reviews(
 
     reviewer_ids = set()
     for record in records:
-        reviewer_id = _review_ok(record, head_sha, errors, notices)
+        reviewer_id = _review_ok(record, head_sha, pr_number, errors, notices)
         if reviewer_id is not None:
             reviewer_ids.add(reviewer_id)
 

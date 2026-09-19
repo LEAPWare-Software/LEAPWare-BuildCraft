@@ -230,7 +230,7 @@ def test_review_ok_requires_distinct_reviewer_and_author_identity(tmp_path):
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, 9, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -302,19 +302,23 @@ def test_independent_reviews_rejects_a_disagree_verdict(tmp_path):
 
 
 def test_review_ok_rejects_record_with_no_reviewed_commit(tmp_path):
+    """A null reviewed_commit is now caught by the schema's type check
+    (reviewed_commit must be a string) before the STALE logic ever runs --
+    a clearer, earlier error for a shape violation, not the staleness
+    message meant for a wrong-but-well-formed value."""
     _write_review(tmp_path, "claude-cto.json", reviewed_commit=None)
     original_root = lwb_lanes.REPO_ROOT
     try:
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, 9, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
     assert got is None
-    assert any("STALE" in e for e in errors)
+    assert any("reviewed_commit" in e for e in errors), errors
 
 
 def test_review_ok_rejects_record_whose_reviewed_commit_does_not_match_head(tmp_path):
@@ -324,7 +328,7 @@ def test_review_ok_rejects_record_whose_reviewed_commit_does_not_match_head(tmp_
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, 9, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -340,7 +344,7 @@ def test_review_ok_accepts_matching_reviewed_commit(tmp_path):
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, 9, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -426,7 +430,7 @@ def test_reviewable_head_still_rejects_stale_review_before_a_later_substantive_c
         _write_review(repo, "verifier.json", reviewed_commit=older_substantive)
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            repo / "reviews" / "9" / "verifier.json", reviewable_head, errors
+            repo / "reviews" / "9" / "verifier.json", reviewable_head, 9, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -475,9 +479,31 @@ def test_cutoff_constant_is_the_next_pr():
     assert lwb_lanes.REVIEWER_ID_FORMAT_CUTOFF_PR == 19
 
 
-def test_parse_identity_accepts_well_formed_id():
-    parsed = lwb_lanes._parse_identity("verifier-sonnet-a1b2c3d4-2026-09-20", "reviewer_id", "rec", [])
-    assert parsed == ("verifier", "sonnet", "a1b2c3d4", "2026-09-20")
+def test_parse_identity_parses_from_the_right_with_hyphenated_role_and_model():
+    """The role and model are one blob, hyphens and all -- `[^-]+`-per-field
+    hard-failed real identifiers like `lw-verifier` (this repo's own agent
+    name) or `claude-sonnet-5` (a real model id). Parsing from the right
+    (date, then session-token, then everything left over as
+    role-and-model) is the only way to accept those without pushing authors
+    toward degraded ids just to satisfy the validator."""
+    parsed = lwb_lanes._parse_identity(
+        "lw-verifier-claude-opus-5-abc123-2026-09-19", "reviewer_id", "rec", []
+    )
+    assert parsed == ("lw-verifier-claude-opus-5", "abc123", "2026-09-19")
+
+
+def test_parse_identity_parses_from_the_right_second_case():
+    parsed = lwb_lanes._parse_identity(
+        "verifier-sonnet-5-1-tok-2026-09-19", "reviewer_id", "rec", []
+    )
+    assert parsed == ("verifier-sonnet-5-1", "tok", "2026-09-19")
+
+
+def test_parse_identity_rejects_single_field_id():
+    errors: list[str] = []
+    parsed = lwb_lanes._parse_identity("justoneword", "reviewer_id", "rec", errors)
+    assert parsed is None
+    assert errors
 
 
 def test_parse_identity_rejects_id_missing_fields():
@@ -500,7 +526,7 @@ def test_review_ok_below_cutoff_does_not_require_parseable_ids(tmp_path):
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "18" / "verifier.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "18" / "verifier.json", HEAD_SHA, 18, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -510,9 +536,14 @@ def test_review_ok_below_cutoff_does_not_require_parseable_ids(tmp_path):
 
 
 def test_review_ok_at_cutoff_rejects_unparseable_reviewer_id(tmp_path):
+    # No trailing "-YYYY-MM-DD": unparseable under the from-the-right
+    # algorithm too, unlike the older "lw-verifier-sonnet-<token>-<date>"
+    # style ids, which DO parse now that role-and-model may contain
+    # hyphens (that shape used to hard-fail the old [^-]+-per-field regex,
+    # which is exactly the false-fail this format was rewritten to fix).
     _write_review_pr(
         tmp_path, 19, "verifier.json",
-        reviewer_id="lw-verifier-sonnet-acc84f592377940aa-2026-09-18",
+        reviewer_id="lw-verifier-sonnet-no-trailing-date-here",
         commit_author_id="author-role-model-token-2026-09-20",
         reviewer_was_dispatched_by_author=False,
     )
@@ -521,13 +552,13 @@ def test_review_ok_at_cutoff_rejects_unparseable_reviewer_id(tmp_path):
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
     assert got is None
-    assert any("does not match" in e or "format" in e for e in errors), errors
+    assert any("does not" in e or "format" in e for e in errors), errors
 
 
 def test_review_ok_at_cutoff_rejects_shared_session_token(tmp_path):
@@ -545,7 +576,7 @@ def test_review_ok_at_cutoff_rejects_shared_session_token(tmp_path):
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -566,7 +597,7 @@ def test_review_ok_at_cutoff_requires_dispatched_boolean_field(tmp_path):
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -591,7 +622,7 @@ def test_review_ok_at_cutoff_accepts_and_notices_when_dispatched_true(tmp_path):
         errors: list[str] = []
         notices: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors, notices
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors, notices
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -614,7 +645,7 @@ def test_review_ok_at_cutoff_accepts_cleanly_when_dispatched_false(tmp_path):
         errors: list[str] = []
         notices: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, errors, notices
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors, notices
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
@@ -622,6 +653,259 @@ def test_review_ok_at_cutoff_accepts_cleanly_when_dispatched_false(tmp_path):
     assert got == "verifier-sonnet-tokenA-2026-09-20"
     assert errors == []
     assert notices == []
+
+
+# ---------------------------------------------------------------------------
+# The bypass: `pr` used to be trusted from inside the record itself, not
+# from the authoritative pr_number the caller (independent_reviews, keyed
+# off the directory it globbed) actually has. A record filed under
+# reviews/19/ claiming "pr": 18 skipped every pr>=19 check entirely.
+# ---------------------------------------------------------------------------
+
+
+def test_review_ok_rejects_record_whose_pr_field_disagrees_with_its_directory(tmp_path):
+    """The adversarial-review bypass: a record sitting in reviews/19/ but
+    self-declaring "pr": 18 must not be judged as a pr-18 (pre-cutoff,
+    free-form-ok) record just because it says so. The directory it was
+    found under, passed in by the caller as the authoritative pr_number,
+    is what must gate the cutoff -- not the field inside the file."""
+    _write_review_pr(
+        tmp_path, 19, "sneaky.json",
+        reviewer_id="reviewer-session",
+        commit_author_id="author-session",
+        # no reviewer_was_dispatched_by_author -- would fail the pr>=19
+        # path outright if that path were reached, proving the bypass
+        # actually skips it rather than merely also passing it
+    )
+    path = tmp_path / "reviews" / "19" / "sneaky.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["pr"] = 18  # self-declared, disagrees with the reviews/19/ directory
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "sneaky.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("18" in e and "19" in e for e in errors), errors
+
+
+def test_review_ok_rejects_pr_field_as_string(tmp_path):
+    """"pr": "19" (a string, not an int) must not silently satisfy the
+    reconciliation check via Python's == treating them as different values
+    that just happen to render the same -- nor should it slip past the
+    cutoff logic by masquerading as the right value."""
+    _write_review_pr(tmp_path, 19, "verifier.json")
+    path = tmp_path / "reviews" / "19" / "verifier.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["pr"] = "19"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert errors
+
+
+def test_review_ok_rejects_pr_field_as_float(tmp_path):
+    _write_review_pr(tmp_path, 19, "verifier.json")
+    path = tmp_path / "reviews" / "19" / "verifier.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["pr"] = 19.0
+    path.write_text(json.dumps(data), encoding="utf-8")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert errors
+
+
+def test_review_ok_rejects_missing_pr_field(tmp_path):
+    _write_review_pr(tmp_path, 19, "verifier.json")
+    path = tmp_path / "reviews" / "19" / "verifier.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data["pr"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(path, HEAD_SHA, 19, errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("pr" in e for e in errors), errors
+
+
+def test_review_ok_rejects_null_pr_field(tmp_path):
+    _write_review_pr(tmp_path, 19, "verifier.json")
+    path = tmp_path / "reviews" / "19" / "verifier.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["pr"] = None
+    path.write_text(json.dumps(data), encoding="utf-8")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert errors
+
+
+def test_review_ok_accepts_when_pr_field_matches_directory(tmp_path):
+    """The reconciliation check must not reject the ordinary, honest case."""
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="verifier-sonnet-tokenA-2026-09-20",
+        commit_author_id="implementer-opus-tokenB-2026-09-19",
+        reviewer_was_dispatched_by_author=False,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == "verifier-sonnet-tokenA-2026-09-20"
+    assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# Schema type checking (item 2): required/enum/pattern already ran; "type"
+# was decorative. isinstance(True, int) is a trap for "integer".
+# ---------------------------------------------------------------------------
+
+
+def test_validate_against_schema_rejects_bool_for_integer_field():
+    errors: list[str] = []
+    lwb_lanes._validate_against_schema({"pr": True}, "rec", errors)
+    assert any("pr" in e and "type" in e.lower() for e in errors), errors
+
+
+def test_validate_against_schema_accepts_real_integer_for_integer_field():
+    errors: list[str] = []
+    full_record = {
+        "pr": 19,
+        "reviewed_commit": HEAD_SHA,
+        "reviewer_agent": "claude",
+        "reviewer_id": "reviewer-session",
+        "commit_author_agent": "claude",
+        "commit_author_id": "author-session",
+        "verdict": "AGREE",
+    }
+    lwb_lanes._validate_against_schema(full_record, "rec", errors)
+    assert errors == []
+
+
+def test_validate_against_schema_rejects_wrong_type_for_string_field():
+    errors: list[str] = []
+    lwb_lanes._validate_against_schema({"reviewer_id": 12345}, "rec", errors)
+    assert any("reviewer_id" in e for e in errors), errors
+
+
+def test_validate_against_schema_rejects_wrong_type_for_boolean_field():
+    errors: list[str] = []
+    lwb_lanes._validate_against_schema(
+        {"reviewer_was_dispatched_by_author": "true"}, "rec", errors
+    )
+    assert any("reviewer_was_dispatched_by_author" in e for e in errors), errors
+
+
+def test_type_matches_covers_integer_string_boolean_array_object():
+    tm = lwb_lanes._type_matches
+    assert tm(1, "integer") is True
+    assert tm(True, "integer") is False  # the bool-is-an-int trap
+    assert tm(False, "integer") is False
+    assert tm("x", "string") is True
+    assert tm(1, "string") is False
+    assert tm(True, "boolean") is True
+    assert tm("true", "boolean") is False
+    assert tm([], "array") is True
+    assert tm({}, "array") is False
+    assert tm({}, "object") is True
+    assert tm([], "object") is False
+
+
+# ---------------------------------------------------------------------------
+# A non-string reviewed_commit used to crash with an uncaught TypeError at
+# `len(reviewed_commit) < 7` -- `1234567890` passed the schema pattern
+# check (guarded by isinstance(value, str)) and then hit the un-guarded
+# STALE check.
+# ---------------------------------------------------------------------------
+
+
+def test_review_ok_non_string_reviewed_commit_is_a_clean_error_not_a_crash(tmp_path):
+    _write_review_pr(tmp_path, 9, "verifier.json", reviewed_commit=1234567890)
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "9" / "verifier.json", HEAD_SHA, 9, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("reviewed_commit" in e for e in errors), errors
+
+
+# ---------------------------------------------------------------------------
+# Item 4: session-token-sharing rejection must still work against the
+# from-the-right parse, using ids with real hyphenated role/model blobs.
+# ---------------------------------------------------------------------------
+
+
+def test_review_ok_at_cutoff_rejects_shared_session_token_with_hyphenated_ids(tmp_path):
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="lw-verifier-claude-opus-5-tokX-2026-09-20",
+        commit_author_id="lw-implementer-claude-sonnet-5-tokX-2026-09-19",
+        reviewer_was_dispatched_by_author=False,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("session-token" in e for e in errors), errors
 
 
 def test_review_ok_validates_against_schema_required_fields(tmp_path):
@@ -639,7 +923,7 @@ def test_review_ok_validates_against_schema_required_fields(tmp_path):
     try:
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
-        got = lwb_lanes._review_ok(path, HEAD_SHA, errors)
+        got = lwb_lanes._review_ok(path, HEAD_SHA, 9, errors)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
@@ -655,7 +939,7 @@ def test_review_ok_validates_schema_enum_for_reviewer_agent(tmp_path):
     try:
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
-        got = lwb_lanes._review_ok(path, HEAD_SHA, errors)
+        got = lwb_lanes._review_ok(path, HEAD_SHA, 9, errors)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
@@ -671,7 +955,7 @@ def test_review_ok_accepts_a_short_prefix_match(tmp_path):
         lwb_lanes.REPO_ROOT = tmp_path
         errors: list[str] = []
         got = lwb_lanes._review_ok(
-            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, errors
+            tmp_path / "reviews" / "9" / "claude-cto.json", HEAD_SHA, 9, errors
         )
     finally:
         lwb_lanes.REPO_ROOT = original_root
