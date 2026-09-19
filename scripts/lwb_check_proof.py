@@ -402,6 +402,42 @@ def validate_all() -> tuple[list[str], int]:
     return errors, count
 
 
+def check_flat_proof_layout() -> list[str]:
+    """`proof/` is documented (`proof/README.md`) as a FLAT directory --
+    `proof/<id>.json`, nothing nested. Adversarial review found that two
+    checks disagreed about the actual shape: `validate_all()` and
+    `check_pr_has_record()` use `PROOF_DIR.glob("*.json")`, which is NOT
+    recursive, while `check_new_proof_records_declare_pr` finds files via
+    `git diff -- proof`, which IS recursive by nature (git diffs the whole
+    tree under a pathspec). A record at `proof/sub/20.json` was therefore
+    seen and pr-checked by one and completely invisible to the other --
+    it could carry no `sanitiser_version`, no `verifiable`, malformed
+    `commands[]`, and nothing would ever validate it.
+
+    Rather than making every OTHER check recursive too (silently widening
+    scope to match the one check that happened to be recursive by
+    accident), a nested `proof/**/*.json` is rejected outright: the flat
+    layout is the documented convention, and a nested file is more likely
+    an accident (a stray subdirectory) or a deliberate evasion attempt
+    than a legitimate structure. This is called unconditionally from
+    `main()`, independent of `--pr`/`--coverage`, so a nested file is
+    always caught regardless of which other checks happen to run.
+    """
+    errors: list[str] = []
+    if not PROOF_DIR.is_dir():
+        return errors
+    for path in sorted(PROOF_DIR.rglob("*.json")):
+        if path.parent != PROOF_DIR:
+            errors.append(
+                f"{path.relative_to(REPO_ROOT)}: proof/ is a FLAT directory "
+                "(proof/<id>.json, see proof/README.md) -- a record nested "
+                "under a subdirectory is not a supported layout (it would be "
+                "invisible to validate_all()'s non-recursive glob); move it "
+                "directly under proof/"
+            )
+    return errors
+
+
 SQUASH_SUBJECT_RE = re.compile(r"\(#(\d+)\)\s*$")
 EXEMPT_PATH = PROOF_DIR / "exempt.json"
 
@@ -629,6 +665,19 @@ def check_new_proof_records_declare_pr(
         rel_path = Path(relname)
         if rel_path.name in ("schema.json", "exempt.json"):
             continue
+        # A NESTED file (proof/sub/20.json) is `git diff`'s business (it
+        # sees the whole tree under the pathspec) but not this function's:
+        # `check_flat_proof_layout` is the single authority that rejects a
+        # nested proof record outright, and it runs unconditionally from
+        # `main()`. Independently pr-checking it here too would let a
+        # nested file with a "correct" pr silently pass THIS check while
+        # still being rejected by the layout check -- a confusing,
+        # inconsistent report for the same file. See
+        # docs/maintainers/proof-of-completion-plan.md and
+        # check_flat_proof_layout's docstring for the scope-mismatch this
+        # avoids re-introducing.
+        if rel_path.parent != Path("proof"):
+            continue
         full_path = REPO_ROOT / rel_path
         if not full_path.is_file():
             continue  # deleted in this PR -- nothing left to validate
@@ -667,15 +716,34 @@ def main() -> int:
         default=None,
         help="pre-merge: require a proof record naming this PR number",
     )
+    # Paired with --pr: the base/head to diff for
+    # check_new_proof_records_declare_pr's "new or changed in this PR"
+    # check. Same base/head reasoning as lwb_check_commit_identity.py and
+    # lwb_lanes.py in .github/workflows/ci.yml: pass
+    # github.event.pull_request.base.sha / head.sha explicitly, never
+    # 'origin/main..HEAD' by default in CI -- a pull_request checkout's
+    # HEAD is the synthetic refs/pull/N/merge commit, and origin/main may
+    # have moved since the PR branched. Both flags must be given together;
+    # with neither, check_new_proof_records_declare_pr falls back to its
+    # own 'origin/main..HEAD' default, which is only correct for local,
+    # non-CI use (a real checkout of main plus a local branch).
+    parser.add_argument("--base", default=None, help="base ref/sha for the pr-authority check")
+    parser.add_argument("--head", default=None, help="head ref/sha for the pr-authority check")
     args = parser.parse_args()
 
     errors, count = validate_all()
+    errors.extend(check_flat_proof_layout())
     if args.rev_range:
         errors.extend(check_coverage(args.rev_range))
     notices: list[str] = []
     if args.pr_number:
         errors.extend(check_pr_has_record(args.pr_number))
-        errors.extend(check_new_proof_records_declare_pr(args.pr_number, notices=notices))
+        pr_check_kwargs = {}
+        if args.base and args.head:
+            pr_check_kwargs["rev_range"] = f"{args.base}..{args.head}"
+        errors.extend(
+            check_new_proof_records_declare_pr(args.pr_number, notices=notices, **pr_check_kwargs)
+        )
     else:
         # No --pr means no authoritative PR number is available to THIS
         # invocation (a local run, the plain `lwb-proof` job on every PR,

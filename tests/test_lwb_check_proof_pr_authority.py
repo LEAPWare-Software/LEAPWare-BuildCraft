@@ -190,6 +190,54 @@ def test_unresolvable_range_degrades_to_a_notice_not_an_error(tmp_path):
     assert any("unverified" in n or "UNVERIFIED" in n for n in notices), notices
 
 
+def test_main_threads_explicit_base_head_in_preference_to_the_default(tmp_path, monkeypatch):
+    """`.github/workflows/ci.yml`'s sibling base/head-sensitive steps
+    (lwb_check_commit_identity.py, lwb_lanes.py, lwb_check_env_leak.py
+    --range) all pass github.event.pull_request.base.sha / head.sha
+    explicitly, because HEAD in a pull_request checkout is the synthetic
+    refs/pull/N/merge commit -- this check must not be the lone exception
+    relying on its own hardcoded 'origin/main..HEAD' default. main() must
+    prefer an explicit --base/--head over that default."""
+    repo = _init_repo(tmp_path)
+    captured = {}
+
+    def fake_check(pr_number, rev_range="origin/main..HEAD", notices=None):
+        captured["pr_number"] = pr_number
+        captured["rev_range"] = rev_range
+        return []
+
+    monkeypatch.setattr(lwb_check_proof, "check_new_proof_records_declare_pr", fake_check)
+    monkeypatch.setattr(
+        lwb_check_proof.sys,
+        "argv",
+        [
+            "lwb_check_proof.py",
+            "--pr", "20",
+            "--base", "deadbeef0000000000000000000000000000dead",
+            "--head", "beefdead0000000000000000000000000000beef",
+        ],
+    )
+    _with_repo_root(repo, lwb_check_proof.main)
+    assert captured["pr_number"] == 20
+    assert captured["rev_range"] == (
+        "deadbeef0000000000000000000000000000dead..beefdead0000000000000000000000000000beef"
+    )
+
+
+def test_main_falls_back_to_default_range_without_explicit_base_head(tmp_path, monkeypatch):
+    repo = _init_repo(tmp_path)
+    captured = {}
+
+    def fake_check(pr_number, rev_range="origin/main..HEAD", notices=None):
+        captured["rev_range"] = rev_range
+        return []
+
+    monkeypatch.setattr(lwb_check_proof, "check_new_proof_records_declare_pr", fake_check)
+    monkeypatch.setattr(lwb_check_proof.sys, "argv", ["lwb_check_proof.py", "--pr", "20"])
+    _with_repo_root(repo, lwb_check_proof.main)
+    assert captured["rev_range"] == "origin/main..HEAD"
+
+
 def test_deleted_proof_file_is_not_flagged(tmp_path):
     """A file deleted in this PR's diff is not on disk to read -- must be
     skipped, not crash or falsely flag."""

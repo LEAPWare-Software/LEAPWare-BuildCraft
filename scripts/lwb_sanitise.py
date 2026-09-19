@@ -96,12 +96,24 @@ def _normalise(path: str) -> str:
 
 def _is_windows_shaped(path_norm: str) -> bool:
     """True if `path_norm` (already NORMALISED to forward slashes) is
-    shaped like a Windows path: a drive letter (`C:/...`) or a UNC root
-    (`//server/share`). This, not `os.name` and not which OS is running
-    `sanitise()`, is what decides case-insensitive matching -- see the
-    module docstring. A bare posix path is never Windows-shaped, even
-    when `sanitise()` itself runs on Windows."""
-    return bool(re.match(r"^[A-Za-z]:/", path_norm)) or path_norm.startswith("//")
+    shaped like a Windows path: a drive letter, with or without anything
+    after it (`C:`, `C:/`, `C:/...`), or a UNC root (`//server/share`).
+    This, not `os.name` and not which OS is running `sanitise()`, is what
+    decides case-insensitive matching -- see the module docstring. A bare
+    posix path is never Windows-shaped, even when `sanitise()` itself runs
+    on Windows.
+
+    Matches a BARE drive-colon (`^[A-Za-z]:$`), not just `[A-Za-z]:/...`,
+    because `sanitise()` calls this on a needle AFTER `rstrip("/")`: a
+    `repo_root` of `"C:/"` normalises to `"C:/"` and then strips down to
+    `"C:"` -- a real, if unusual, Windows drive root. Requiring a trailing
+    `/` here would make that specific needle fail its own shape check and
+    fall back to case-sensitive matching, breaking the very
+    identical-bytes guarantee this function exists to provide -- found by
+    adversarial review as an interaction bug between the strip and this
+    check, not a case this check was ever meant to exclude.
+    """
+    return bool(re.match(r"^[A-Za-z]:(/|$)", path_norm)) or path_norm.startswith("//")
 
 
 def _replace_prefix(text: str, needle: str, placeholder: str) -> str:

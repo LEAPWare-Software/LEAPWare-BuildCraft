@@ -183,6 +183,23 @@ def test_posix_case_distinct_prefixes_are_not_conflated():
     assert "<home>" not in out.split(" and ")[1]
 
 
+def test_bare_drive_root_still_converges_case_insensitively():
+    """The rstrip/shape-detection interaction bug found by adversarial
+    review: 'C:/' rstrips to 'C:', and if shape were checked AFTER the
+    strip, `_is_windows_shaped('C:')` would need to recognise a bare
+    drive-colon as Windows-shaped too, or case-insensitive matching would
+    silently stop applying to a genuinely Windows prefix -- the SAME
+    logical path ('C:/foo/bar.py' vs 'c:/foo/bar.py') must sanitise to
+    identical bytes regardless of whether repo_root has a trailing slash."""
+    out_upper = lwb_sanitise.sanitise(
+        "C:/foo/bar.py", repo_root="C:/", home="C:/nobody-unused"
+    )
+    out_lower = lwb_sanitise.sanitise(
+        "c:/foo/bar.py", repo_root="C:/", home="C:/nobody-unused"
+    )
+    assert out_upper == out_lower == "<repo>/foo/bar.py"
+
+
 def test_posix_prefix_still_matches_exact_case():
     text = "/srv/alice/proj/f.py"
     out = lwb_sanitise.sanitise(text, repo_root="/srv/alice/proj", home="/srv/alice-unused")
