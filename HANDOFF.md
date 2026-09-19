@@ -14,22 +14,21 @@ Read it before touching a gate.
 1. **DONE: #17-#27.** `main` green. Repo is **PUBLIC** (Apache-2.0):
    every commit world-readable, forever. Decisions:
    `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
+   Branch tips and PR state are not written here; re-derive per
+   `docs/handoff-protocol.md`.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor picks work every 2h;
    two reviewer routines write the gating records hourly, oldest-first
    and newest-first; a watchdog reports to ledger issue #33. No routine
    can create a routine, so a conductor CANNOT dispatch its reviewer --
    independence is structural, not promised. Same account: separation of
    dispatch and context, NOT of interest.
-3. **IN FLIGHT.** #29 (runbook, routine specs, `.claude/` lane fix),
-   #30 (plan + D21-D27 onto main), #31 (Actions merge path). #32 (the #27
-   provenance correction) is PERMANENTLY BLOCKED -- six DISAGREE reviewer
-   records from six one-shot identities that no longer exist to update
-   them, a stale HANDOFF.md baked into an old commit, and a leaked
-   private domain unrepairable without a force-push -- and is superseded
-   by a re-cut PR carrying only its four content commits. #32 itself is
-   left open, commented as superseded, not closed by this session. Each
-   open item needs `proof/<pr>.json` AND a review record naming its
-   CURRENT head. Re-derive every SHA.
+3. **IN FLIGHT.** Re-derive current PR state per
+   `docs/handoff-protocol.md`, not from a hand-written list -- see item
+   1. #32 (the #27 provenance correction) was PERMANENTLY BLOCKED --
+   unclearable DISAGREE records, a stale HANDOFF.md, a leaked private
+   domain, force-push denied -- and superseded by a re-cut carrying
+   only its four content commits. That re-cut needs its own
+   `proof/<pr>.json` and a review record naming its CURRENT head.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    **0 armed to deny**, 4 skills. **A consuming repo installs `lwb` and
    gets a no-op.** Phase 1 is `lwbpoce`.
@@ -42,7 +41,7 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 20:27 UTC
+Generated: 2026-09-19 21:07 UTC
 main SHA: bfe850796969980545811e1ffa551b9143965faf
 CLI: claude
 Session: session_01EkvcWAEAV2sJYoN51CPrTF
