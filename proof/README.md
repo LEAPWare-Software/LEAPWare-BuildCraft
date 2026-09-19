@@ -152,6 +152,43 @@ Two things cannot go in `commands[]` at all:
   contain proof of its own existence. Verify it after writing the record.
 - Anything printing a private-name needle, for the obvious reason.
 
+## Re-execution: `lwb_check_proof.py --reexecute`
+
+From PR #21 onward this exists: `--reexecute` re-runs every `commands[]`
+entry across every `proof/*.json` record whose `verifiable` is `true`,
+sanitises the output through the CURRENTLY RUNNING `lwb_sanitise.sanitise`,
+and compares its sha256 and exit code against what the record claims. This
+is the first thing in this repo that actually CHECKS a digest rather than
+merely attributing it to a known sanitiser version.
+
+- It is gated on the explicit `--reexecute` flag, which never appears in
+  any recorded `argv` (a pinned test asserts this), AND independently
+  skips any command whose argv resolves to `lwb_check_proof.py` itself --
+  a record cannot contain proof of its own re-execution, and re-executing
+  it anyway risks recursing into `--reexecute` from inside `--reexecute`.
+- A command whose `sanitiser_version` differs from the running
+  `SANITISER_VERSION` is reported `UNCOMPARABLE`, never silently passed or
+  failed.
+- A record with zero verifiable commands reports "0 of N re-executed",
+  never "all verified" -- the summary always carries both numbers, at the
+  per-record and the total level.
+- An exit-code mismatch fails even when the digest happens to match.
+
+**Landed report-only.** `.github/workflows/ci.yml`'s `lwb-proof-reexecute`
+step runs `--reexecute` with `continue-on-error: true` and `if: always()`
+-- it cannot fail a PR. The sanitiser's cross-platform determinism has
+been verified on Windows only; a GitHub-hosted runner has a different
+repo root, home directory and checkout layout, and the first real run
+there is the experiment. It becomes blocking only in a later PR, once
+digests are observed reproducing on a runner. See
+`docs/maintainers/proof-of-completion-plan.md`, blocker 2.
+
+**As measured against this repo today: 3 of 101 `commands[]` entries
+across 12 records are `verifiable: true`.** Only `proof/20.json` carries
+verifiability flags at all; records 7-19 predate the scheme and are not
+back-filled (see above). Say the actual number, always -- never "records
+are falsifiable" or "verified".
+
 ## Acceptance criteria and token cost (PR #12 onward)
 
 Two fields tie the record to the mission's quality floor and efficiency

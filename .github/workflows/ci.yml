@@ -120,6 +120,27 @@ jobs:
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
 
+      - name: lwb-proof-reexecute (report-only: re-run verifiable commands, compare digests)
+        if: always()
+        # REPORT-ONLY, deliberately: this step can never fail the job
+        # (continue-on-error: true, plus if: always() above like every
+        # other gate in this job). The sanitiser's cross-platform
+        # determinism (scripts/lwb_sanitise.py) has been verified on
+        # Windows only, and a GitHub-hosted runner has a different
+        # absolute repo root, a different home directory, and a different
+        # checkout layout than any machine that has recorded a digest so
+        # far. If a locally-recorded digest does not reproduce here, a
+        # BLOCKING gate would fail every PR -- including the one that
+        # fixes the sanitiser -- and force-push to fix a bad merge is
+        # denied in this repo (session-protocol.md: that has already cost
+        # two PRs). The first real runner output is the experiment; making
+        # this blocking is a separate PR, filed only after digests are
+        # observed reproducing here. See
+        # docs/maintainers/proof-of-completion-plan.md, blocker 2, and
+        # SPEC-d2-ci-reexecution.md.
+        continue-on-error: true
+        run: python scripts/lwb_check_proof.py --reexecute
+
       - name: lwb-proof-coverage (every landed deliverable HAS a record)
         # Post-merge, on main: `before..sha` contains the squash commit that
         # GitHub has now actually written, `(#N)` subject and all.

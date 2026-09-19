@@ -24,6 +24,7 @@ failure found (not just the first) and exits 1.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -32,6 +33,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PROOF_DIR = REPO_ROOT / "proof"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import lwb_sanitise  # noqa: E402
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
@@ -699,6 +703,176 @@ def check_new_proof_records_declare_pr(
     return errors
 
 
+def _command_resolves_to_self(argv) -> bool:
+    """True if `argv` names `lwb_check_proof.py` itself, by basename match
+    on any token (so `python scripts/lwb_check_proof.py`, an absolute path,
+    and `... lwb_check_proof.py --pr 20` are all caught).
+
+    This is the second half of the recursion guard `--reexecute` needs --
+    see `reexecute_verifiable_commands`. Every proof record lists
+    `lwb_check_proof.py` among its commands (it is one of CI's own gates),
+    so re-executing it as an ordinary verifiable command would re-enter
+    validation from inside `--reexecute` itself. The FIRST half of the
+    guard is that `--reexecute` is an explicit CLI flag that never appears
+    in a recorded `argv` (see `tests/test_lwb_check_proof_reexecute.py`),
+    so a re-executed command never inherits it and recurses into ITS OWN
+    `--reexecute` mode; this function additionally refuses to launch the
+    self-referencing command at all, belt and braces, independent of
+    whether that first guard holds.
+    """
+    if not isinstance(argv, list):
+        return False
+    return any(isinstance(a, str) and Path(a).name == "lwb_check_proof.py" for a in argv)
+
+
+def reexecute_verifiable_commands(records, *, run=subprocess.run) -> dict:
+    """Re-run every `commands[]` entry across `records` whose `verifiable`
+    is `True`, sanitise its combined stdout+stderr through the CURRENTLY
+    RUNNING `lwb_sanitise.sanitise`, and compare the resulting sha256 (and
+    exit code) against what the record claims.
+
+    `records` is a list of `(label, data)` pairs -- `label` is whatever the
+    caller wants printed (a relative path, in `main`'s real use), `data` is
+    a parsed proof record dict. This shape, rather than reading `PROOF_DIR`
+    directly, is what lets every guard above be tested without touching
+    disk or spawning a real process (`run` is injectable for the same
+    reason -- production passes `subprocess.run`, tests pass a spy).
+
+    Four failure modes this function exists to prevent becoming theatre,
+    each named in `SPEC-d2-ci-reexecution.md`:
+
+    1. Recursion -- `_command_resolves_to_self` skips any command naming
+       `lwb_check_proof.py`, reported `SKIPPED-SELF`, never invoked.
+    2. Sanitiser drift -- a command whose `sanitiser_version` differs from
+       `lwb_sanitise.SANITISER_VERSION` is reported `UNCOMPARABLE` and is
+       not re-run at all: comparing its digest under different rules would
+       prove nothing, so this is neither a pass nor a failure.
+    3. Empty is not success -- every record's line and the final `TOTAL`
+       line always carry both the re-executed count and the total command
+       count, even when the re-executed count is 0. There is no "all
+       verified" message anywhere in this function.
+    4. Exit codes -- a re-run whose exit code differs from the recorded
+       `exit` is a failure, checked BEFORE the digest comparison, even if
+       the digest happens to match anyway.
+
+    Returns `{"lines": [...], "failures": [...], "total_commands": M,
+    "total_reexecuted": N}`. `failures` is empty exactly when every
+    attempted re-execution passed (an empty `failures` list with
+    `total_reexecuted == 0` is the explicit "0 of N" case above, not a
+    claim that anything was verified).
+    """
+    lines: list[str] = []
+    failures: list[str] = []
+    total_commands = 0
+    total_reexecuted = 0
+
+    for label, data in records:
+        commands = data.get("commands") if isinstance(data, dict) else None
+        if not isinstance(commands, list):
+            continue
+        record_total = len(commands)
+        record_reexecuted = 0
+        record_lines: list[str] = []
+
+        for cmd in commands:
+            if not isinstance(cmd, dict):
+                continue
+            argv = cmd.get("argv")
+            name = " ".join(argv) if isinstance(argv, list) and all(isinstance(a, str) for a in argv) else repr(argv)
+
+            if _command_resolves_to_self(argv):
+                record_lines.append(
+                    f"    SKIPPED-SELF {name} -- a proof record cannot contain proof of its own re-execution"
+                )
+                continue
+
+            if cmd.get("verifiable") is not True:
+                continue  # not claimed re-executable; not counted as attempted
+
+            sanitiser_version = cmd.get("sanitiser_version")
+            if sanitiser_version != lwb_sanitise.SANITISER_VERSION:
+                record_lines.append(
+                    f"    UNCOMPARABLE {name} -- record sanitiser_version={sanitiser_version!r}, "
+                    f"running SANITISER_VERSION={lwb_sanitise.SANITISER_VERSION!r}"
+                )
+                continue
+
+            record_reexecuted += 1
+            total_reexecuted += 1
+            try:
+                proc = run(argv, cwd=str(REPO_ROOT), capture_output=True, encoding="utf-8", errors="replace")
+            except OSError as exc:
+                msg = f"{label}: {name}: could not re-execute: {exc}"
+                failures.append(msg)
+                record_lines.append(f"    FAIL {name} (could not re-execute: {exc})")
+                continue
+
+            combined = proc.stdout + proc.stderr
+            sanitised = lwb_sanitise.sanitise(combined)
+            digest = hashlib.sha256(sanitised.encode("utf-8")).hexdigest()
+            recorded_digest = cmd.get("sha256")
+            recorded_exit = cmd.get("exit")
+
+            if proc.returncode != recorded_exit:
+                msg = (
+                    f"{label}: {name}: exit mismatch -- recorded exit {recorded_exit!r}, "
+                    f"re-run exit {proc.returncode!r}"
+                )
+                failures.append(msg)
+                record_lines.append(f"    FAIL {name} (exit {proc.returncode!r} != recorded {recorded_exit!r})")
+            elif digest != recorded_digest:
+                msg = (
+                    f"{label}: {name}: digest mismatch -- recorded sha256 {recorded_digest!r}, "
+                    f"re-run sha256 {digest!r}"
+                )
+                failures.append(msg)
+                record_lines.append(f"    FAIL {name} (sha256 {digest} != recorded {recorded_digest})")
+            else:
+                record_lines.append(f"    PASS {name}")
+
+        total_commands += record_total
+        lines.append(f"{label}: {record_reexecuted} of {record_total} commands re-executed")
+        lines.extend(record_lines)
+
+    lines.append(
+        f"TOTAL: {total_reexecuted} of {total_commands} commands re-executed across {len(records)} records"
+    )
+
+    return {
+        "lines": lines,
+        "failures": failures,
+        "total_commands": total_commands,
+        "total_reexecuted": total_reexecuted,
+    }
+
+
+def _load_records_for_reexecute() -> list[tuple[str, dict]]:
+    """Every real `proof/*.json` record, as `(relative-path-string, data)`
+    pairs -- `reexecute_verifiable_commands`'s disk-facing input. A record
+    that fails to parse is skipped here (already reported by
+    `validate_all`); this function's only job is to hand back what CAN be
+    re-executed.
+    """
+    records: list[tuple[str, dict]] = []
+    if not PROOF_DIR.is_dir():
+        return records
+    for path in sorted(PROOF_DIR.glob("*.json")):
+        if path.name in ("schema.json", "exempt.json"):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        try:
+            label = str(path.relative_to(REPO_ROOT))
+        except ValueError:
+            label = str(path)
+        records.append((label, data))
+    return records
+
+
 def main() -> int:
     import argparse
 
@@ -729,7 +903,30 @@ def main() -> int:
     # non-CI use (a real checkout of main plus a local branch).
     parser.add_argument("--base", default=None, help="base ref/sha for the pr-authority check")
     parser.add_argument("--head", default=None, help="head ref/sha for the pr-authority check")
+    parser.add_argument(
+        "--reexecute",
+        action="store_true",
+        help=(
+            "re-run every commands[] entry whose verifiable is true across all "
+            "proof/*.json records, sanitise its output, and compare the sha256 "
+            "against the recorded digest. Mutually exclusive with every other mode: "
+            "run alone, prints a re-execution report, and exits 1 on any digest or "
+            "exit-code mismatch (never on an UNCOMPARABLE sanitiser-version drift, "
+            "and never on zero verifiable commands -- see reexecute_verifiable_commands)."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.reexecute:
+        records = _load_records_for_reexecute()
+        report = reexecute_verifiable_commands(records)
+        for line in report["lines"]:
+            print(line)
+        if report["failures"]:
+            for f in report["failures"]:
+                print(f"FAIL: {f}")
+            return 1
+        return 0
 
     errors, count = validate_all()
     errors.extend(check_flat_proof_layout())
