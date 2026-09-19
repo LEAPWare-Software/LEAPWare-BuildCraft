@@ -56,10 +56,23 @@ class RepoFacts:
         as a tuple so an `Event` stays immutable and hashable. An
         identifier is a record file's stem: `proof/24.json` -> `"24"`. An
         empty tuple means the adapter looked and found none.
+    facts_incomplete: True when the adapter could not fully gather these
+        facts -- e.g. a proof directory or `.git/HEAD` exists but could
+        not be READ (permission denied), as opposed to legitimately not
+        existing. This is NOT the same as `branch is None` or
+        `proof_ids == ()`: those can mean "looked and there is nothing
+        there", a fact a rule may safely reason about. This field means
+        "looked and could not tell" -- a rule must not treat it the same
+        as an empty result. See `rules/lwb_proof_required.py`, which
+        stays silent rather than risk a false deny built on facts it does
+        not actually have when this is set.
+    facts_incomplete_reason: human-readable detail for the above, or None.
     """
 
     branch: Optional[str] = None
     proof_ids: Tuple[str, ...] = ()
+    facts_incomplete: bool = False
+    facts_incomplete_reason: Optional[str] = None
 
 
 @dataclass(frozen=True)

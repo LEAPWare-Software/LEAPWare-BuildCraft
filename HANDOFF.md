@@ -8,49 +8,50 @@ next step. Session start, re-derive commands, hard rules and traps live in
 
 In order. Do not start step *n+1* before step *n* is done and proven.
 
-**THE PLAN IS `docs/requirements/build-plan.md`** -- seven phases,
-owner-approved 2026-09-19. Read it before starting anything. Session
-detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
-`docs/maintainers/proof-of-completion-plan.md`.
+Detail for every item: `docs/maintainers/proof-of-completion-plan.md`.
+Read it before touching a gate.
 
-**THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
-that no WORTHY AND VETTED tool already does it before building anything.
-
-1. **DONE: #17-#27.** `main` green. Decisions:
+1. **DONE.** Scaffold, ruleset, mission. Repo is **PUBLIC** (Apache-2.0):
+   all commits world-readable. Decisions:
    `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
-2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
-   every 2h; a separate reviewer routine writes the gating record
-   hourly. No routine can create a routine, so a conductor CANNOT
-   dispatch its reviewer -- independence is structural. #27 landed on a
-   routine's record. Same account: separation of dispatch and context,
-   NOT of interest.
-3. **IN FLIGHT.** #30 (plan + D21-D27 onto main, which the conductor
-   reads), #31 (Actions merge path, re-cut after `.claude/` paths
-   killed #28), #29 (runbook, routine specs, `.claude/` lane fix). Each
-   needs `proof/<pr>.json` AND a review record. Re-derive every SHA.
-4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
-   **0 armed to deny**, 2 of 8 skills working. **A consuming repo
-   installs `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
-5. **DEFECT PATTERN:** "I could not check" must never share a
-   representation with "I checked and found nothing". Live in Codex's
-   lane. The hook has still never been seen to fire from `hooks.json`.
-6. Every deliverable: proof record, pushed, CI green, announced
+   Branch tips and PR state are not written here; re-derive per
+   `docs/handoff-protocol.md`.
+2. **DONE. Proof of completion in CI: #17-#22.** `main` green.
+3. **IN FLIGHT:** #23 re-execute hardening, #24 open-PR post-merge. Both
+   carry an independent AGREE.
+4. **WHAT ACTUALLY BLOCKS 1.0.0 -- not a gate fix.** Version **0.1.0**,
+   zero tags, no release ever run; `core/lwb_core/rules/` holds ONE
+   rule, a self-declared no-op; every gate is a `scripts/` file wired to
+   THIS repo's CI. **A consuming repo installs `lwb` and gets a no-op.**
+   Plan doc, "1.0.0 readiness".
+5. **SETTLE FIRST -- touches the owner's permission prompts.** The lane
+   hook returns explicit `"permissionDecision": "allow"` for every edit
+   it does not deny, which may suppress the normal prompt. PLAUSIBLE.
+6. **Lane guard is a NUDGE by design**, so the ungated `Bash` path is
+   not a broken premise. Two real defects: a worktree inside the
+   checkout is denied wrongly, one outside is never checked.
+7. **The shipped hook has never been seen to fire** (`"matcher":
+   "Agent"`). Needs a NEW session, marker registered BEFORE start.
+   The *lane* hook does fire and deny, so the mechanism works.
+8. **Then:** re-execution blocking; the fork gap; install the plugin
+   here.
+9. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 14:20 UTC
-main SHA: f9b4deadbb441f0c1046a0d73b0434424f1cf13c
+Generated: 2026-09-19 15:22 UTC
+main SHA: de27f7230da32ccdeb25374781f81d60ad5e9940
 CLI: unknown
 Session: unknown
 
 Open PRs:
-#31 Re-cut the cloud merge path onto a branch the lane gate can pass (supersedes #28) (lwb-cloud-autoqueue-v2)
+#32 #27's review record claims a dispatch that did not happen (lwb-correct-27-dispatch)
 #30 The plan and the decisions the cloud routines read — they are not on main (lwb-capture-d21-d22)
 #29 Cloud-only operation: the protocol, the roles, and the merge path that was broken for a routine (cloud/runbook)
 
 Deliverable proof state (from proof/):
-18/18 proven
+21/21 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
@@ -60,7 +61,7 @@ Deliverable proof state (from proof/):
 - Session start, re-derive commands, hard rules, traps →
   `docs/handoff-protocol.md`
 - Architecture, policy format → `docs/architecture.md`, `docs/policy.md`
-- Session detail, gates that failed →
-  `docs/maintainers/session-handoff-2026-09-19.md`
+- Session detail, gates that failed, environment changes →
+  `docs/maintainers/session-handoff-2026-09-18.md`
 - Proof-of-completion plan, open blockers, what it will NOT cover →
   `docs/maintainers/proof-of-completion-plan.md`

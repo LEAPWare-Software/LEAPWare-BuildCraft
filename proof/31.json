@@ -1,0 +1,163 @@
+{
+  "deliverable": "cloud-merge-path-re-cut-onto-a-clean-branch",
+  "pr": 31,
+  "author": "conductor-track-a-opus5-01XXZR3A-2026-09-19",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "497a735",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 14%]",
+        "........................................................................ [ 28%]",
+        "........................................................................ [ 43%]",
+        "........................................................................ [ 57%]",
+        "........................................................................ [ 72%]",
+        "........................................................................ [ 86%]",
+        ".................................................................        [100%]",
+        "497 passed in 18.71s"
+      ],
+      "sha256": "0da176a6244c04ef2cab41c600f86540ac3c72a91d66af680f96f90faf9d4638",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_auto_queue.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "..........                                                               [100%]",
+        "10 passed in 0.02s"
+      ],
+      "sha256": "4c78d91fecebd9ff2601366b209fedef5a34c74b72f29aadd727b0d4e4957970",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...                                                                      [100%]",
+        "3 passed in 0.05s"
+      ],
+      "sha256": "6affff3fa6ce0c6f95578cfcdc5fb8f6e18696d0b51309940bab380bda460a3e",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "PR #31's diff against origin/main is exactly four files -- .github/workflows/auto-queue.yml, scripts/cloud/auto_queue.py, tests/test_auto_queue.py and one .gitignore hunk -- with no .claude/worktrees/ path in any commit, which is the whole reason #28 could not be salvaged",
+      "met": true
+    },
+    {
+      "criterion": "The three carried-over files are byte-identical to PR #28's, so this is a re-cut and not a rewrite: the content #28 reviewed is the content #31 carries",
+      "met": true
+    },
+    {
+      "criterion": "The branch history is clean -- a single commit on lwb-cloud-autoqueue-v2, so every commit passes the per-commit lane gate, unlike #28 where even the commit that DELETED .claude/worktrees/agent-* failed because .claude/ classifies as `other` (no lane) in scripts/lwb_lanes.py",
+      "met": true
+    },
+    {
+      "criterion": "The full test suite passes at this head: 497 passed, captured in commands[] rather than asserted",
+      "met": true
+    },
+    {
+      "criterion": "tests/test_auto_queue.py's 10 tests, every one a refusal path, pass at this head -- captured in commands[]",
+      "met": true
+    },
+    {
+      "criterion": "The auto-queue workflow parses as valid workflow YAML: tests/test_workflows_parse.py passes, 3 tests, captured in commands[]",
+      "met": true
+    },
+    {
+      "criterion": "lwb-prefix and lwb-no-instruction-dep both pass at this head, and are the two of five commands in this record that are independently re-executable by CI",
+      "met": true
+    },
+    {
+      "criterion": "This record and HANDOFF.md's regenerated generated-block land in ONE commit, the documented workaround for the record/head circularity that has bitten four prior PRs",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 9207485,
+    "cached_input": 9207331,
+    "uncached_input": 154,
+    "output": 81743,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 598.588,
+    "source": "transcript message.usage summed across 77 usage-bearing assistant records in this cloud session's transcript (2026-09-19T14:11:34.431Z to 2026-09-19T14:21:33.019Z). Output includes 40170 thinking tokens per output_tokens_details. This covers ONLY this cloud session, which cut the branch and wrote this record; it EXCLUDES the coordinator session that authored PR #28's content and every subagent. It is also a snapshot taken before this record was committed, so the session's own remaining spend is not in it. A floor, not a total."
+  },
+  "mutations": [
+    ".github/workflows/auto-queue.yml: carried from PR #28 byte-identical -- check_suite completion and manual dispatch, default-branch code only, 5 minute timeout",
+    "scripts/cloud/auto_queue.py: carried from PR #28 byte-identical -- the readiness decision, kept out of the workflow so it is testable",
+    "tests/test_auto_queue.py: carried from PR #28 byte-identical -- 10 tests, all refusal paths",
+    ".gitignore: the one hunk from PR #28 -- .claude/worktrees/ is scratch and must never be committed",
+    "proof/31.json: this record, added by this commit",
+    "HANDOFF.md: generated lwb-handoff block regenerated in the SAME commit as this record, because adding the record changes the proof-state lines the block derives"
+  ],
+  "unproven": [
+    "NO INDEPENDENT REVIEW RECORD EXISTED WHEN THIS RECORD WAS WRITTEN. reviews/31/ is empty; this record's `checked_by` is the placeholder `pending-independent-reviewer-routine`, which names no reviewer and asserts no review happened. The schema requires a non-empty `checked_by` differing from `author` and nothing more, so a placeholder satisfies it -- that is a gap in the gate, not evidence of a check. An independent review is written by a separate reviewer routine, and lwb-lanes will fail until it lands.",
+    "THE AUTO-QUEUE LOGIC HAS NEVER BEEN EXECUTED AGAINST A REAL PR. auto-queue.yml runs only from the default branch, and it is not on the default branch yet, so it cannot fire until #31 lands. Its tests pass; its behaviour in GitHub Actions is designed, not observed. Carried forward unchanged from PR #28, whose workflow never fired either.",
+    "THE ADOPT-BEFORE-BUILD SURVEY IS INCOMPLETE. docs.github.com was not reachable from this environment, so 'no suitable existing action exists' is NOT proven -- only that three named candidates were examined and do not fit. The broader marketplace was never surveyed.",
+    "Token accounting covers only this cloud session and excludes the coordinator session that authored #28's content and all subagent spend; it is a snapshot taken before this commit, so it does not include this record's own remaining cost.",
+    "2 of 5 commands in this record are independently re-executable. The other three are pytest invocations whose output carries a wall clock and a progress width, marked verifiable: false with reason nondeterministic-output. No script can check that this stated reason is honest -- see proof/README.md.",
+    "The generated HANDOFF.md open-PR listing in this commit is DEGRADED, not accurate: lwb_handoff.py shells out to `gh pr list`, which is GraphQL, and GraphQL is blocked by this environment's proxy, so the block records the '(unavailable ...)' fallback string instead of listing the open PRs. The block is honest about being unavailable but it is not a listing.",
+    "GRAPHQL FROM INSIDE ACTIONS IS ASSUMED TO WORK, not measured, exactly as in proof/28.json. The premise is that Actions runs inside GitHub so nothing is proxied. Not yet observed for this repository -- and this environment's own GraphQL block is the reason the enqueue was moved into Actions in the first place.",
+    "That the three carried files are byte-identical to PR #28's was checked by this session against #28's branch; the comparison itself is not captured as a commands[] entry in this record."
+  ]
+}

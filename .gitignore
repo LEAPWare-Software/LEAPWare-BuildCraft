@@ -58,3 +58,6 @@ desktop.ini
 # local build output, rebuilt with `/graphify . --update`, not source.
 graphify-out/
 graphify-vault/
+
+# Agent worktrees are scratch, never committed
+.claude/worktrees/

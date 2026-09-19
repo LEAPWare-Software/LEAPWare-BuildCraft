@@ -221,6 +221,23 @@ jobs:
       - name: Run both hooks exactly as each hooks.json declares them
         run: python scripts/lwb_check_hook_launch.py
 
+  lwb-foreign-repo:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: "Drive the shipped hook against a scratch repo outside this checkout"
+        timeout-minutes: 10
+        run: python scripts/lwb_check_foreign_repo.py
+
   lwb-hosted-runners:
     runs-on: ubuntu-latest
     steps:
