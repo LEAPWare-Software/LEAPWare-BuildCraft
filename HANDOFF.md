@@ -40,17 +40,16 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 07:51 UTC
-main SHA: ae058820757801a4332db33b782767924bd0cb7b
+Generated: 2026-09-19 08:14 UTC
+main SHA: 1385baf48bf52f76b05b80edfa50bdcb492d0b9a
 CLI: claude
 Session: goal-1.0.0
 
 Open PRs:
-#24 The same post-merge trap, one line down the same block — live on main (lwb-openpr-postmerge)
 #23 Close the three defects blocking a blocking re-execute gate (lwb-reexecute-blockable)
 
 Deliverable proof state (from proof/):
-15/15 proven
+16/16 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

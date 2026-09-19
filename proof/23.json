@@ -1,0 +1,135 @@
+{
+  "deliverable": "reexecute-gate-can-be-made-blocking",
+  "pr": 23,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "reviewer-claude-3b64530b-2026-09-19",
+  "commit": "4bb7378",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 17%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 53%]",
+        "........................................................................ [ 71%]",
+        "........................................................................ [ 89%]",
+        "...........................................                              [100%]",
+        "403 passed in 88.37s (0:01:28)"
+      ],
+      "sha256": "dde32dee6fc3f3458892462a2c3679821d85cb90095eed7aa92837752072058e",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_lwb_check_proof_reexecute.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "....................................                                     [100%]",
+        "36 passed in 0.28s"
+      ],
+      "sha256": "a04fa9bfdf7b81c7084b804d803155c2cdf41f061355c83404d967c6109e0085",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "UNCOMPARABLE is counted in the TOTAL line and has its own exit code 3, so a sanitiser_version bump can no longer silently disable the gate",
+      "met": true
+    },
+    {
+      "criterion": "Exit precedence MISMATCH(1) > UNCOMPARABLE(3) > NOTHING(2) > ALL_MATCHED(0), probed directly including the mismatch-beats-uncomparable case",
+      "met": true
+    },
+    {
+      "criterion": "All four confirmed recursion-guard bypasses are closed: uppercase filename, -m module form, bash -c wrapper, subprocess.run wrapper",
+      "met": true
+    },
+    {
+      "criterion": "Every re-executed command carries a 300s timeout, and a timeout is a FAILURE naming the command and the limit, never a pass or a skip",
+      "met": true
+    },
+    {
+      "criterion": "A malformed command entry fails against its own record and the run continues, instead of killing the check for every other record",
+      "met": true
+    },
+    {
+      "criterion": "THE SILENT OPT-OUT IS CLOSED: a self-referencing command marked verifiable:true is a FAILURE, and skips are counted in the TOTAL line. All 16 self-references in real records are verifiable:false, so the rule costs nothing",
+      "met": true
+    },
+    {
+      "criterion": "The three vacuous wrapper tests now discriminate: reverting to the old guard fails 7 tests where it previously failed 4",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": 884098522,
+    "cached_input": 877581608,
+    "uncached_input": 6516914,
+    "output": 2359938,
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": 125676.647,
+    "source": "transcript message.usage summed across this session's 2146 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T07:56:50.235Z). Cumulative across PRs 12-24 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, not attributable to this PR alone."
+  },
+  "mutations": [
+    "scripts/lwb_check_proof.py: REEXECUTE_EXIT_UNCOMPARABLE=3 with documented precedence; _command_resolves_to_self rewritten to a case-insensitive substring match; REEXECUTE_TIMEOUT_SECONDS=300 and SELF_REEXECUTE_GUARD_ENV on every child; malformed-argv validation; total_skipped_self counted; verifiable:true self-reference is a failure; --help corrected to four exit codes",
+    "tests/test_lwb_check_proof_reexecute.py: bypass tests for all four confirmed forms, uncomparable exit-code tests, timeout tests, malformed-argv tests, the silent-opt-out reproduction, and the three wrapper payloads changed so the needle is not the final path component",
+    "docs/maintainers/proof-of-completion-plan.md: the three defects recorded as closed, plus what still stands between this gate and blocking"
+  ],
+  "unproven": [
+    "NOT FIXED, AND A PRECONDITION FOR THE BLOCKING PR: on Windows a timed-out command whose CHILD process keeps the pipes open makes subprocess.run wait for the child anyway -- the reviewer measured a 2-second limit taking 20 seconds. There is also no overall time budget (worst case 300s x number of verifiable commands) and ci.yml has no timeout-minutes, so GitHub's 360-minute default is the only cap.",
+    "THE CHANGED RE-EXECUTION PATH IS NOT YET PROVEN ON A RUNNER. This PR added env= and timeout= kwargs to every re-executed subprocess. Digests reproducing on six runners was measured for the PREVIOUS path, not this one. That is why the gate stays report-only and why blocking is a separate one-line ci.yml PR.",
+    "The recording and re-run environments now differ by one variable: children see LWB_CHECK_PROOF_REEXECUTING=1, which scripts/lwb_record.py does not set when recording. A command whose output depended on it would never reproduce. No current record does. Found by the reviewer.",
+    "I PUBLISHED A FALSE CLAIM IN THIS PR'S FIRST DESCRIPTION -- that a false SKIPPED-SELF 'can only lower the re-executed count, never manufacture a pass'. The reviewer disproved it and I reproduced the disproof. Corrected in the description; commit 774f04d's message cannot be rewritten because force-push is denied.",
+    "A red-count clarification: I wrote '10 tests red before the fix' for 774f04d. Reverting the guard ALONE gives 4 red; the other 6 were red for the other two defects.",
+    "The reviewer did not check CI on 4bb7378 and did not read the plan-doc changes.",
+    "Token accounting is cumulative across PRs 12-24, not attributable to this PR."
+  ]
+}
