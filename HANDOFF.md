@@ -27,11 +27,11 @@ that no WORTHY AND VETTED tool already does it before building anything.
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT:** #38 (this PR -- re-cuts dead #37, itself #35 re-cut on
-   #30; #30/#35/#37 all dead on unfixable identity/leak failures, don't
-   touch any). Blocked on `lwb-lanes`: 0 valid reviews -- gate defect,
-   not content. #29 (runbook, conflicts w/ main), #32 (#27 correction).
-   Re-derive SHAs.
+3. **IN FLIGHT:** #39 (this PR -- re-cuts dead #38; #30/#35/#37/#38 all
+   dead on unfixable identity/leak failures, don't touch any). Blocked on
+   `lwb-lanes`: 2 AGREEs on file, both rejected on a same-repo-name
+   segment collision -- flagged to the owner, gate defect not content.
+   #29 (runbook, conflicts w/ main), #32 (#27 correction). Re-derive SHAs.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
@@ -43,7 +43,7 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 18:30 UTC
+Generated: 2026-09-19 19:40 UTC
 main SHA: bfe850796969980545811e1ffa551b9143965faf
 CLI: claude
 Session: conductor-track-a-e4242f53

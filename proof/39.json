@@ -1,6 +1,6 @@
 {
   "deliverable": "the-plan-and-decisions-the-routines-read",
-  "pr": 38,
+  "pr": 39,
   "author": "conductor-track-a-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
   "commit": "57f130a",
@@ -24,9 +24,9 @@
         "........................................................................ [ 82%]",
         "........................................................................ [ 96%]",
         "..................                                                       [100%]",
-        "522 passed in 19.79s"
+        "522 passed in 18.59s"
       ],
-      "sha256": "b09fdd5691a04aa622cb871d68ae83a545c2116dddaff3f800b9ae6e75e32015",
+      "sha256": "ef6f46e2d972ce806211d156decd8aff9dc84966c384e9e04026dbd03b1dc395",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
