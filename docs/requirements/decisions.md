@@ -678,6 +678,76 @@ correct, and the audit that followed found 0 of 15 stages, 0 of 1 roles,
 adoption register. See `docs/maintainers/proof-of-completion-plan.md`,
 "1.0.0 readiness".
 
+## D23 — The stage vocabulary, finally written down · 2026-09-19
+
+Owner-decided 2026-09-19. **This is the rewrite D15 required and item 8 of
+required work.** D15 settled HOW stages are derived; it explicitly did not
+claim the derivation had been done, and it had not been — for a day, the
+plan named seven stages while labelling them "history, not the
+vocabulary".
+
+Derivation rule applied, from D15: each stage is named for the
+responsibility it covers and carries the component that covers it; a
+responsibility with no component and no gate does not become a stage.
+
+**THIRTEEN STAGES:**
+
+| # | Stage | Component | Provided by |
+|---|---|---|---|
+| 1 | requirements | GitHub Spec Kit | adopt |
+| 2 | architecture | thin — ADR tooling | adopt, owner ruled it IN |
+| 3 | implementation | Superpowers | adopt |
+| 4 | verification | Anthropic `code-review` | adopt |
+| 5 | security | `security-review` + Trail of Bits | adopt |
+| 6 | documentation | thin | adopt, owner ruled it IN |
+| 7 | build integrity | — | lwb builds |
+| 8 | data changes | — | lwb builds |
+| 9 | release | — | lwb builds |
+| 10 | observability | Datadog / Sentry MCP | adopt |
+| 11 | incident response | PagerDuty MCP | **HOLD — no work** |
+| 12 | vulnerability handling | Dependabot | adopt |
+| 13 | handoff | `claude-mem` CONTESTED | lwb's own gate |
+
+**Owner rulings that changed the derived list:**
+
+- **Retirement / decommissioning is ELIMINATED.** It was one of the four
+  responsibilities D12 said lwb must build. It is not a stage.
+- **Incident response is HELD.** It stays in the vocabulary; no work is to
+  be done on it.
+- **Architecture and documentation STAY, and are critical.** The
+  derivation rule would have dropped both — thin tooling, no gate — and
+  the owner overruled that directly: "Architecture is critical as well as
+  docs. must be in." So these two are stages by owner ruling rather than
+  by derivation, which is recorded here so no later reader "corrects" the
+  list back.
+
+**A CONDITION THE OWNER ATTACHED TO THE WHOLE LIST, to be stated loudly in
+the build plan and not buried:** we must absolutely, positively have
+double-checked that there are no WORTHY AND VETTED tools or plugins for
+each stage before building anything ourselves. This is Principle 4 given
+teeth. It applies to all thirteen — including the stages D12 assigned to
+lwb to build, because that survey is a year-zero snapshot and the
+conclusion "nothing credible exists" is exactly the kind of claim this
+repo has learned not to take on trust.
+
+**Two gaps in the source map, found while deriving and NOT invented over:**
+
+1. **D12 claims fifteen responsibilities and names fourteen.** The missing
+   one is in the group with credible adoptable components.
+2. **D12 claims eight adoptable components and names seven.** Same gap,
+   seen from the other side.
+
+The fifteenth responsibility is written down nowhere in this repo. It was
+not fabricated to make the count work. Recovering it means re-running the
+survey against its original source.
+
+**`operations` is gone**, as D15 intended — a stage with no gate. Its work
+is now stages 10 and 11, each named for what it actually does.
+
+**Proof of completion is deliberately NOT a stage.** It is the evidence
+layer that runs across all thirteen, which is why it is Phase 1
+infrastructure rather than a step in the line — see D24.
+
 ### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
 
 Full detail on the first two in-flight steps, moved here so HANDOFF.md
