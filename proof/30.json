@@ -1,13 +1,13 @@
 {
   "deliverable": "the-plan-and-decisions-the-routines-read",
   "pr": 30,
-  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "author": "conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
-  "commit": "2613df2",
+  "commit": "74de2f6",
   "commands": [
     {
       "argv": [
-        "python",
+        "python3",
         "-m",
         "pytest",
         "tests/",
@@ -16,23 +16,24 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "........................................................................ [ 14%]",
-        "........................................................................ [ 29%]",
-        "........................................................................ [ 44%]",
-        "........................................................................ [ 59%]",
-        "........................................................................ [ 73%]",
-        "........................................................................ [ 88%]",
-        ".......................................................                  [100%]",
-        "487 passed in 41.23s"
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 41%]",
+        "........................................................................ [ 55%]",
+        "........................................................................ [ 68%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 96%]",
+        "..................                                                       [100%]",
+        "522 passed in 20.53s"
       ],
-      "sha256": "30372a85ec9400e19ff6bc82f8958219c12d435faa47b9fb9c3353ef69795a8e",
+      "sha256": "7d391a03a9c26e2d07263fe3a84e87f60a68d981def22f982d5d3576e74e0e0c",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
-        "python",
+        "python3",
         "scripts/lwb_check_state_claims.py",
         "--repo",
         "."
@@ -40,31 +41,46 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "HANDOFF.md:42: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 14:20 UTC",
+        "HANDOFF.md:44: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 16:18 UTC",
         "lwb-check-state-claims check passed"
       ],
-      "sha256": "7f1b7181110e8bfa081dc0e732cc713aa3bb9c22af8af6a55dee220810c77be0",
+      "sha256": "57cf0522dcec5c6d35df041687c924c9d675fbf131008a5cd33861faeac7b226",
       "sanitiser_version": "1",
       "verifiable": true
     },
     {
       "argv": [
-        "python",
+        "python3",
         "scripts/lwb_check_proof.py"
       ],
       "exit": 0,
       "expect_exit": 0,
       "tail": [
         "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
-        "lwb-proof check passed (18 record(s))"
+        "lwb-proof check passed (21 record(s))"
       ],
-      "sha256": "7b40ad619acafa3181811db67ca95724aeb7ffe245300e82f2026d4d631ddd08",
+      "sha256": "11c384419b8c98fd8fde3ad60e731b833c28bd65063870560a712e2ecee50ab0",
       "sanitiser_version": "1",
       "verifiable": true
     },
     {
       "argv": [
-        "python",
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2770 bytes)"
+      ],
+      "sha256": "f5b6c17e7d1e5581cdbc268573cf034b154ce1de026fcf3225275ec940db1586",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
         "scripts/lwb_check_prefix.py"
       ],
       "exit": 0,
@@ -78,7 +94,7 @@
     },
     {
       "argv": [
-        "python",
+        "python3",
         "scripts/lwb_check_no_instruction_dep.py"
       ],
       "exit": 0,
@@ -87,22 +103,6 @@
         "lwb-no-instruction-dep check passed"
       ],
       "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
-      "sanitiser_version": "1",
-      "verifiable": true
-    },
-    {
-      "argv": [
-        "python",
-        "scripts/lwb_build.py",
-        "--check"
-      ],
-      "exit": 0,
-      "expect_exit": 0,
-      "tail": [
-        "OK: <repo>/plugins/claude/lwb/vendor matches source",
-        "OK: <repo>/plugins/codex/lwb/vendor matches source"
-      ],
-      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
       "sanitiser_version": "1",
       "verifiable": true
     }
@@ -129,11 +129,15 @@
       "met": true
     },
     {
-      "criterion": "HANDOFF.md is regenerated and under its 3000-byte cap: `python scripts/lwb_handoff.py --check` reports 2941 bytes, and `python scripts/lwb_check_state_claims.py --repo .` passes. The generated block had recorded main at 55f38ae while live main was f9b4dea; the state-claims gate caught it rather than a human.",
+      "criterion": "HANDOFF.md's own \"In flight\" rewrite (the build-plan pointer, the adopt-before-build condition, an in-flight list naming the PRs actually open) survives on the branch's HEAD, not just on an intermediate commit a later merge can silently discard. Independent cloud review B (reviews/30/cloud-reviewer-b.json) found the merge commit 1a171c9 had reverted exactly this to main's stale copy; reproduced independently before fixing: `diff <(git show origin/main:HANDOFF.md | sed '/lwb-handoff:begin/,/lwb-handoff:end/d') <(sed '/lwb-handoff:begin/,/lwb-handoff:end/d' HANDOFF.md)` was IDENTICAL at the reviewed head, and is no longer identical at this commit.",
       "met": true
     },
     {
-      "criterion": "Documentation only. `git diff --name-only origin/main...HEAD` touches only HANDOFF.md and docs/. No code path changes, and `python -m pytest tests/ -q` is 487 passed.",
+      "criterion": "HANDOFF.md is regenerated LAST (after the prose fix and after merging current main), under its 3000-byte cap, and its recorded main SHA is an exact match rather than surviving on the one-commit first-parent tolerance the same review flagged as finding 2: `python scripts/lwb_handoff.py --check` reports 2770 bytes, `python scripts/lwb_check_state_claims.py --repo .` passes, and HANDOFF.md:44 records main SHA bfe850796969980545811e1ffa551b9143965faf, which is live main's actual HEAD, not its first parent.",
+      "met": true
+    },
+    {
+      "criterion": "python -m pytest tests/ -q is 522 passed (up from 487 at the previous record, reflecting main's #25-#27/#31/#34 landing since).",
       "met": true
     }
   ],
@@ -149,15 +153,16 @@
     "source": "unknown -- this record was written mid-session and no per-PR token accounting was taken. Recorded as unknown rather than copied from an earlier record or estimated, because a borrowed number is a manufactured one."
   },
   "mutations": [
-    "docs/requirements/build-plan.md: the consolidated seven-phase plan, walked with the owner phase by phase and approved",
-    "docs/requirements/decisions.md: D21, D22, D23, D24, D27",
-    "docs/maintainers/session-handoff-2026-09-19.md: the session handoff, corrected after an audit found it had pinned stale SHAs in ungated prose",
-    "HANDOFF.md: in-flight section rewritten for the post-#27 state and the live cloud loop; generated block regenerated"
+    "docs/requirements/build-plan.md: the consolidated seven-phase plan, walked with the owner phase by phase and approved (unchanged by this fix)",
+    "docs/requirements/decisions.md: D21, D22, D23, D24, D25, D26, D27 (unchanged by this fix; the previous record under-enumerated this to D21/D22/D23/D24/D27 only -- non-blocking finding 3 in reviews/30/cloud-reviewer-b.json, corrected here)",
+    "docs/maintainers/session-handoff-2026-09-19.md: the session handoff, corrected after an audit found it had pinned stale SHAs in ungated prose (unchanged by this fix)",
+    "HANDOFF.md: the branch's own in-flight rewrite (THE PLAN pointer, the adopt-before-build condition, an in-flight list naming #29/#30/#32 in place of the stale #23/#24) re-applied on top of merge commit 1a171c9, which had reverted it to main's stale copy; generated block regenerated last against main SHA bfe8507 and merged main up to bfe8507 (carrying #34) first"
   ],
   "unproven": [
-    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. `checked_by` is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, because inventing or borrowing one is the exact dishonesty this system exists to catch. The independent review record under reviews/30/ is what makes this record complete, and until it exists this PR must not land.",
-    "THE COMMANDS RAN ON WINDOWS ONLY (win32, CPython 3.12). CI runs the same gates on ubuntu, macos and windows across 3.10 and 3.12; I did not run the other five legs.",
-    "THE PLAN'S CONTENT IS NOT PROVEN BY ANY COMMAND. These commands prove the documents are well-formed, the caps hold and the gates pass. Whether the seven phases are the RIGHT phases is an owner judgement recorded in a conversation, not a fact a script can check. The only evidence is that the owner walked it phase by phase and approved each one.",
-    "THE CONDUCTOR'S FALLBACK IS UNTESTED IN THE FAILING DIRECTION. Its prompt now reads the plan from this branch when the file is absent from main. The run at 14:11Z read the plan successfully, but I did not test what it does when BOTH sources are unreachable -- the path where it is supposed to comment and stop rather than improvise."
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. `checked_by` is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, because inventing or borrowing one is the exact dishonesty this system exists to catch. reviews/30/cloud-reviewer-b.json reviewed an earlier head (1a171c9a) and is now STALE against this commit by construction (lwb_lanes.py's freshness check); a fresh independent review record under reviews/30/ at THIS head is what makes this record complete, and until it exists this PR must not land. I did not write and must not write that record myself (D20).",
+    "THE COMMANDS RAN ON LINUX ONLY (this container). CI runs the same gates on ubuntu, macos and windows across 3.10 and 3.12; I did not run the other five legs.",
+    "THE PLAN'S CONTENT IS NOT PROVEN BY ANY COMMAND, as the previous record already noted; this fix touches only HANDOFF.md and this proof record, not the plan or decisions documents themselves.",
+    "THE CONDUCTOR'S FALLBACK IS UNTESTED IN THE FAILING DIRECTION, as the previous record already noted; not re-verified here.",
+    "NON-BLOCKING FINDING 4 (reviews/30/cloud-reviewer-b.json): D25's own justification overstates what is measurable (\"one figure for sixteen deliverables\" vs. 14 distinct cumulative figures plus two 'unknown' records plus one non-cumulative outlier). Not corrected here -- D25's substantive conclusion is unaffected and the reviewer marked this non-blocking; left for whoever next touches decisions.md."
   ]
 }
