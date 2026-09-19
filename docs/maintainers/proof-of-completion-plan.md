@@ -52,6 +52,16 @@ script over every `commands[].argv` in `proof/*.json`, normalising numeric
 arguments, there are **ten distinct command kinds**: five re-execute
 cleanly on a runner, three cannot, and two are conditional.
 
+**MEASURED AGAIN 2026-09-19, and the number moved.** Running the real
+recorder (`scripts/lwb_record.py`) against this repo gives **5 of 9**,
+not 5 of 10. The tenth kind, `lwb_build.py --check`, appears in the table
+above but no proof record in this repo has ever actually run it — it was
+counted from the table rather than from the records. The split that
+matters is therefore: five verifiable, four not
+(`pytest` as nondeterministic-output, `lwb_check_env_leak.py` as
+needs-repo-secret, and both git-range commands as
+git-range-not-reproducible). Say "5 of 9" when describing this repo.
+
 An earlier draft of this paragraph said "five are re-executable and five
 are not." That was wrong, and it was wrong in a document written to end
 false claims — caught by an independent review of PR #17. The review's own
@@ -110,7 +120,15 @@ mid-flight and were unrepairable because force-push is denied here.
 
 Nothing in (d) or (e) is built while these stand.
 
-1. **The sanitiser does not exist as code.** `session-protocol.md` tells
+1. **CLOSED 2026-09-19 — the sanitiser exists as code.**
+   `scripts/lwb_sanitise.py` carries a `SANITISER_VERSION`, normalises
+   path separators so Windows and ubuntu produce identical bytes, and is
+   called by `scripts/lwb_record.py`, which replaces the throwaway
+   capture script. Each command entry records the `sanitiser_version`
+   that produced its digest. Records 7-19 predate the scheme and are NOT
+   back-filled — a back-filled digest is a fabricated receipt — so their
+   digests remain unverifiable, which `proof/README.md` now states.
+   Originally recorded as: **The sanitiser does not exist as code.** `session-protocol.md` tells
    each session to write a throwaway script and *delete it*. The records
    disagree about what it did: 7-13 say they replaced `<repo>`, `<home>`
    and `<path>`; 15-16 say `<repo>` and `<home>`. Two rule sets, so every
@@ -118,10 +136,22 @@ Nothing in (d) or (e) is built while these stand.
    `scripts/lwb_sanitise.py`, have the recorder call it, add
    `sanitiser_version` to `commands[]`, and state plainly that records
    7-16 predate the scheme.
-2. **Non-deterministic commands cannot be digest-matched.** Either exclude
+2. **CLOSED 2026-09-19 as to recording, OPEN as to enforcement.** A
+   command now carries `verifiable` plus a `verifiable_reason` from a
+   closed enum, so a non-deterministic command is named as such rather
+   than silently digest-matched. What does NOT yet exist is the CI job
+   that re-executes the verifiable ones and compares digests — that is
+   the next PR, and until it lands no digest in this repo has ever been
+   checked by anything.
+   Originally recorded as: **Non-deterministic commands cannot be
+   digest-matched.** Either exclude
    them by name or record a normalised form — argv, exit code, and a
    count extracted by regex — instead of a hash of raw output.
-3. **Git-range commands need resolved shas.** The record must store the
+3. **CLOSED 2026-09-19 — resolved shas are required and enforced.**
+   A command whose argv names a git revision range must carry
+   `resolved_base` and `resolved_head`, in both the `a..b` and the
+   `--base/--head` forms; the validator rejects it otherwise, from PR 20.
+   Originally recorded as: **Git-range commands need resolved shas.** The record must store the
    base and head it actually ran against, and CI must substitute those
    rather than re-running the symbolic argv.
 4. **Re-deriving the generated `HANDOFF.md` block cannot pass.** It

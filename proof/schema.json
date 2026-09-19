@@ -56,6 +56,28 @@
             "type": "string",
             "pattern": "^[0-9a-f]{64}$",
             "description": "sha256 of the command's full captured output (stdout+stderr concatenated), so a 10-line tail can't quietly hide a truncated failure — see scripts/lwb_check_proof.py's re-hash check."
+          },
+          "sanitiser_version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "scripts/lwb_sanitise.py's SANITISER_VERSION at the time this command's output was sanitised, so the digest is attributable to a known set of substitution rules rather than to whichever throwaway script a session happened to hand-write that day. Required, and enforced, for records from PR #20 onward (docs/maintainers/proof-of-completion-plan.md, open blocker 1); records 7-19 predate scripts/lwb_sanitise.py entirely and are not backfilled."
+          },
+          "verifiable": {
+            "type": "boolean",
+            "description": "Whether this exact command is independently re-executable by CI on a fresh checkout. Measured, not assumed -- docs/maintainers/proof-of-completion-plan.md counts the distinct command kinds found across proof/*.json and finds five re-execute cleanly, three cannot (e.g. wall-clock/terminal-width-dependent output, or a symbolic git range CI cannot reproduce), and two are conditional (need a repo secret or a gitignored build step). Required, and enforced, for records from PR #20 onward; see scripts/lwb_check_proof.py."
+          },
+          "verifiable_reason": {
+            "type": "string",
+            "enum": ["nondeterministic-output", "git-range-not-reproducible", "needs-repo-secret", "needs-build-step"],
+            "description": "Required when 'verifiable' is false. A CLOSED enum, machine-checked -- free text is an advisory rule, and a reason a validator cannot check is not a check. See the plan's measured table for which command kinds take which reason."
+          },
+          "resolved_base": {
+            "type": "string",
+            "description": "For a command whose argv names a git revision range (a single 'a..b' token, or separate --base/--head flags) -- the actual sha this command's 'base' side resolved to when it was run. Without this, CI substituting the symbolic argv (e.g. origin/main..HEAD) resolves a DIFFERENT commit than the one the record proves, and an honest record fails -- open blocker 3."
+          },
+          "resolved_head": {
+            "type": "string",
+            "description": "As resolved_base, for the 'head' side of a git revision range."
           }
         }
       }

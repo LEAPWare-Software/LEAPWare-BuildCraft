@@ -77,6 +77,54 @@ See `schema.json` for the enforced shape. In prose:
   record does NOT prove. An empty list is a claim of total proof; use it
   honestly.
 
+## Records 7-19 predate the sanitiser scheme
+
+`docs/maintainers/session-protocol.md` used to tell every session to
+hand-write a throwaway sanitiser script and delete it after. No two
+sessions wrote the same rules -- records 7-13 replaced `<repo>`, `<home>`
+and `<path>`; 15-19 replaced only `<repo>` and `<home>` -- and neither
+script was ever committed, so **no digest in `proof/7.json` through
+`proof/19.json` is independently reproducible by anyone, including the
+record's own author.** This is stated here rather than fixed by
+backfilling: a digest computed after the fact, from a rule set nobody can
+prove ran at the time, would be a fabricated receipt -- exactly the
+dishonesty a proof record exists to prevent.
+
+From PR #20 onward, `scripts/lwb_sanitise.py` is committed, versioned code
+(`SANITISER_VERSION`), and `scripts/lwb_record.py` -- the committed
+recorder, replacing the throwaway script -- calls it and stamps the
+version on every `commands[]` entry. See
+`docs/maintainers/proof-of-completion-plan.md`, open blocker 1, and
+`docs/maintainers/session-protocol.md`'s "Writing a proof record".
+
+## Verifiability: `verifiable`, `verifiable_reason`, resolved shas
+
+Not every command a proof record runs can be re-executed by CI on a fresh
+checkout and digest-matched -- `pytest`'s output carries a wall clock and a
+progress bar width, and `origin/main..HEAD` means something different by
+the time CI checks it out. Pretending otherwise is the failure mode this
+scheme exists to close, so records from PR #20 onward say so explicitly,
+per command:
+
+- `verifiable: true|false`. When `false`, `verifiable_reason` is required
+  from a CLOSED enum: `nondeterministic-output`, `git-range-not-reproducible`,
+  `needs-repo-secret`, `needs-build-step`. Free text is rejected -- a
+  reason a validator cannot check is not a check.
+- `resolved_base` / `resolved_head` are required on any command whose
+  argv names a git revision range (a single `a..b` token, or separate
+  `--base`/`--head` flags): the actual shas it ran against. Without them,
+  CI re-running the symbolic argv resolves a different commit than the
+  one the record proves.
+- `sanitiser_version` names the `lwb_sanitise.SANITISER_VERSION` that
+  produced this entry's digest.
+
+**Say the measured split, never "falsifiable."** `scripts/lwb_record.py`'s
+`summarise_verifiability()` derives "N of M commands are independently
+re-executable" from a record's own `commands[]`. Use that sentence, with
+the actual number, anywhere a human reads about this scheme -- never a
+claim that records are falsifiable outright; they are falsifiable for the
+commands marked `true`, and openly not for the rest.
+
 ## Captured output must be sanitized
 
 Directive 7 wants really-captured command output. Directive 8 (**SACRED**)
@@ -88,15 +136,15 @@ public repo, and the `lwb-env-leak` gate rejected it. (This paragraph
 cannot show you the offending string: the same gate scans this file, and
 rejected an earlier draft of it for quoting one.)
 
-So before a record is written:
-
-- Replace the repo root with `<repo>`, the home directory with `<home>`,
-  and any remaining local absolute path with `<path>`, in every `tail`
-  line.
-- Take `sha256` over the **sanitized** text, so anyone applying the same
-  substitutions reproduces the same digest. A hash of unpublishable bytes
-  is not verifiable by anyone.
-- Say so in `unproven[]`, because a sanitized tail is not verbatim output.
+So before a record is written, `scripts/lwb_record.py` calls
+`scripts/lwb_sanitise.py` on every command's captured output: the repo
+root becomes `<repo>`, the home directory becomes `<home>`, and any
+remaining local absolute path becomes `<path>`, before either `tail` or
+`sha256` is computed. Anyone applying the same committed rules reproduces
+the same digest -- a hash of unpublishable bytes is not verifiable by
+anyone. Still true for any field you write by hand rather than through the
+recorder: sanitize it the same way, and say so in `unproven[]`, because a
+sanitized tail is not verbatim output.
 
 Two things cannot go in `commands[]` at all:
 

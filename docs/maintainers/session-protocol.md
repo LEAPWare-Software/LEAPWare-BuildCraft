@@ -53,23 +53,73 @@ Then poll `gh pr view N --json state,mergeCommit` until MERGED.
 
 ## Writing a proof record
 
-Generate it from really-run commands with a throwaway script OUTSIDE the
-repo; never hand-write an exit code or a hash. Delete the script after.
+Generate it from really-run commands with `scripts/lwb_record.py`, the
+committed recorder -- never a throwaway script, and never a hand-written
+exit code or hash. The throwaway-script instruction that used to be here
+is why records 7-13 and 15-19 disagree about their own sanitisation rules
+(two different scripts, never committed, each since deleted) and why no
+historical digest before PR #20 is independently reproducible; see
+`proof/README.md` and `docs/maintainers/proof-of-completion-plan.md`,
+open blocker 1.
 
-- **Sanitise before hashing.** Replace the repo root with `<repo>`, the
-  home directory with `<home>`, and any remaining absolute path with
-  `<path>` -- then take `sha256` over the SANITISED text so the digest is
-  reproducible. This is not optional: this repo is public, several checks
-  print absolute paths, and a verbatim tail leaks a user-profile path.
-  **Sanitise every field you write, not just captured output.** A record
-  was rejected for putting a transcript path into `tokens.source` while
-  its command tails were clean.
+```python
+import sys
+sys.path.insert(0, "scripts")
+import lwb_record
+
+commands = lwb_record.run_commands([
+    {"argv": ["python", "-m", "pytest", "tests/", "-q"], "expect_exit": 0,
+     "verifiable": False, "verifiable_reason": "nondeterministic-output"},
+    {"argv": ["python", "scripts/lwb_check_prefix.py"], "expect_exit": 0,
+     "verifiable": True},
+    {"argv": ["python", "scripts/lwb_check_env_leak.py", "--range", "origin/main..HEAD"],
+     "expect_exit": 0, "verifiable": False,
+     "verifiable_reason": "git-range-not-reproducible",
+     "resolved_base": "<sha origin/main resolved to>",
+     "resolved_head": "<sha HEAD resolved to>"},
+])
+```
+
+- **Sanitisation is `scripts/lwb_sanitise.py`, called internally by
+  `run_command`.** It replaces the repo root with `<repo>`, the home
+  directory with `<home>`, and any remaining absolute path with `<path>`,
+  then hashes the SANITISED text. This is not optional: this repo is
+  public, several checks print absolute paths, and a verbatim tail leaks a
+  user-profile path. `run_command` stamps `sanitiser_version` on every
+  entry automatically. **Sanitise every OTHER field you write by hand too
+  (e.g. `tokens.source`), not just captured output** -- a record was
+  rejected for putting a raw transcript path into `tokens.source` while
+  its command tails were clean; call `lwb_sanitise.sanitise(...)` on it.
+- **`run_command` never invents a value.** A command that cannot even be
+  launched raises rather than being recorded as a fake zero exit -- if
+  that happens, the deliverable is not ready for a proof record, not an
+  excuse to hand-write one.
 - **Never include `lwb_check_proof.py --pr N` for the record's own PR** --
   a record cannot contain proof of its own existence. Verify it after.
-- Keys are exactly `argv`, `exit`, `expect_exit`, `tail`, `sha256`. A
-  record using `cmd`/`exit_code` was rejected.
+- **Every `commands[]` entry needs `verifiable: true|false`**, and if
+  `false`, `verifiable_reason` from the closed enum
+  `lwb_record.ALLOWED_VERIFIABLE_REASONS` (`nondeterministic-output`,
+  `git-range-not-reproducible`, `needs-repo-secret`, `needs-build-step`).
+  Enforced from PR #20 onward. Don't guess which value applies -- the
+  plan's measured table (`proof-of-completion-plan.md`) names the actual
+  command kinds and which reason each one takes.
+- **A command whose argv names a git revision range** (a single `a..b`
+  token, or separate `--base`/`--head` flags) needs `resolved_base` and
+  `resolved_head` -- the actual shas it ran against, resolved with
+  `git rev-parse` before the command runs. Without these, CI substituting
+  the symbolic argv resolves a different commit than the one the record
+  proves, and an honest record fails.
+- Keys are exactly `argv`, `exit`, `expect_exit`, `tail`, `sha256`,
+  `sanitiser_version`, `verifiable`, and (conditionally)
+  `verifiable_reason` / `resolved_base` / `resolved_head`. A record using
+  `cmd`/`exit_code` was rejected.
 - Records for PR 12 onward also need `acceptance_criteria` and `tokens`.
   A field with no measurable source is `"unknown"`, never `0`.
+- **Call `lwb_record.summarise_verifiability(commands)`** and put its
+  `summary` string somewhere a human reads it (a PR comment, the session's
+  own report). Say "N of M commands are independently re-executable" --
+  never "records are falsifiable". The coverage gap is a number, not a
+  claim of total proof.
 - `unproven[]` is where the record says what it does NOT establish. Use it
   honestly; it is the most valuable part.
 

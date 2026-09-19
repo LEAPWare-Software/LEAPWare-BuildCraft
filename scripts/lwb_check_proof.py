@@ -118,6 +118,8 @@ def _validate_record(path: Path, data: object) -> list[str]:
     if isinstance(pr, int) and pr >= 12:
         errors.extend(_validate_acceptance_criteria(rel, data.get("acceptance_criteria")))
         errors.extend(_validate_tokens(rel, data.get("tokens")))
+    if isinstance(pr, int) and pr >= VERIFIABILITY_CUTOFF_PR and isinstance(commands, list):
+        errors.extend(_validate_verifiability(rel, commands))
 
     return errors
 
@@ -143,6 +145,79 @@ ZERO_FORBIDDEN_FIELDS = ("total_input", "output")
 # record citing one is unreproducible and unreviewable by anyone else. See
 # proof/schema.json's tokens.source description.
 ALLOWED_TOKEN_SOURCE_PREFIXES = ("transcript message.usage", "unknown")
+
+# The plan's stated cutoff (docs/maintainers/proof-of-completion-plan.md,
+# open blockers 1-3): verifiability fields are enforced only for records
+# whose typed `pr` is >= this. Records 7-19 predate the scheme -- two
+# different throwaway sanitiser scripts, disagreeing about their own rules
+# -- and are never rewritten to add fields that were never captured; see
+# proof/README.md.
+VERIFIABILITY_CUTOFF_PR = 20
+
+# Closed enum, per the plan's measured table of the ten distinct command
+# kinds found in proof/*.json: five re-execute cleanly in CI, three
+# cannot, two are conditional. Free text is an advisory rule and this
+# repo rejects it -- a reason a validator cannot check is not a check.
+ALLOWED_VERIFIABLE_REASONS = (
+    "nondeterministic-output",
+    "git-range-not-reproducible",
+    "needs-repo-secret",
+    "needs-build-step",
+)
+
+
+def _argv_has_git_range(argv: list) -> bool:
+    """True if `argv` names a git revision range, by either spelling seen
+    in this repo's own proof records: a single 'a..b' token (e.g.
+    `--range origin/main..HEAD`), or separate `--base`/`--head` flags (e.g.
+    `lwb_lanes.py --base origin/main --head HEAD`). Without resolved shas,
+    CI re-executing either form resolves a different commit than the one
+    the record proves and an honest record fails -- exactly the failure
+    mode that gets a gate switched off."""
+    if not isinstance(argv, list):
+        return False
+    if any(isinstance(a, str) and ".." in a for a in argv):
+        return True
+    return "--base" in argv and "--head" in argv
+
+
+def _validate_verifiability(rel, commands: list) -> list[str]:
+    errors: list[str] = []
+    for cmd in commands:
+        if not isinstance(cmd, dict):
+            continue  # already reported by the base structural check
+        argv = cmd.get("argv")
+        name = " ".join(argv) if isinstance(argv, list) and all(isinstance(a, str) for a in argv) else repr(argv)
+        prefix = f"{rel}: commands[{name!r}]"
+
+        sanitiser_version = cmd.get("sanitiser_version")
+        if not isinstance(sanitiser_version, str) or not sanitiser_version:
+            errors.append(
+                f"{prefix}: missing 'sanitiser_version' -- a digest cannot be attributed "
+                "to a known sanitiser without it"
+            )
+
+        verifiable = cmd.get("verifiable")
+        if not isinstance(verifiable, bool):
+            errors.append(f"{prefix}: 'verifiable' must be a boolean")
+        elif verifiable is False:
+            reason = cmd.get("verifiable_reason")
+            if not isinstance(reason, str) or reason not in ALLOWED_VERIFIABLE_REASONS:
+                errors.append(
+                    f"{prefix}: 'verifiable' is false but 'verifiable_reason' "
+                    f"{reason!r} is not one of {ALLOWED_VERIFIABLE_REASONS!r}"
+                )
+
+        if _argv_has_git_range(argv):
+            resolved_base = cmd.get("resolved_base")
+            resolved_head = cmd.get("resolved_head")
+            if not isinstance(resolved_base, str) or not resolved_base or not isinstance(resolved_head, str) or not resolved_head:
+                errors.append(
+                    f"{prefix}: argv names a git revision range but is missing "
+                    "'resolved_base'/'resolved_head' -- without the shas actually run "
+                    "against, a CI re-execution resolves a different commit"
+                )
+    return errors
 
 
 def _validate_acceptance_criteria(rel, criteria) -> list[str]:
