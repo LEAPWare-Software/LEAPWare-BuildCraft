@@ -89,6 +89,46 @@ _NON_PUBLISHING_FLAGS = frozenset({"--dry-run", "-n", "--help", "-h"})
 
 _QUOTES = ("'", '"')
 
+#: A heredoc introducer: `<<WORD`, `<<-WORD`, `<<'WORD'` or `<<"WORD"`. The
+#: `<<-` form (leading tabs stripped from the body and terminator) is
+#: matched the same as plain `<<`; this rule only needs to find where the
+#: body ends, not reproduce tab-stripping.
+_HEREDOC_START = re.compile(
+    r"<<-?\s*(?:'([^'\n]+)'|\"([^\"\n]+)\"|([A-Za-z_][A-Za-z0-9_]*))"
+)
+
+
+def _strip_heredocs(command: str) -> str:
+    """Blank out heredoc BODIES so their lines are never read as new commands.
+
+    `cat > x.sh <<'EOF'` followed by a body line of `git push origin main`
+    and a terminator line of `EOF` writes a script; it does not publish.
+    Without this, `_SEGMENT_SPLIT` (which splits on newlines among other
+    things) reads the body line as its own segment and the rule fires on
+    a file it never ran.
+
+    Finds each heredoc introducer, then the next line that is exactly the
+    terminator word (its own line, only surrounding whitespace allowed),
+    and removes everything from the introducer through that terminator
+    line inclusive. An unterminated heredoc -- the terminator never
+    appears -- has its body run to the end of the string, matching this
+    rule's existing under-match posture for an unterminated quote in
+    `_strip_quoted`.
+    """
+    out = command
+    while True:
+        match = _HEREDOC_START.search(out)
+        if match is None:
+            return out
+        word = match.group(1) or match.group(2) or match.group(3)
+        terminator = re.compile(
+            r"^[ \t]*" + re.escape(word) + r"[ \t]*$", re.MULTILINE
+        )
+        tail = terminator.search(out, match.end())
+        if tail is None:
+            return out[: match.start()]
+        out = out[: match.start()] + " " + out[tail.end() :]
+
 
 def _strip_quoted(command: str) -> str:
     """Blank out quoted spans so their contents can never look like a command.
@@ -137,7 +177,7 @@ def _scan_command(command: str) -> Tuple[bool, List[str]]:
     publishes = False
     pr_numbers: List[str] = []
 
-    for segment in _SEGMENT_SPLIT.split(_strip_quoted(command)):
+    for segment in _SEGMENT_SPLIT.split(_strip_quoted(_strip_heredocs(command))):
         tokens = segment.split()
         if not tokens:
             continue

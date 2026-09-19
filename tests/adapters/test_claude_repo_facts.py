@@ -185,6 +185,74 @@ def test_collect_repo_facts_returns_the_neutral_shape(tmp_path):
     assert facts.proof_ids == ("21",)
 
 
+def test_a_slash_branch_name_can_be_cleared_by_the_message_it_receives(tmp_path):
+    """Finding 2 (THE BLOCKER): a nested id must round-trip through the rule.
+
+    Before the fix: `directory.glob("*.json")` does not recurse, so
+    `proof/feat/x-12.json` is invisible and the id space never contains
+    `"feat/x-12"` -- the finding tells you to create exactly the file you
+    already created, forever.
+
+    After the fix: the collector walks `proof/` recursively and yields the
+    path relative to the proof dir, slash-joined, with `.json` stripped --
+    so the id space DOES contain `"feat/x-12"`, the branch matches it
+    directly, and the rule goes silent. This is the actual fix; the
+    directory walk is just the mechanism that produces it.
+    """
+    import sys as _sys
+
+    _make_repo(tmp_path, branch="feat/x-12", records=())
+
+    sys_path_added = str(REPO_ROOT) not in _sys.path
+    if sys_path_added:
+        _sys.path.insert(0, str(REPO_ROOT))
+    from lwb_core.config import Policy, RuleConfig, RuleMode
+    from lwb_core.rules import lwb_proof_required
+
+    warn = Policy(rules={"lwb_proof_required": RuleConfig(mode=RuleMode.WARN)})
+
+    # 1. Before creating any record: the rule names a path to create.
+    facts_before = collect_repo_facts(str(tmp_path))
+    assert facts_before == RepoFacts(branch="feat/x-12", proof_ids=())
+
+    raw = _hook_json("git push -u origin HEAD", tmp_path)
+    event = parse_event(raw, repo=facts_before)
+    finding = lwb_proof_required.evaluate(event, warn.rules["lwb_proof_required"])
+    assert finding is not None
+    assert "add proof/feat/x-12.json before publishing" in finding.reason
+
+    # 2. Create EXACTLY the path the message named.
+    named_path = tmp_path / "proof" / "feat" / "x-12.json"
+    named_path.parent.mkdir(parents=True, exist_ok=True)
+    named_path.write_text("{}", encoding="utf-8")
+
+    # 3. Re-collect: the id space now contains "feat/x-12" with forward
+    #    slashes (checked literally, so a backslash id from os.sep on
+    #    Windows would fail this the same way a missing id would).
+    facts_after = collect_repo_facts(str(tmp_path))
+    assert "feat/x-12" in facts_after.proof_ids
+
+    # 4. Re-evaluate: the rule is now silent.
+    event_after = parse_event(raw, repo=facts_after)
+    assert lwb_proof_required.evaluate(event_after, warn.rules["lwb_proof_required"]) is None
+
+
+def test_flat_ids_still_work_after_the_recursive_walk(tmp_path):
+    """`proof/22.json` must still yield `"22"`, not `"22"` nested oddly."""
+    _make_repo(tmp_path, records=("22",))
+    assert "22" in collect_proof_ids(tmp_path)
+
+
+def test_nested_proof_ids_use_forward_slashes_on_every_platform(tmp_path):
+    _make_repo(tmp_path, records=())
+    nested = tmp_path / "proof" / "feat" / "x-12.json"
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text("{}", encoding="utf-8")
+    ids = collect_proof_ids(tmp_path)
+    assert "feat/x-12" in ids
+    assert not any("\\" in i for i in ids)
+
+
 # --------------------------------------------------------------------
 # Adapter enrichment
 # --------------------------------------------------------------------

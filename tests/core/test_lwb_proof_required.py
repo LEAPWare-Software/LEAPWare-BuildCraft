@@ -133,6 +133,32 @@ def test_a_publish_that_is_not_the_first_token_is_not_recognized():
     assert RULE.evaluate(_bash("echo git push", NO_MATCH), WARN) is None
 
 
+def test_a_heredoc_body_written_to_a_file_is_not_a_publish():
+    """Finding 1: a heredoc BODY is data, not a new shell command.
+
+    `cat > x.sh <<'EOF'` followed by a body line of `git push origin main`
+    writes a SCRIPT; it does not publish. `_SEGMENT_SPLIT` (which splits on
+    newlines among other things) must not treat the body's line as its own
+    segment.
+    """
+    command = "cat > x.sh <<'EOF'\ngit push origin main\nEOF"
+    assert RULE.evaluate(_bash(command, NO_MATCH), WARN) is None
+
+
+def test_a_real_publish_on_the_introducer_line_is_still_caught_past_a_heredoc():
+    """A heredoc used as stdin for a REAL publish must still be caught.
+
+    `gh pr create --body-file - <<EOF ... EOF` genuinely runs `gh pr
+    create` (the heredoc is its stdin, not a separate command) -- that IS
+    a publish, on the introducer line itself, independent of whatever the
+    heredoc body happens to contain. Stripping the body must not blind the
+    rule to a real publish that precedes the `<<`.
+    """
+    command = "gh pr create --body-file - <<EOF\nthen something unrelated\nEOF"
+    finding = RULE.evaluate(_bash(command, NO_MATCH), WARN)
+    assert finding is not None
+
+
 @pytest.mark.parametrize(
     "command",
     [

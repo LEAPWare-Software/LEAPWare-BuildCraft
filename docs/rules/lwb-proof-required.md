@@ -117,6 +117,48 @@ process spawn. A worktree's `.git` pointer file is followed, so the
 - Detached HEAD with no PR number on the command line: there is no
   identifier for the claim, so there is nothing to ask for.
 
+## DENY is advisory, not a security control
+
+`deny` mode blocks a publish this rule can SEE and can prove has no
+matching record. It is not a security boundary, and must not be relied
+on as one. An adversarial user -- or an agent trying to get past it --
+can defeat it. Confirmed bypasses, from independent review of PR #26:
+
+- **No facts, so silent, so permitted.** `event.repo is None` always
+  means allow (see "When it says nothing" above). Every one of these
+  yields no facts and therefore passes `deny` with no record at all:
+  a bare repository, a directory with no `.git`, a corrupt `HEAD`, and a
+  detached HEAD.
+- **Undetected commands.** The command parser only recognizes a
+  publish as the FIRST token of a segment (see "Under-match,
+  deliberately"). All of these publish for real and are not seen:
+  `git -C . push`, `(git push)`, `command git push`, `FOO=1 git push`,
+  `echo $(git push)`, and `git.exe push`.
+
+**Detaching HEAD in one call and pushing in the next defeats `deny`
+entirely.** The first call reports no branch and passes; the second
+publishes with `repo.branch is None` and no PR number, which this rule
+already treats as having no identifier for the claim, and therefore
+nothing to ask for (see "When it says nothing"). No single Bash call
+needs to look suspicious for either step.
+
+**KNOWN LIMIT:** facts are gathered from the hook event's `cwd` -- the
+session's own working directory at the time of the call -- not from
+wherever a command actually runs. `cd ../other-repo && git push` is
+judged against the session repo's branch and proof records, not
+`../other-repo`'s (reviewer finding 4; plausible, not reproduced in this
+fix).
+
+**What would have to change before `deny` could be called a control:**
+`deny` would have to fail CLOSED -- block, not permit -- when a
+publishing command is seen but `event.repo is None` or the facts are
+otherwise incomplete. That is a deliberate, separate change: it is NOT
+made in this fix, because at `warn` a fail-closed default would warn on
+every Bash call in every repository with no `.git` or an unreadable one,
+which is worse than the blind spots it would close. Until that change
+ships, treat `deny` as a report-only gate with a stricter default, not
+as enforcement.
+
 ## Known gap: Codex
 
 `adapters/codex/hook_io.py` does not collect repo facts, so `Event.repo` is

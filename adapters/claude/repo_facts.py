@@ -136,21 +136,37 @@ def read_branch(repo_root: Path) -> Optional[str]:
 
 
 def collect_proof_ids(repo_root: Path) -> List[str]:
-    """Filename stems of every `*.json` under the known proof directories.
+    """Ids of every `*.json` record under the known proof directories, RECURSIVE.
 
-    `proof/24.json` -> `"24"`. Contents are NOT read or validated: whether
-    a record is well-formed, self-certified or complete is
-    `scripts/lwb_check_proof.py`'s job in CI, where there is time to do it
-    properly. This runs before a tool call, so it does the cheapest thing
-    that answers the rule's question -- does a record for this claim exist
-    at all.
+    An id is the record's path RELATIVE TO the proof directory, with the
+    `.json` suffix removed, joined with forward slashes regardless of
+    platform. `proof/24.json` -> `"24"` (unchanged -- a flat id is just the
+    one-segment case of this). `proof/feat/x-12.json` -> `"feat/x-12"`.
+
+    This is `directory.glob("*.json")` widened to `directory.rglob(...)`,
+    which matters because a branch name containing a slash (`feat/x-12`,
+    the common case) names a nested path when read literally as
+    `proof/<branch>.json` -- see `lwb_proof_required._matching_record` and
+    its message. Before this walked recursively, that path was invisible
+    to a flat glob, so the rule's own "add proof/<claim>.json" instruction
+    could never be satisfied for such a branch. `_matching_record` compares
+    `repo.branch` against these ids VERBATIM, so producing a native-separator
+    id on Windows (`os.sep` is a backslash) would reproduce the same bug
+    platform-specifically -- hence the explicit forward-slash join below
+    rather than `str(path)` or a Windows-native `PurePath`'s own separator.
+
+    Contents are NOT read or validated: whether a record is well-formed,
+    self-certified or complete is `scripts/lwb_check_proof.py`'s job in
+    CI, where there is time to do it properly. This runs before a tool
+    call, so it does the cheapest thing that answers the rule's question
+    -- does a record for this claim exist at all.
     """
     ids: List[str] = []
     seen = set()
     for relative in PROOF_DIRS:
         directory = repo_root.joinpath(*relative.split("/"))
         try:
-            entries = sorted(directory.glob("*.json"))
+            entries = sorted(directory.rglob("*.json"))
         except OSError:
             continue
         for entry in entries:
@@ -161,10 +177,12 @@ def collect_proof_ids(repo_root: Path) -> List[str]:
                     continue
             except OSError:
                 continue
-            stem = entry.stem
-            if stem not in seen:
-                seen.add(stem)
-                ids.append(stem)
+            relative_parts = entry.relative_to(directory).parts
+            stem_parts = relative_parts[:-1] + (entry.stem,)
+            record_id = "/".join(stem_parts)
+            if record_id not in seen:
+                seen.add(record_id)
+                ids.append(record_id)
     return ids
 
 
