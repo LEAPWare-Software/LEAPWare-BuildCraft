@@ -40,13 +40,15 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 09:32 UTC
-main SHA: 55f38ae1c46b5e8fa06d25eb9ac6887fc98000cf
-CLI: claude
-Session: goal-1.0.0
+Generated: 2026-09-19 14:24 UTC
+main SHA: f9b4deadbb441f0c1046a0d73b0434424f1cf13c
+CLI: unknown
+Session: unknown
 
 Open PRs:
-#26 lwb_proof_required — the first rule that ships, and the first that can deny (lwb-ship-proof-rule)
+#31 Re-cut the cloud merge path onto a branch the lane gate can pass (supersedes #28) (lwb-cloud-autoqueue-v2)
+#30 The plan and the decisions the cloud routines read — they are not on main (lwb-capture-d21-d22)
+#29 Cloud-only operation: the protocol, the roles, and the merge path that was broken for a routine (cloud/runbook)
 
 Deliverable proof state (from proof/):
 18/18 proven
