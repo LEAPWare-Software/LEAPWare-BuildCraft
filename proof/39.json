@@ -3,7 +3,7 @@
   "pr": 39,
   "author": "conductor-track-a-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
-  "commit": "03cfbd9",
+  "commit": "af431de",
   "commands": [
     {
       "argv": [
@@ -24,9 +24,9 @@
         "........................................................................ [ 82%]",
         "........................................................................ [ 96%]",
         "..................                                                       [100%]",
-        "522 passed in 17.97s"
+        "522 passed in 19.42s"
       ],
-      "sha256": "eec93f3e36850de9173740e65b69d249e78b0b2fe4a02939a4389856e9cb9c02",
+      "sha256": "b4921228bcd450093d9fd62e10403c04d3d820c4cb64d5203844557812ecb080",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -41,10 +41,10 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 19:40 UTC",
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 20:02 UTC",
         "lwb-check-state-claims check passed"
       ],
-      "sha256": "359279aef2bc9fadeb35f25ba6bfaf0137025d5454f2ea6b5485464d180b3bb2",
+      "sha256": "c3463b65c46e4e98be761f28a1005192f5baf2cf8c10c36f8eb48754de1f7606",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -58,9 +58,9 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "OK: <repo>/HANDOFF.md passes all checks (3000 bytes)"
+        "OK: <repo>/HANDOFF.md passes all checks (2961 bytes)"
       ],
-      "sha256": "0e3e0d44cec6454e498e119aa88087a47a85cae111285de3712bf0871bf1779a",
+      "sha256": "ab8f5e3be55b7ccb642be8c14e54c200edacc355a15f468491bc96399cddeb83",
       "sanitiser_version": "1",
       "verifiable": true
     },
@@ -157,7 +157,8 @@
     "HANDOFF.md: the branch's own in-flight rewrite (THE PLAN pointer, the adopt-before-build condition, an in-flight list naming #29/#30/#32 in place of the stale #23/#24) re-applied on top of merge commit 1a171c9, which had reverted it to main's stale copy; generated block regenerated last against main SHA bfe8507 and merged main up to bfe8507 (carrying #34) first",
     "HANDOFF.md: item 3 updated to name #37 as \"this PR\" instead of #35 (carried over from the #30 re-cut); #37 re-cuts #35 the same way #35 re-cut #30. reviews/35/cloud-reviewer.json and cloud-reviewer-b.json are unchanged/inherited (they still say #35 in filename only, not content); proof/35.json renamed to proof/37.json, pr field updated to 37, commands[] and commit field regenerated against this branch's actual head.",
     "proof/37.json renamed to proof/38.json, pr field updated from 37 to 38: the v4 branch was cut before this PR's number (#38) was known, and the inherited record still self-declared pr:37, which check_new_proof_records_declare_pr correctly rejects for a record newly added by PR #38. HANDOFF.md item 3 updated to name #38 and list #30/#35/#37 as dead. commands[] and commit field regenerated against this commit.",
-    "proof/38.json: author field changed from 'conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19' to 'conductor-track-a-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19', dropping the repository-name segment. Per an independent reviewer's finding (reviews/38/cloud-reviewer-clock-01HAaru7.json): commit_author_id is never cross-checked against git, only copied from this field, and 'buildcraft' -- present in this field only because a recent session's convention embedded the repo name -- collided with the reviewer routine's own mandated 'reviewer-cloud-routine-buildcraft' identifier, rejecting two otherwise-valid independent AGREEs as a false-positive self-review. No author id merged on main before this carried a 'buildcraft' segment (#27's is claude-lwb-agent-leapware-hq-...); this restores that convention. This is my own self-declared label, not a reviewer's mandated identity, so changing its format is not the relabelling-to-pass-a-gate this repo has a decision against -- it does not change who the author is, and scripts/lwb_lanes.py is untouched. The two existing AGREE records in reviews/38/ still name the OLD author id verbatim (frozen at review time) and so still collide; they remain valid evidence of independent review but cannot clear the gate. A fresh review against this author id is needed."
+    "proof/38.json: author field changed from 'conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19' to 'conductor-track-a-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19', dropping the repository-name segment. Per an independent reviewer's finding (reviews/38/cloud-reviewer-clock-01HAaru7.json): commit_author_id is never cross-checked against git, only copied from this field, and 'buildcraft' -- present in this field only because a recent session's convention embedded the repo name -- collided with the reviewer routine's own mandated 'reviewer-cloud-routine-buildcraft' identifier, rejecting two otherwise-valid independent AGREEs as a false-positive self-review. No author id merged on main before this carried a 'buildcraft' segment (#27's is claude-lwb-agent-leapware-hq-...); this restores that convention. This is my own self-declared label, not a reviewer's mandated identity, so changing its format is not the relabelling-to-pass-a-gate this repo has a decision against -- it does not change who the author is, and scripts/lwb_lanes.py is untouched. The two existing AGREE records in reviews/38/ still name the OLD author id verbatim (frozen at review time) and so still collide; they remain valid evidence of independent review but cannot clear the gate. A fresh review against this author id is needed.",
+    "HANDOFF.md item 3 corrected: it still described #38's rejected-AGREE state after the re-cut to #39 that fixed the collision. Now says accurately that #39 has 0 reviews in reviews/39/ and needs a fresh one, per reviews/39/cloud-reviewer-b.json's finding."
   ],
   "unproven": [
     "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. `checked_by` is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, because inventing or borrowing one is the exact dishonesty this system exists to catch. This is PR #35, not #30: reviews/30/cloud-reviewer-b.json reviewed PR #30's branch (1a171c9a, and then that branch's first repair attempt at 1793c1f) and does not apply here by filename (lwb_lanes.py globs reviews/<pr_number>/, i.e. reviews/35/ for this PR). A fresh independent review record under reviews/35/ at THIS head is what makes this record complete, and until it exists this PR must not land. I did not write and must not write that record myself (D20).",
