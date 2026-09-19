@@ -54,14 +54,53 @@ The defect is in the **provenance claim**, not the review.
 
 **A manual fire of a reviewer routine by the author's session is an
 author dispatch.** If a record produced that way is filed at all, that
-field must read `true`, which means it will not satisfy the gate — which
-is the correct outcome.
+field must read `true`.
+
+**An earlier version of this document said that a `true` value "will not
+satisfy the gate — which is the correct outcome". That was false, and an
+independent reviewer measured it.** A record declaring
+`reviewer_was_dispatched_by_author: true` PASSES `lwb-lanes` with exit 0
+and a printed NOTICE. Three places in this repository already said so and
+the document contradicted all three: `_review_ok` in
+`scripts/lwb_lanes.py` returns the reviewer id *after* the
+`if dispatched` branch rather than returning `None`; that function's own
+comment says the field is "recorded and surfaced, never trusted as
+proof"; and `reviews/schema.json` states, verbatim, that `true` "does not
+fail the gate".
+
+So the honest correction is worse than the one first written here. Had
+#27's reviewer recorded `true`, **`lwb-lanes` would still have gone green
+and #27 would still have merged**, with a NOTICE in a log that nothing
+fails on. A document written to be exact about provenance asserted a
+safeguard that does not exist — the same error class it was correcting,
+one level up.
 
 The gate was not bypassed by a bug. It was bypassed by a human-initiated
-convenience that the gate had no way to see. Nothing in
+convenience **that the gate is not built to see at all**. Nothing in
 `scripts/lwb_lanes.py` can distinguish a cron-dispatched run from a
-manually-fired one, because both arrive as a commit on a branch. That is
-a real limitation and it is not fixed here.
+manually-fired one, because both arrive as a commit on a branch, and the
+field that would say which is self-declared and advisory by design. That
+is a real limitation and it is not fixed here.
+
+## A second limitation, found reviewing this document
+
+The same reviewer found that **a pull request whose commits touch only
+`reviews/` and `proof/` is not covered by the review gate at all.**
+`classify_path` calls those paths shared, so the gate demands an
+independent review — but `resolve_reviewable_head` skips record-only
+commits, so the head a record must attest to is the *base* commit, which
+the pull request does not modify. The reviewer demonstrated it: it
+replaced this document's entire contents with a line of nonsense
+asserting the opposite of the document, and `lwb-lanes` still passed.
+
+The skip rule is correct and load-bearing for ordinary pull requests — it
+is what stops a review record invalidating itself. In the degenerate
+all-records pull request it defines the reviewed content out of
+existence.
+
+**This pull request is itself an instance.** A green `lwb-lanes` here is
+not evidence that anything in this file was reviewed. Treat the review
+record under `reviews/32/` as the evidence, and read it.
 
 **The mitigation in force is procedural, not mechanical:** the reviewer
 routines are never fired by hand for a PR the firing session authored.
