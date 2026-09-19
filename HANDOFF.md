@@ -42,7 +42,7 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 20:21 UTC
+Generated: 2026-09-19 20:27 UTC
 main SHA: bfe850796969980545811e1ffa551b9143965faf
 CLI: claude
 Session: session_01EkvcWAEAV2sJYoN51CPrTF
