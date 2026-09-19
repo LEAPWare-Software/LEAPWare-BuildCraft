@@ -59,8 +59,8 @@ PLUGIN_ROOT = REPO_ROOT / "plugins" / "claude" / "lwb"
 HOOKS_JSON = PLUGIN_ROOT / "hooks" / "hooks.json"
 
 
-def _bash_hook_command(hooks_json: Path) -> str:
-    """The literal `command` string `hooks.json` registers for `Bash`.
+def _bash_hook_entry(hooks_json: Path) -> dict:
+    """The literal PreToolUse hook entry `hooks.json` registers for `Bash`.
 
     Reads the actual PreToolUse registration a consuming repo's Claude
     Code install would use to decide whether the plugin's hook runs at
@@ -74,6 +74,15 @@ def _bash_hook_command(hooks_json: Path) -> str:
     matcher or one of the "|"-separated names in it, not merely a
     substring (so a hypothetical "NotBash" matcher is correctly NOT
     treated as covering "Bash").
+
+    Returns the WHOLE hook dict -- not just `command` -- because the
+    caller also needs the sibling `timeout` key: an independent reviewer
+    of c2acfdf found that this script read `command` from this dict
+    specifically to avoid assuming, then hardcoded `timeout=30` for the
+    subprocess call regardless of what `hooks.json` declared (10, for
+    both matchers). A hook that runs 10-30s is killed by Claude Code at
+    the declared timeout in a real session, so this check silently
+    proved nothing about that failure mode. See `_run_hook`.
     """
     hooks = json.loads(hooks_json.read_text(encoding="utf-8"))
     for entry in hooks.get("hooks", {}).get("PreToolUse", []):
@@ -81,9 +90,8 @@ def _bash_hook_command(hooks_json: Path) -> str:
         names = [name.strip() for name in matcher.split("|")]
         if "Bash" in names:
             for hook in entry.get("hooks", []):
-                command = hook.get("command")
-                if command:
-                    return command
+                if hook.get("command"):
+                    return hook
     raise SystemExit(
         f"FAIL: no PreToolUse entry in {hooks_json} has a matcher covering "
         "'Bash' -- lwb_proof_required can never fire in a consuming repo, "
@@ -107,6 +115,21 @@ _PROOF_MARKER = "publishing command with no proof record"
 #: rule that ran and had nothing to say -- so ANY case, warn-expecting or
 #: silence-expecting, fails the moment this marker appears.
 _RULE_CRASH_MARKER = "rule 'lwb_proof_required' raised"
+
+#: The substring `plugins/claude/lwb/bin/lwb_hook.py` puts in
+#: `permissionDecisionReason` when `adapters/claude/repo_facts.collect_repo_facts`
+#: raises instead of returning. Same shape as `_RULE_CRASH_MARKER`: fail-open
+#: at the adapter level means the decision stays "allow", but a collector
+#: that crashed must not read the same as "gathered facts, found nothing" --
+#: an independent reviewer found this was previously indistinguishable
+#: (`repo = None` with no trace), and this check caught it only as an
+#: unexplained warn-expectation mismatch, not as the crash it actually was.
+_REPO_FACTS_ERROR_MARKER = "lwb: repo facts unavailable"
+
+#: Same shape again, for the bundled policy file failing to read/parse.
+#: Previously produced `{"permissionDecision":"allow"}` with NO reason at
+#: all -- found by the same independent reviewer.
+_POLICY_ERROR_MARKER = "lwb: policy unreadable"
 
 
 def _onerror_clear_readonly(func, path, exc_info):
@@ -183,15 +206,27 @@ def _checkout_branch(scratch: Path, branch: str) -> None:
         _run_git(["checkout", "-q", "-b", branch], cwd=scratch)
 
 
-def _set_proof_record(scratch: Path, branch: str, present: bool) -> None:
-    """Create or remove `proof/<branch>.json` in the scratch repo.
+def _set_proof_record(scratch: Path, branch: str, present: bool, proof_dir: str = "proof") -> None:
+    """Create or remove `<proof_dir>/<branch>.json` in the scratch repo.
+
+    `proof_dir` defaults to `"proof"`, this repository's own layout, but a
+    case may pass `".lwb/proof"` instead -- the alternate directory
+    `adapters/claude/repo_facts.PROOF_DIRS` offers a consuming repo so it
+    need not take over a top-level `proof/` name it may already use for
+    something else. An independent reviewer's Attack 10-A (drop
+    `.lwb/proof` from `PROOF_DIRS` in both the source and the vendored
+    copy) still passed THIS check with only `"proof"` exercised here --
+    the full test suite caught it
+    (`tests/adapters/test_claude_repo_facts.py::test_a_consuming_repo_may_use_dot_lwb_proof`)
+    but that made it a coverage gap in this gate, not a hole in CI. See the
+    `.lwb/proof` case in `CASES`.
 
     Not committed -- `adapters/claude/repo_facts.collect_proof_ids` walks
     the working tree, not git history, so an untracked file is enough
     (and matches how a real session's uncommitted proof record would look
     right before the `git push` that is supposed to be gated on it).
     """
-    record = scratch / "proof" / f"{branch}.json"
+    record = scratch.joinpath(*proof_dir.split("/")) / f"{branch}.json"
     if present:
         record.parent.mkdir(parents=True, exist_ok=True)
         record.write_text(json.dumps({"id": branch}), encoding="utf-8")
@@ -202,8 +237,22 @@ def _set_proof_record(scratch: Path, branch: str, present: bool) -> None:
             pass
 
 
-def _run_hook(scratch: Path, command: str, ledger_path: Path) -> dict:
+def _run_hook(
+    scratch: Path,
+    tool_command: str,
+    ledger_path: Path,
+    hook_command: str,
+    hook_timeout: float,
+) -> dict:
     """Invoke the SHIPPED hook entry point as a real subprocess.
+
+    `tool_command` is the Bash command the hook is asked to evaluate (what
+    a case in `CASES` names `command`, e.g. `"git push"`) -- it travels
+    inside the event's `tool_input.command`, exactly as Claude Code would
+    send it. `hook_command` and `hook_timeout` are the literal `command`
+    and `timeout` `hooks.json` registers for the `Bash` matcher (see
+    `_bash_hook_entry`) -- the process this function launches, and the
+    time it is allowed before Claude Code would kill it in a real session.
 
     `cwd=scratch` is what makes `adapters/claude/repo_facts.py` find the
     scratch repo's own branch and proof records rather than this
@@ -217,7 +266,7 @@ def _run_hook(scratch: Path, command: str, ledger_path: Path) -> dict:
         "transcript_path": str(scratch / "transcript.jsonl"),
         "hook_event_name": "PreToolUse",
         "tool_name": "Bash",
-        "tool_input": {"command": command},
+        "tool_input": {"command": tool_command},
         "cwd": str(scratch),
     }
 
@@ -226,26 +275,34 @@ def _run_hook(scratch: Path, command: str, ledger_path: Path) -> dict:
     env["LWB_LEDGER_PATH"] = str(ledger_path)
     env.pop("LWB_POLICY_PATH", None)  # exercise the bundled default policy
 
-    command = _bash_hook_command(HOOKS_JSON).replace(
-        "${CLAUDE_PLUGIN_ROOT}", str(PLUGIN_ROOT)
-    )
+    launch_command = hook_command.replace("${CLAUDE_PLUGIN_ROOT}", str(PLUGIN_ROOT))
 
-    result = subprocess.run(
-        command,
-        shell=True,
-        cwd=scratch,
-        input=json.dumps(event),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(
+            launch_command,
+            shell=True,
+            cwd=scratch,
+            input=json.dumps(event),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            timeout=hook_timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit(
+            f"FAIL: hook exceeded its declared timeout of {hook_timeout}s "
+            f"(plugins/claude/lwb/hooks/hooks.json) for command "
+            f"{launch_command!r} -- Claude Code would kill this hook at "
+            "that timeout in a real session, so lwb_proof_required would "
+            "never get to run\n"
+            f"stdout so far: {exc.stdout!r}\nstderr so far: {exc.stderr!r}"
+        ) from exc
 
     if result.returncode != 0:
         raise SystemExit(
-            f"FAIL: hook exited {result.returncode} for command {command!r}\n"
+            f"FAIL: hook exited {result.returncode} for command {launch_command!r}\n"
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
 
@@ -267,6 +324,7 @@ class Case:
         command: str,
         expect_warn: bool,
         expect_substr: Optional[str] = None,
+        proof_dir: str = "proof",
     ) -> None:
         self.name = name
         self.branch = branch
@@ -274,6 +332,7 @@ class Case:
         self.command = command
         self.expect_warn = expect_warn
         self.expect_substr = expect_substr
+        self.proof_dir = proof_dir
 
 
 CASES = [
@@ -329,19 +388,40 @@ CASES = [
         expect_warn=True,
         expect_substr="proof/feat/x-12.json",
     ),
+    Case(
+        "silent: push with a matching proof record under .lwb/proof",
+        branch="docs-only-lwb-proof-dir",
+        proof_present=True,
+        command="git push -u origin HEAD",
+        expect_warn=False,
+        proof_dir=".lwb/proof",
+    ),
 ]
 
 
 def main() -> int:
+    bash_entry = _bash_hook_entry(HOOKS_JSON)
+    bash_command = bash_entry["command"]
+    bash_timeout = bash_entry.get("timeout")
+    if not isinstance(bash_timeout, (int, float)) or isinstance(bash_timeout, bool):
+        raise SystemExit(
+            f"FAIL: the Bash PreToolUse entry in {HOOKS_JSON} declares no "
+            "numeric 'timeout' -- this check refuses to substitute a value "
+            "hooks.json does not itself declare; say so explicitly rather "
+            "than silently picking one"
+        )
+
     scratch = _make_scratch_repo()
     errors: List[str] = []
     try:
         ledger_path = scratch.parent / f"{scratch.name}-ledger.jsonl"
         for case in CASES:
             _checkout_branch(scratch, case.branch)
-            _set_proof_record(scratch, case.branch, case.proof_present)
+            _set_proof_record(scratch, case.branch, case.proof_present, case.proof_dir)
 
-            payload = _run_hook(scratch, case.command, ledger_path)
+            payload = _run_hook(
+                scratch, case.command, ledger_path, bash_command, bash_timeout
+            )
             hook_output = payload.get("hookSpecificOutput", {})
             decision = hook_output.get("permissionDecision")
             reason = hook_output.get("permissionDecisionReason")
@@ -366,6 +446,27 @@ def main() -> int:
                 # _RULE_CRASH_MARKER above.
                 errors.append(
                     f"{case.name}: lwb_proof_required raised instead of evaluating, got: {reason!r}"
+                )
+                continue
+
+            if bool(reason) and _REPO_FACTS_ERROR_MARKER in reason:
+                # Same reasoning as the rule-crash check above, one layer
+                # lower: the collector that feeds rules their repo facts
+                # crashed, so nothing about "warned" or "stayed silent" is
+                # trustworthy for this case either. See
+                # _REPO_FACTS_ERROR_MARKER above.
+                errors.append(
+                    f"{case.name}: repo facts were unavailable instead of gathered, got: {reason!r}"
+                )
+                continue
+
+            if bool(reason) and _POLICY_ERROR_MARKER in reason:
+                # And one layer below that: the bundled policy itself could
+                # not be read, so every rule ran (or didn't run) under a
+                # degraded all-OFF policy rather than the shipped one this
+                # check means to exercise. See _POLICY_ERROR_MARKER above.
+                errors.append(
+                    f"{case.name}: the bundled policy was unreadable instead of loaded, got: {reason!r}"
                 )
                 continue
 

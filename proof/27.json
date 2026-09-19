@@ -23,9 +23,9 @@
         "........................................................................ [ 73%]",
         "........................................................................ [ 88%]",
         "........................................................                 [100%]",
-        "488 passed in 37.31s"
+        "488 passed in 43.83s"
       ],
-      "sha256": "435786aec7466fe79ec6f687688b2e5c6266672f5672c3bfee9737f6616ddc8a",
+      "sha256": "14a49a94177e90570bf2eacba9320f2ae46f7fce6fc8b45cd5d817c6c44d9deb",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -38,11 +38,11 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "TOTAL: 7 of 7 cases exercised against a scratch repo OUTSIDE this checkout -- 3 expected a proof-required warning, 4 expected silence, all matched",
+        "TOTAL: 8 of 8 cases exercised against a scratch repo OUTSIDE this checkout -- 3 expected a proof-required warning, 5 expected silence, all matched",
         "    the command hooks.json registers for Bash was launched as a subprocess for every case, with CLAUDE_PLUGIN_ROOT set and cwd in the scratch repo -- not imported in-process, and not a hardcoded path",
         "lwb-foreign-repo check passed"
       ],
-      "sha256": "9c10490cc03cb4b58b0b1950253742b5e9afe2aed07fcbf2c48961863684948d",
+      "sha256": "0515596848f9ccfc93555ee827b8310dfb9b54e60e17e86f227aacb582815174",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -59,8 +59,7 @@
       ],
       "sha256": "b48fc74400ced6df61ac28ff5edec0a81eb23026b48768bb20d1e52c93f08d7d",
       "sanitiser_version": "1",
-      "verifiable": false,
-      "verifiable_reason": "nondeterministic-output"
+      "verifiable": true
     },
     {
       "argv": [
@@ -76,8 +75,7 @@
       ],
       "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
       "sanitiser_version": "1",
-      "verifiable": false,
-      "verifiable_reason": "nondeterministic-output"
+      "verifiable": true
     },
     {
       "argv": [
@@ -143,15 +141,15 @@
     }
   ],
   "tokens": {
-    "total_input": 1079446631,
-    "cached_input": 1072299076,
-    "uncached_input": 7147555,
-    "output": 2801867,
+    "total_input": 1122491195,
+    "cached_input": 1115237881,
+    "uncached_input": 7253314,
+    "output": 2885275,
     "retries": "unknown",
     "setup_overhead": "unknown",
     "tool_overhead": "unknown",
-    "wall_time_seconds": 138710.347,
-    "source": "transcript message.usage summed across this session's 2594 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T11:34:03.935Z). Cumulative across PRs 12-27 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
+    "wall_time_seconds": 141988.957,
+    "source": "transcript message.usage summed across this session's 2663 usage-bearing assistant records (2026-09-17T21:02:13.588Z to 2026-09-19T12:28:42.545Z). Cumulative across PRs 12-27 and EXCLUDES all subagent spend, including every implementer and the independent reviewer's peer session. A floor, not a total, and not attributable to this PR alone."
   },
   "mutations": [
     "scripts/lwb_check_foreign_repo.py: new -- scratch repo outside the checkout, seven cases, reads the Bash command from hooks.json, fails on a raised rule, asserts the scratch path is genuinely outside REPO_ROOT",
