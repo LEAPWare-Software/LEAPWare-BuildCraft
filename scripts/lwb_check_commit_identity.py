@@ -10,6 +10,20 @@ flagged: it is either a real, non-LEAPWare human identity (which does not
 belong in this repo's history per owner directive 10) or a bot this list
 has not reviewed yet.
 
+A commit whose changed files are ALL under `reviews/` or `proof/` (pure
+record-keeping -- e.g. a reviewer filing their own AGREE record) is exempt
+from this check via the same `_is_record_only_commit` test `lwb_lanes.py`
+uses to compute the reviewable head. Before this exemption existed, a
+reviewer's own record-only commit landing under any identity other than
+exactly `LEAPWare <leapware@outlook.com>` permanently failed this gate for
+the whole branch -- and since force-push is denied here, that could not be
+fixed in place, only worked around by re-cutting the entire PR from a clean
+commit. `lwb_lanes.resolve_reviewable_head` already carried this same
+exemption for the freshness check; `_authors` here had it not, which was
+the asymmetry actually driving that pattern. This does not touch owner
+directive 10 for anything that changes code: any code-changing commit must
+still be authored as LEAPWare.
+
 Usage:
     python scripts/lwb_check_commit_identity.py [--base <ref>] [--head <ref>]
 
@@ -32,6 +46,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# lwb_lanes.py lives in this same directory (scripts/); imported for
+# `_is_record_only_commit` rather than duplicating that logic here, so the
+# definition of "record-only" can never drift between the two checks that
+# both depend on it.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lwb_lanes import _is_record_only_commit  # noqa: E402
+
 ALLOWED_HUMAN = ("LEAPWare", "leapware@outlook.com")
 
 # A GitHub bot commits as "<name>[bot] <NNNNNNN+name[bot]@users.noreply.github.com>"
@@ -42,8 +63,15 @@ BOT_EMAIL = re.compile(r"^(?:\d+\+)?[\w.\-]+\[bot\]@users\.noreply\.github\.com$
 
 
 def _authors(rev_range: str) -> list[tuple[str, str]]:
+    """Distinct (name, email) pairs among non-record-only commits in
+    `rev_range`. A commit whose changed files are ALL under `reviews/` or
+    `proof/` is skipped via `_is_record_only_commit` -- see the module
+    docstring for why. `%H` is included in the log format (previously
+    only `%an\\t%ae`) because that test needs the commit sha; it is split
+    off `line` below and not otherwise used.
+    """
     result = subprocess.run(
-        ["git", "log", "--format=%an\t%ae", rev_range],
+        ["git", "log", "--format=%H\t%an\t%ae", rev_range],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -55,7 +83,10 @@ def _authors(rev_range: str) -> list[tuple[str, str]]:
     for line in result.stdout.splitlines():
         if not line.strip():
             continue
-        name, _, email = line.partition("\t")
+        sha, _, rest = line.partition("\t")
+        name, _, email = rest.partition("\t")
+        if _is_record_only_commit(sha):
+            continue
         pair = (name, email)
         if pair not in seen:
             seen.append(pair)
