@@ -121,13 +121,31 @@ REVIEWER_ID_FORMAT_CUTOFF_PR = 19
 # exists to remove, just relocated to id construction. Parsing from the
 # right instead means role and model no longer need to be told apart at
 # all; only the date (fixed shape, unambiguous) and the session-token
-# (the one segment adjacent to it) need to be isolated.
+# (the segment adjacent to it, for PARSING an individual id into its three
+# fields) need to be isolated. NOTE: parsing an id's own session-token
+# field this way is still correct and used for the format check below --
+# but comparing two ids' session-token FIELDS this way, to detect a shared
+# identity, is not (see _shared_long_segment): an appended suffix segment
+# shifts which field sits "next to" the date without changing what the
+# two ids actually share, and this repo's own PRs 15-17 self-review has
+# its shared token NOT adjacent to the date at all.
 _DATE_SUFFIX_RE = re.compile(r"-(\d{4}-\d{2}-\d{2})$")
 # A session-token must not itself be shaped like a date -- covers both the
 # hyphenated form (impossible here in practice, since a token is defined as
 # a single dash-free segment by construction) and a compact 8-digit
 # YYYYMMDD, so a token cannot smuggle in a second, disguised date field.
 _DATE_SHAPED_RE = re.compile(r"^\d{4}-?\d{2}-?\d{2}$")
+
+# Below this length, a hyphen-delimited segment shared between two ids is
+# not evidence of anything -- a real session or dispatch token is long: this
+# very session's own token is 8 hex characters ("f8da3f9e"), and the
+# per-dispatch ids already sitting in reviews/7 through reviews/13 run 17
+# characters ("ac5ffd6d6cde8a968"). A short coincidental fragment ("9999",
+# "v2", "sonnet") turns up between two UNRELATED ids often enough that
+# flagging it would block a legitimate review -- the failure mode that gets
+# a gate disabled. 8 is the floor observed in this repo's own real session
+# token, not an arbitrary round number.
+MIN_SHARED_SEGMENT_LENGTH = 8
 
 # How many DISTINCT independent reviewers a shared-path change needs. The
 # old rule was "one record per CLI vendor", which read as two but was really
@@ -451,6 +469,55 @@ def _parse_identity(
     return (role_and_model, token, date)
 
 
+def _id_segments(value: str) -> set[str]:
+    """The hyphen-delimited segments of an identity string, with a
+    trailing '-YYYY-MM-DD' date stripped first -- so two reviews that
+    simply happened on the same calendar day never count "2026", "09" or
+    "19" as a shared segment. Works on ANY id ending in a real date, not
+    only one that otherwise fits the '<role-and-model>-<session-token>-
+    <date>' shape: used to check for a shared segment even against this
+    repo's own historical, free-form ids."""
+    m = _DATE_SUFFIX_RE.search(value)
+    remainder = value[: m.start()] if m else value
+    return {seg for seg in remainder.split("-") if seg}
+
+
+def _shared_long_segment(id_a: str, id_b: str) -> Optional[str]:
+    """A hyphen-delimited segment present in BOTH ids' segment SETS (date
+    excluded) and at least MIN_SHARED_SEGMENT_LENGTH characters long, or
+    None if there is no such segment. Deterministic when more than one
+    qualifies: the shortest, then alphabetically first.
+
+    Compares the SET of segments, not one fixed position (e.g. "the
+    segment immediately before the date"). A fixed-position comparison is
+    two different bugs at once, both found by adversarial review:
+      - an author can defeat it by appending one throwaway segment after
+        the real token, which shifts what sits "next to" the date without
+        changing what the two ids actually share
+        ("...-realtoken123-2026-09-19" vs
+        "...-realtoken123-extra-2026-09-19" -- "realtoken123" is shared,
+        but neither id's date-adjacent segment is);
+      - it also MISSED this repo's own real self-review in PRs 15-17,
+        where the shared session token ("f8da3f9e") is not adjacent to
+        the date at all
+        ("...-f8da3f9e-scope13to15-2026-09-18" vs
+        "...-session-f8da3f9e-2026-09-18").
+    Comparing sets closes both without introducing substring matching
+    across segment boundaries -- "realtoken123" inside "xrealtoken123y"
+    is a different problem this function does not try to solve, since
+    chasing partial substrings invites the false positives
+    MIN_SHARED_SEGMENT_LENGTH exists to avoid.
+
+    This raises the cost of an ACCIDENTAL self-review. It does not detect
+    deliberate evasion -- nothing stops two ids from sharing no segment at
+    all while still naming the same underlying session under different
+    words -- and nothing here or in reviews/README.md claims otherwise.
+    """
+    shared = _id_segments(id_a) & _id_segments(id_b)
+    long_shared = sorted(s for s in shared if len(s) >= MIN_SHARED_SEGMENT_LENGTH)
+    return long_shared[0] if long_shared else None
+
+
 def _review_ok(
     review_path: Path,
     head_sha: str,
@@ -571,11 +638,14 @@ def _review_ok(
         author_parsed = _parse_identity(author_id, "commit_author_id", rel, errors)
         if reviewer_parsed is None or author_parsed is None:
             return None
-        if reviewer_parsed[1] == author_parsed[1]:
+        shared_segment = _shared_long_segment(reviewer_id, author_id)
+        if shared_segment is not None:
             errors.append(
-                f"{rel}: reviewer_id and commit_author_id share session-token "
-                f"{reviewer_parsed[1]!r} -- this is a subagent reviewing the work of "
-                "the session that dispatched it, not an independent reviewer"
+                f"{rel}: reviewer_id and commit_author_id share the segment "
+                f"{shared_segment!r} ({len(shared_segment)} characters, at or above "
+                f"MIN_SHARED_SEGMENT_LENGTH={MIN_SHARED_SEGMENT_LENGTH}) -- likely the "
+                "same session or dispatch reviewing its own work, not an independent "
+                "reviewer"
             )
             return None
         dispatched = data.get("reviewer_was_dispatched_by_author")

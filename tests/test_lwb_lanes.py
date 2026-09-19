@@ -582,7 +582,7 @@ def test_review_ok_at_cutoff_rejects_shared_session_token(tmp_path):
         lwb_lanes.REPO_ROOT = original_root
 
     assert got is None
-    assert any("session-token" in e for e in errors), errors
+    assert any("segment" in e for e in errors), errors
 
 
 def test_review_ok_at_cutoff_requires_dispatched_boolean_field(tmp_path):
@@ -888,10 +888,12 @@ def test_review_ok_non_string_reviewed_commit_is_a_clean_error_not_a_crash(tmp_p
 
 
 def test_review_ok_at_cutoff_rejects_shared_session_token_with_hyphenated_ids(tmp_path):
+    """Shared token is 8 characters -- at MIN_SHARED_SEGMENT_LENGTH -- so
+    this stays a genuine collision under the segment-set rule."""
     _write_review_pr(
         tmp_path, 19, "verifier.json",
-        reviewer_id="lw-verifier-claude-opus-5-tokX-2026-09-20",
-        commit_author_id="lw-implementer-claude-sonnet-5-tokX-2026-09-19",
+        reviewer_id="lw-verifier-claude-opus-5-tok12345-2026-09-20",
+        commit_author_id="lw-implementer-claude-sonnet-5-tok12345-2026-09-19",
         reviewer_was_dispatched_by_author=False,
     )
     original_root = lwb_lanes.REPO_ROOT
@@ -905,7 +907,100 @@ def test_review_ok_at_cutoff_rejects_shared_session_token_with_hyphenated_ids(tm
         lwb_lanes.REPO_ROOT = original_root
 
     assert got is None
-    assert any("session-token" in e for e in errors), errors
+    assert any("segment" in e for e in errors), errors
+
+
+# ---------------------------------------------------------------------------
+# Re-review finding: the positional check above ("the segment immediately
+# before the date") is itself both an evasion and a false-positive
+# generator. Replaced with a segment-SET comparison (excluding the
+# stripped trailing date) that flags any shared segment of at least
+# MIN_SHARED_SEGMENT_LENGTH characters, wherever it sits in either id.
+# ---------------------------------------------------------------------------
+
+
+def test_shared_long_segment_none_for_unrelated_ids():
+    assert lwb_lanes._shared_long_segment(
+        "verifier-sonnet-ac5ffd6d6cde8a968-2026-09-17",
+        "claude-code-opus5-session-f8da3f9e-2026-09-17",
+    ) is None
+
+
+def test_shared_long_segment_finds_token_not_adjacent_to_date():
+    """The actual PR 15-17 shape: the shared session token sits BEFORE an
+    extra trailing segment, not immediately before the date. This is
+    exactly what the old position-only check missed and is why it was
+    replaced."""
+    shared = lwb_lanes._shared_long_segment(
+        "lw-verifier-sonnet5-f8da3f9e-scope13to15-2026-09-18",
+        "claude-code-opus5-session-f8da3f9e-2026-09-18",
+    )
+    assert shared == "f8da3f9e"
+
+
+def test_shared_long_segment_catches_the_padded_suffix_evasion(tmp_path):
+    """A one-segment suffix appended after the real token must not defeat
+    the check: comparing SETS of segments, not the one adjacent to the
+    date, still finds the real token shared between the two ids."""
+    shared = lwb_lanes._shared_long_segment(
+        "verifier-sonnet-realtoken123-2026-09-19",
+        "author-claude-realtoken123-extra-2026-09-19",
+    )
+    assert shared == "realtoken123"
+
+
+def test_shared_long_segment_ignores_short_coincidental_overlap():
+    """Two unrelated ids that happen to both end in the same SHORT chunk
+    before the date must not be treated as a collision -- that blocks a
+    legitimate review, the failure mode that gets a gate disabled."""
+    assert lwb_lanes._shared_long_segment(
+        "verifier-sonnet-aaaa-bbbb-9999-2026-09-19",
+        "author-claude-cccc-dddd-9999-2026-09-19",
+    ) is None
+
+
+def test_review_ok_at_cutoff_rejects_the_padded_suffix_evasion(tmp_path):
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="verifier-sonnet-realtoken123-2026-09-19",
+        commit_author_id="author-claude-realtoken123-extra-2026-09-19",
+        reviewer_was_dispatched_by_author=False,
+        reviewed_commit=HEAD_SHA,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got is None
+    assert any("realtoken123" in e for e in errors), errors
+
+
+def test_review_ok_at_cutoff_accepts_short_coincidental_overlap(tmp_path):
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="verifier-sonnet-aaaa-bbbb-9999-2026-09-19",
+        commit_author_id="author-claude-cccc-dddd-9999-2026-09-19",
+        reviewer_was_dispatched_by_author=False,
+        reviewed_commit=HEAD_SHA,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == "verifier-sonnet-aaaa-bbbb-9999-2026-09-19"
+    assert errors == []
 
 
 def test_review_ok_validates_against_schema_required_fields(tmp_path):

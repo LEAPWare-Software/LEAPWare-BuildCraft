@@ -140,13 +140,38 @@ being enforced (see below).
   editing a historical record to satisfy a new validator is falsifying
   evidence, not honesty.
 - **From PR #19 onward, a record whose `reviewer_id` and `commit_author_id`
-  share the same `session-token` field is REJECTED** as a self-review — the
-  literal case measured above (3 of 10 records). This is a narrower,
-  precise version of "same substring": PR #6's naive attempt (reject any
-  shared substring) would have flagged every one of the then-16 records,
-  because every id happened to end in the same `-2026-09-18` run — longer
-  than the 8-character session token it needed to catch. Comparing a
-  parsed FIELD instead of the raw string is why the format above exists.
+  share a long segment is REJECTED** as a self-review — the literal case
+  measured above (3 of 10 records). "Long" means at least
+  `scripts/lwb_lanes.MIN_SHARED_SEGMENT_LENGTH` (8) characters, and the
+  comparison is over the SET of hyphen-delimited segments each id splits
+  into once its trailing date is stripped, not over any one fixed
+  position such as "the segment immediately before the date." An earlier
+  version of this check compared only that one position and was wrong in
+  both directions, found by adversarial review:
+  - **Evasion:** appending one throwaway segment after the real token
+    shifts what sits next to the date without changing what the two ids
+    actually share (`...-realtoken123-2026-09-19` vs
+    `...-realtoken123-extra-2026-09-19` — `realtoken123` is shared by
+    both, but neither id's date-adjacent segment matched the other's).
+  - **False positive:** two unrelated ids that happen to both end in the
+    same short chunk before the date (`...-9999-2026-09-19` on both
+    sides) were rejected as a collision though nothing meaningful was
+    shared — the failure mode that gets a gate disabled.
+  - It also MISSED this repo's own real self-review: PRs 15-17 share the
+    token `f8da3f9e`, but it sits BEFORE an extra trailing segment on the
+    reviewer side (`...-f8da3f9e-scope13to15-2026-09-18`), not adjacent to
+    the date at all. The set-based rule catches this correctly — verified
+    against the actual records: PRs 15, 16 and 17 (`f8da3f9e`, 8
+    characters) are flagged; PRs 7-13 and 18 share nothing at or above the
+    8-character floor and are not.
+  - This is still not substring matching across segment boundaries —
+    `realtoken123` inside `xrealtoken123y` is a different problem, and
+    chasing it would reintroduce the false-positive risk
+    `MIN_SHARED_SEGMENT_LENGTH` exists to avoid — and it still only
+    raises the cost of an ACCIDENTAL self-review. It does not detect
+    deliberate evasion: two ids can share no segment at all while still
+    naming the same underlying session under different words, and nothing
+    here claims otherwise.
 - **What this gate CANNOT do, said plainly so it is never overclaimed
   again:** it cannot tell a genuinely independent reviewer from one that
   merely uses a different-looking dispatch id for the same underlying
