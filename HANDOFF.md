@@ -27,11 +27,11 @@ that no WORTHY AND VETTED tool already does it before building anything.
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT, each blocked on a DISAGREE review at its head:**
-   #35 (this PR -- re-cuts #30, dead: its commits fail commit-identity
-   permanently and force-push can't fix them; do not touch #30), #29
-   (cloud-only runbook; also conflicts with main), #32 (correction to
-   #27's review record). Plan, not fact -- re-derive every SHA.
+3. **IN FLIGHT:** #37 (this PR -- re-cuts dead #35, itself #30 re-cut on
+   an unfixable commit-identity failure; don't touch either). Blocked on
+   `lwb-lanes`: 0 valid reviews (1 stale, 1 a same-name segment
+   collision) -- gate defect, not content. #29 (runbook, conflicts w/
+   main), #32 (#27 correction). Re-derive SHAs.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
@@ -43,10 +43,10 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 17:05 UTC
+Generated: 2026-09-19 18:19 UTC
 main SHA: bfe850796969980545811e1ffa551b9143965faf
 CLI: claude
-Session: conductor-track-a-01PDRLaG5
+Session: conductor-track-a-e4242f53
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
