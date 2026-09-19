@@ -19,14 +19,31 @@ catch:
     one -- the "main SHA:" field is re-derived and compared, but a
     same-shape sha cited elsewhere in prose, with no comparable ground
     truth, is not);
-  - anything outside tracked `.md` files (a PR body, a commit message, a
-    Slack message, or anything said directly to the owner);
+  - anything outside tracked `.md` files -- NAMED explicitly, because an
+    undocumented hole is the thing this gate exists to stop shipping: a
+    `.txt` or `.rst` file, a Python (or any other language's) docstring
+    or comment, a PR body, a commit message, a Slack message, or anything
+    said directly to the owner;
   - anything said out loud rather than written down.
 That last one is the biggest gap and must be said out loud: most of the
 false claims that motivated this script were made in conversation with
 the owner, not in a committed document, and this gate cannot see those at
 all. Directive 7a still binds conduct for everything said outside a
 tracked file; this script is the mechanizable slice of it.
+
+KNOWN FALSE POSITIVES, left in deliberately rather than "fixed" with a
+retrospective-context heuristic that would itself be a new way to misfire
+silently:
+  - a retrospective/statistical mention of a count in the same shape as a
+    live claim ("During Q2 there were three open PRs on average per
+    week");
+  - a changelog-style historical label ("main SHA: <sha> was tagged as
+    the release point").
+Neither is disambiguated from a live claim; both are flagged. Mark a
+genuine historical mention with `<!-- volatile-ok: historical -->` (or
+`example`) ON THE SAME PHYSICAL LINE -- the escape is scoped to the
+physical line it appears on, not the paragraph, so it will not also
+exempt an unrelated claim two lines later in the same bullet.
 
 Design decisions (see SPEC-b-state-claim-gate.md for the brief this
 implements):
@@ -52,11 +69,28 @@ implements):
   - `<!-- volatile-ok: REASON -->` takes REASON from a closed enum
     (`VOLATILE_OK_REASONS`); an unrecognised reason does not exempt the
     line and is itself reported as an error, so a free-text escape can
-    never quietly slip past review.
+    never quietly slip past review. The escape is scoped to the PHYSICAL
+    line it appears on (via each logical line's parallel char-to-lineno
+    map), not to the whole joined paragraph -- an earlier version let one
+    legitimately-escaped clause shield an unrelated live claim two lines
+    later in the same hard-wrapped bullet, which an adversarial review
+    caught by direct probe.
   - A quoted volatile phrase is exempt only when it is preceded (within
     the same logical line) by an attribution verb, or when it sits inside
     a markdown blockquote (`> ...`). A bare quotation with neither is
     still an assertion and is flagged.
+  - Counts are matched as digits OR spelled out zero through twenty (plus
+    "a"/"an"), case-insensitive, for both commit counts and PR counts;
+    "PR(s)" and "pull request(s)" are both covered. A table row (`| ... |
+    ... |`) is normalised -- cell separators collapsed to whitespace --
+    before matching, so a claim hidden in a table cell is scanned exactly
+    like prose. The SHA-label pattern accepts optional backticks around
+    the subject and the value, an optional literal "SHA" keyword, and
+    either "SHA:" or a bare ":" -- covering "main SHA: <sha>",
+    "`main` SHA: `<sha>`", "main: <sha>" (shorthand, no "SHA" word), and
+    a normalised table row "main SHA <sha>" (no colon at all) in one
+    pattern. A reordered "at <sha> ... on main" is covered in addition to
+    the subject-first "main is at <sha>" form.
 
 Scans tracked `.md` files only (via `git ls-files`), so an untracked
 scratch file can never fail CI and a file nobody will ship is not policed.
@@ -127,6 +161,18 @@ FENCE_MARK = re.compile(r"^\s*```")
 _SHA = r"[0-9a-f]{7,40}"
 _REF = r"`?[\w][\w./-]*`?"
 
+# Spelled-out counts evade a \d+-only pattern outright ("six commits",
+# "zero open pull requests", "Ten open PRs" all used to pass). Cover
+# zero through twenty plus the indefinite article, case-insensitive (the
+# patterns below all carry re.IGNORECASE).
+_NUM = (
+    r"(?:\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen"
+    r"|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|a|an)"
+)
+# "PRs" is this repo's habitual abbreviation, but "pull request(s)" is
+# plain English for the same claim and passed untouched.
+_PR = r"(?:PRs?|pull\s+requests?)"
+
 VOLATILE_PATTERNS: list[tuple[str, re.Pattern]] = [
     (
         "branch/main described as currently at a sha",
@@ -138,6 +184,17 @@ VOLATILE_PATTERNS: list[tuple[str, re.Pattern]] = [
         ),
     ),
     (
+        "branch/main described as currently at a sha (reordered)",
+        # "We are currently at <sha> on main." -- the subject-verb order
+        # of the pattern above is not the only order this repo's own
+        # prose uses.
+        re.compile(
+            r"\b(?:currently\s+)?at\s+`?" + _SHA + r"\b[^.\n]{0,30}?\bon\s+"
+            r"(?:main|master|HEAD|origin/main|" + _REF + r"\s+branch|branch\s+" + _REF + r")\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "tip-of-branch sha claim",
         re.compile(
             r"\bthe\s+tip\s+of\s+" + _REF + r"\s+is\s+`?" + _SHA + r"\b",
@@ -145,42 +202,51 @@ VOLATILE_PATTERNS: list[tuple[str, re.Pattern]] = [
         ),
     ),
     (
-        "branch/main labelled with a live SHA:",
-        re.compile(r"\b(?:main|master|HEAD)\s+SHA:\s*`?" + _SHA + r"\b", re.IGNORECASE),
+        "branch/main labelled with a live SHA",
+        # Covers "main SHA: <sha>" (the original form), backticks around
+        # the subject and/or the value ("`main` SHA: `<sha>`"), the
+        # colon-only shorthand with no "SHA" word ("main: <sha>"), and a
+        # table row with cell separators already normalised to whitespace
+        # ("main SHA <sha>", no colon at all) -- see _normalize_table_row.
+        # "SHA" is required when there is no colon, so a bare
+        # "main <unrelated-hex-looking-word>" does not match.
+        re.compile(
+            r"\b`?(?:main|master|HEAD)`?\s*(?:SHA\s*:?|:)\s*`?" + _SHA + r"\b",
+            re.IGNORECASE,
+        ),
     ),
     (
         "commit count (holds/carries/has N commits)",
-        re.compile(r"\b(?:holds?|carries?|has|contains?)\s+\d+\s+commits?\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:holds?|carries?|has|contains?)\s+" + _NUM + r"\s+commits?\b", re.IGNORECASE
+        ),
     ),
     (
         "commit count (N unmerged/open commits)",
-        re.compile(r"\b\d+\s+(?:unmerged|open)\s+commits?\b", re.IGNORECASE),
+        re.compile(r"\b" + _NUM + r"\s+(?:unmerged|open)\s+commits?\b", re.IGNORECASE),
     ),
     (
         "commit count (N commits ahead/behind)",
-        re.compile(r"\b\d+\s+commits?\s+(?:ahead|behind)\b", re.IGNORECASE),
+        re.compile(r"\b" + _NUM + r"\s+commits?\s+(?:ahead|behind)\b", re.IGNORECASE),
     ),
     (
         "commit count (is N ahead/behind of)",
-        re.compile(r"\bis\s+\d+\s+(?:ahead|behind)\s+of\b", re.IGNORECASE),
+        re.compile(r"\bis\s+" + _NUM + r"\s+(?:ahead|behind)\s+of\b", re.IGNORECASE),
     ),
     (
         "open-PR assertion (no PR is open / no open PRs)",
         re.compile(
-            r"\bno\s+(?:open\s+)?PRs?\s+(?:is|are)\s+open\b|\bno\s+open\s+PRs?\b",
+            r"\bno\s+(?:open\s+)?" + _PR + r"\s+(?:is|are)\s+open\b|\bno\s+open\s+" + _PR + r"\b",
             re.IGNORECASE,
         ),
     ),
     (
         "open-PR assertion (N open PRs)",
-        re.compile(
-            r"\b(?:\d+|one|two|three|four|five|a|an)\s+open\s+PRs?\b",
-            re.IGNORECASE,
-        ),
+        re.compile(r"\b" + _NUM + r"\s+open\s+" + _PR + r"\b", re.IGNORECASE),
     ),
     (
         "open-PR assertion (there is/are ... open PR(s))",
-        re.compile(r"\bthere\s+(?:is|are)\b[^.\n]{0,20}?\bopen\s+PRs?\b", re.IGNORECASE),
+        re.compile(r"\bthere\s+(?:is|are)\b[^.\n]{0,20}?\bopen\s+" + _PR + r"\b", re.IGNORECASE),
     ),
     (
         "open-PR assertion (a/the PR is open)",
@@ -359,11 +425,32 @@ def _line_kind(line: str) -> str:
     return "text"
 
 
+def _normalize_table_row(text: str) -> str:
+    """`| main SHA | <sha> |` -> `main SHA <sha>`. Cell separators are
+    normalised to whitespace so every ordinary volatile pattern -- built
+    on whitespace adjacency -- can see across what used to be a `|`
+    boundary, instead of a table row silently defeating every pattern at
+    once."""
+    inner = text.strip()
+    if inner.startswith("|"):
+        inner = inner[1:]
+    if inner.endswith("|"):
+        inner = inner[:-1]
+    cells = [c.strip() for c in inner.split("|")]
+    return " ".join(c for c in cells if c)
+
+
 @dataclass
 class LogicalLine:
     text: str
     first_lineno: int
     kind: str
+    # Parallel to `text`: char_linenos[i] is the physical line that
+    # produced text[i]. Lets a match be mapped back to the physical
+    # line(s) it actually came from, so an escape comment on ONE
+    # physical line of a joined paragraph cannot exempt a claim that
+    # lives on a different physical line of the same paragraph.
+    char_linenos: list[int]
 
 
 def _build_logical_lines(physical: list[tuple[int, str, bool]]) -> list[LogicalLine]:
@@ -371,15 +458,31 @@ def _build_logical_lines(physical: list[tuple[int, str, bool]]) -> list[LogicalL
     `skip` marks lines inside a fence or inside the HANDOFF generated
     block, which are never joined into ordinary prose logical lines."""
     result: list[LogicalLine] = []
-    parts: list[str] = []
-    first_lineno = 0
+    parts: list[tuple[int, str]] = []  # (physical lineno, stripped segment)
     kind = ""
     prev_kind = None
 
     def flush() -> None:
-        nonlocal parts, first_lineno, kind
+        nonlocal parts, kind
         if parts:
-            result.append(LogicalLine(" ".join(parts), first_lineno, kind))
+            if kind == "table":
+                # A table row is never joined with a neighbour (see
+                # starts_new below), so `parts` holds exactly one segment.
+                row_lineno = parts[0][0]
+                normalized = _normalize_table_row(parts[0][1])
+                result.append(
+                    LogicalLine(normalized, row_lineno, kind, [row_lineno] * len(normalized))
+                )
+            else:
+                chars: list[str] = []
+                linenos: list[int] = []
+                for i, (lineno, seg) in enumerate(parts):
+                    if i > 0:
+                        chars.append(" ")
+                        linenos.append(parts[i - 1][0])
+                    chars.append(seg)
+                    linenos.extend([lineno] * len(seg))
+                result.append(LogicalLine("".join(chars), parts[0][0], kind, linenos))
         parts = []
 
     for lineno, line, skip in physical:
@@ -396,11 +499,10 @@ def _build_logical_lines(physical: list[tuple[int, str, bool]]) -> list[LogicalL
         )
         if starts_new:
             flush()
-            parts = [line.strip()]
-            first_lineno = lineno
+            parts = [(lineno, line.strip())]
             kind = this_kind
         else:
-            parts.append(line.strip())
+            parts.append((lineno, line.strip()))
         prev_kind = this_kind
     flush()
     return result
@@ -432,23 +534,37 @@ def _is_quote_exempt(text: str, start: int, end: int, kind: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def _escaped_linenos(ll: "LogicalLine") -> dict[int, bool]:
+    """Physical linenos, within this logical line, that carry a
+    `volatile-ok` comment -> whether that comment's reason is valid. The
+    escape is scoped to the PHYSICAL line the comment sits on (found via
+    char_linenos), not the whole joined paragraph -- see the module
+    docstring: one legitimately-escaped clause must not shield an
+    unrelated claim elsewhere in the same hard-wrapped paragraph."""
+    escaped: dict[int, bool] = {}
+    for m in ESCAPE_COMMENT.finditer(ll.text):
+        reason = m.group(1).strip().lower()
+        valid = reason in VOLATILE_OK_REASONS
+        for lineno in set(ll.char_linenos[m.start() : m.end()]):
+            escaped[lineno] = escaped.get(lineno, False) or valid
+    return escaped
+
+
 def _scan_generic(logical_lines: list[LogicalLine], rel_path: str) -> list[Finding]:
     findings: list[Finding] = []
     for ll in logical_lines:
-        text = ll.text
-        m = ESCAPE_COMMENT.search(text)
-        escape_reason = m.group(1).strip().lower() if m else None
-        escape_valid = escape_reason in VOLATILE_OK_REASONS if escape_reason is not None else False
-        # Strip the escape comment itself from matching so its own text
-        # (e.g. the word "generated-block") cannot accidentally match a
-        # pattern.
-        scan_text = ESCAPE_COMMENT.sub("", text) if m else text
+        escaped = _escaped_linenos(ll)
+        # Strip escape comments from the text before matching, so their
+        # own text (e.g. the word "generated-block") cannot accidentally
+        # match a volatile pattern.
+        scan_text = ESCAPE_COMMENT.sub(lambda m: " " * len(m.group(0)), ll.text)
         raw_hits: list[tuple[int, int, str, str]] = []  # (start, end, label, matched text)
         for label, pattern in VOLATILE_PATTERNS:
             for pm in pattern.finditer(scan_text):
                 if _is_quote_exempt(scan_text, pm.start(), pm.end(), ll.kind):
                     continue
-                if escape_reason is not None and escape_valid:
+                match_linenos = set(ll.char_linenos[pm.start() : pm.end()])
+                if match_linenos and all(escaped.get(ln) for ln in match_linenos):
                     continue
                 raw_hits.append((pm.start(), pm.end(), label, pm.group(0)))
         # Several patterns can fire on the same phrase (e.g. "N open PRs"
@@ -469,14 +585,14 @@ def _scan_generic(logical_lines: list[LogicalLine], rel_path: str) -> list[Findi
 def _scan_escape_errors(logical_lines: list[LogicalLine], rel_path: str) -> list[str]:
     errors: list[str] = []
     for ll in logical_lines:
-        m = ESCAPE_COMMENT.search(ll.text)
-        if not m:
-            continue
-        reason = m.group(1).strip().lower()
-        if reason not in VOLATILE_OK_REASONS:
+        for m in ESCAPE_COMMENT.finditer(ll.text):
+            reason = m.group(1).strip().lower()
+            if reason in VOLATILE_OK_REASONS:
+                continue
+            linenos = sorted(set(ll.char_linenos[m.start() : m.end()])) or [ll.first_lineno]
             allowed = ", ".join(sorted(VOLATILE_OK_REASONS))
             errors.append(
-                f"{rel_path}:{ll.first_lineno}: volatile-ok reason {reason!r} is not in the "
+                f"{rel_path}:{linenos[0]}: volatile-ok reason {reason!r} is not in the "
                 f"closed enum ({allowed})"
             )
     return errors

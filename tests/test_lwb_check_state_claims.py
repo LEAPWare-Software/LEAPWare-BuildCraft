@@ -439,3 +439,108 @@ def test_findings_report_file_and_line(tmp_path):
     assert len(findings) == 1
     assert findings[0].path == "NOTE.md"
     assert findings[0].lineno == 3
+
+
+# ---------------------------------------------------------------------------
+# Evasions found by adversarial review of PR (head e7b33d8) -- each fixed
+# below was confirmed by direct probe: it produced zero findings when it
+# should not have (or, for the escape leak, produced zero findings on a
+# claim that was never actually escaped).
+# ---------------------------------------------------------------------------
+
+
+def test_escape_comment_does_not_leak_across_joined_paragraph(tmp_path):
+    """The worst evasion: a `volatile-ok` comment anywhere in a hard-wrapped
+    paragraph used to exempt the WHOLE joined logical line, so one
+    legitimately-escaped clause shielded an unrelated false claim in the
+    same paragraph. The escape must be scoped to the physical line it
+    appears on."""
+    repo = _init_repo(tmp_path)
+    _commit_md(
+        repo,
+        "NOTE.md",
+        "- Some legitimate illustrative example. <!-- volatile-ok: illustrative -->\n"
+        "  main SHA: deadbeef1234, a live stale claim in the same paragraph.\n",
+    )
+    findings = m.check(repo)
+    assert any("SHA" in f.label for f in findings), findings
+
+
+def test_escape_on_its_own_line_still_exempts_only_that_line(tmp_path):
+    """The positive control for the fix above: the escape must still work
+    when the comment and the claim share a physical line."""
+    repo = _init_repo(tmp_path)
+    _commit_md(
+        repo,
+        "NOTE.md",
+        "- main SHA: deadbeef1234 <!-- volatile-ok: illustrative -->\n"
+        "  A second, unrelated sentence with nothing volatile in it.\n",
+    )
+    assert m.check(repo) == []
+
+
+def test_spelled_out_commit_count_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "This branch holds six commits on top of main.\n")
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_spelled_out_zero_open_pull_requests_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "There are zero open pull requests right now.\n")
+    findings = m.check(repo)
+    assert len(findings) >= 1, findings
+
+
+def test_capitalized_word_number_open_prs_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "Ten open PRs remain.\n")
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_table_row_stale_main_sha_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _seed_main_branch(repo)
+    _commit_md(
+        repo,
+        "NOTE.md",
+        "| Field | Value |\n| --- | --- |\n"
+        "| main SHA | deadbeefdeadbeefdeadbeefdeadbeefdeadbeef |\n",
+    )
+    findings = m.check(repo)
+    assert len(findings) >= 1, findings
+
+
+def test_table_row_branch_still_exists_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(
+        repo,
+        "NOTE.md",
+        "| Branch | Status |\n| --- | --- |\n"
+        "| `foo` | still exists on the remote |\n",
+    )
+    findings = m.check(repo)
+    assert len(findings) >= 1, findings
+
+
+def test_backticked_sha_label_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "`main` SHA: `deadbeef1234`\n")
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_reordered_currently_at_sha_on_main_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "We are currently at deadbeef1234 on main.\n")
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
+
+
+def test_shorthand_main_colon_sha_is_flagged(tmp_path):
+    repo = _init_repo(tmp_path)
+    _commit_md(repo, "NOTE.md", "main: deadbeef1234 (verified).\n")
+    findings = m.check(repo)
+    assert len(findings) == 1, findings
