@@ -128,7 +128,8 @@ def evaluate(agent: str, raw: dict) -> dict:
                 "permissionDecision": "deny",
                 "permissionDecisionReason": (
                     f"lwb lane guard: {agent} may not write outside its lane or shared "
-                    f"paths: {', '.join(offenders)} (see docs/architecture.md, owner directive 5)"
+                    f"paths: {', '.join(offenders)} (owner directive 5; see "
+                    f"docs/requirements/owner-directives.md and reviews/README.md)"
                 ),
             }
         }

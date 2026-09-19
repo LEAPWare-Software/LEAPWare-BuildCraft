@@ -175,9 +175,17 @@ def _findings_for_line(
     if HARDCODED_INTERPRETER.search(line):
         findings.append(f"{rel}:{lineno}: absolute path to a python interpreter")
     lowered = line.lower()
-    for needle in resolve_needles() if needles is None else needles:
+    all_needles = resolve_needles() if needles is None else needles
+    for idx, needle in enumerate(all_needles, start=1):
         if needle in lowered:
-            findings.append(f"{rel}:{lineno}: private-project name leak ('{needle}')")
+            # NEVER print `needle` itself. GitHub Actions masks a secret's
+            # whole configured value, not its comma-separated members, so a
+            # finding that quotes the matched needle publishes the very
+            # private name this check exists to keep out of a world-readable
+            # log. A stable 1-based index into the configured needle list is
+            # actionable (an operator holding that same list can map the
+            # index back privately) without ever repeating the value.
+            findings.append(f"{rel}:{lineno}: private-project name leak (needle #{idx})")
     return findings
 
 
@@ -302,7 +310,13 @@ def main() -> int:
 
     if findings or unconfigured:
         return 1
-    print(f"lwb-env-leak check passed ({len(needles)} needles)")
+    # No count here, deliberately. `len(needles)` publishes the cardinality
+    # of the private needle set into every proof record's captured tail and
+    # every public CI log, and that number changes whenever the owner adds
+    # or removes a private name -- itself a leak of private-project shape,
+    # not just its members. UNCONFIGURED above stays exactly as loud as it
+    # was; only the count on the success line is gone.
+    print("lwb-env-leak check passed")
     return 0
 
 

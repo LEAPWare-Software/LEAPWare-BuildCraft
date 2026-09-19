@@ -68,9 +68,13 @@ already mean here, or update every citation below in the same change:
   `scripts/lwb_check_no_instruction_dep.py`,
   `tests/test_no_instruction_file_dependency.py`.
 - **Directive 5** — lane discipline: each CLI's own lane is its own to
-  edit; a shared path needs adversarial review from both. Cited by
-  `scripts/lwb_check_lane_write.py`, `scripts/lwb_lanes.py`,
-  `docs/architecture.md`.
+  edit; a shared path needs independent adversarial review. Cited by
+  `scripts/lwb_check_lane_write.py` and `scripts/lwb_lanes.py`.
+  `docs/architecture.md` was listed here too and does NOT cite directive 5
+  — it cites directive 8 only. Found by an independent audit of this
+  file's own claims; a directives file that miscites its own enforcement
+  is the first thing a reader would trust and the last thing anyone
+  checks.
 - **Directive 7** — Proof of Completion on every deliverable: done means
   committed AND pushed, with a proof record and green CI. Cited by
   `scripts/lwb_check_proof.py`, `proof/README.md`, `proof/schema.json`.

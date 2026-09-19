@@ -352,7 +352,7 @@ def _pr12_base(**overrides):
             "setup_overhead": "unknown",
             "tool_overhead": "unknown",
             "wall_time_seconds": 1,
-            "source": "test",
+            "source": "transcript message.usage",
         },
     }
     record.update(overrides)
@@ -389,6 +389,84 @@ def test_pr12_record_with_total_input_zero_fails():
 
 def test_pr12_record_with_unknown_values_passes():
     errors = lwb_check_proof._validate_record(Path("r.json"), _pr12_base())
+    assert errors == []
+
+
+def test_pr12_record_with_spend_ledger_source_is_rejected():
+    """FIX 3: 'spend-ledger' named a PowerShell script from a plugin the
+    owner is removing -- nobody on a fresh clone can re-derive it, so a
+    record citing it is unreproducible evidence."""
+    record = _pr12_base()
+    record["tokens"] = dict(record["tokens"])
+    record["tokens"]["source"] = "spend-ledger"
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("tokens.source" in e and "spend-ledger" in e for e in errors)
+
+
+def test_pr12_record_with_arbitrary_source_string_is_rejected():
+    record = _pr12_base()
+    record["tokens"] = dict(record["tokens"])
+    record["tokens"]["source"] = "a very convincing but unverifiable claim"
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("tokens.source" in e for e in errors)
+
+
+def test_pr12_record_with_source_unknown_is_accepted():
+    record = _pr12_base()
+    record["tokens"] = dict(record["tokens"])
+    record["tokens"]["source"] = "unknown"
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert errors == []
+
+
+def test_pr12_record_with_source_transcript_usage_is_accepted():
+    record = _pr12_base()
+    record["tokens"] = dict(record["tokens"])
+    record["tokens"]["source"] = "transcript message.usage"
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert errors == []
+
+
+def test_pr12_record_with_descriptive_transcript_usage_source_is_accepted():
+    """The prefix rule, not a strict enum: detail after the origin -- which
+    file, how many records were summed -- is honest provenance and must be
+    allowed, not rejected as noise."""
+    record = _pr12_base()
+    record["tokens"] = dict(record["tokens"])
+    record["tokens"]["source"] = (
+        "transcript message.usage summed across 1083 usage-bearing assistant "
+        "records in <home>/.claude/projects/<repo-slug>/<session-id>.jsonl "
+        "(cached_input = cache_read + cache_creation; uncached_input = input_tokens)"
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert errors == []
+
+
+def test_pr12_record_with_leading_whitespace_before_source_prefix_is_rejected():
+    """The prefix match is anchored at position 0 -- leading whitespace
+    before an otherwise-allowed origin must still fail."""
+    record = _pr12_base()
+    record["tokens"] = dict(record["tokens"])
+    record["tokens"]["source"] = "  transcript message.usage"
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("tokens.source" in e for e in errors)
+
+
+def test_pr_below_12_record_with_bad_token_source_still_passes():
+    """The pr >= 12 gate stays inert below 12: tokens.source enforcement
+    must not retroactively break a record that predates the field."""
+    record = {
+        "deliverable": "11",
+        "author": "claude",
+        "checked_by": "codex",
+        "commit": "a" * 40,
+        "commands": [],
+        "mutations": [],
+        "unproven": [],
+        "pr": 11,
+        "tokens": {"source": "spend-ledger"},
+    }
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
     assert errors == []
 
 

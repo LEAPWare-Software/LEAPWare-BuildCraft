@@ -31,10 +31,15 @@ What is durable:
 
 - `main` was at `c33b560` when this session ended. Anything at or after
   that sha is this session's work or later.
-- Branch `lwb-mission-final` carries the unmerged deliverable: the settled
-  mission, the enforceable gates, and decisions D9 onward.
-- Branch `lwb-mission-settled` is a leftover from abandoned PR #12; delete
-  it once `lwb-mission-final` has landed.
+- The deliverable that was unmerged when this was written has since landed
+  as PR #15 (`d0c1386`) and PR #16 (`7d9a0b7`): the settled mission, the
+  enforceable gates, and decisions D9 onward. Every branch named in the
+  original text is deleted.
+- This bullet previously described `lwb-mission-final` as carrying unmerged
+  work and `lwb-mission-settled` as awaiting cleanup. Both were false
+  within hours, found by an independent state audit. They are corrected
+  rather than deleted so the failure mode stays visible: a document that
+  names a branch is stale the moment that branch moves.
 - PRs #12 and #13 are closed and abandoned. Do not reopen them; their
   branch history carries the leaked name.
 - Ruleset 23627212 protects `main`: no deletion, no force-push, PR
