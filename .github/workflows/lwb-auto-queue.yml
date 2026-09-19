@@ -48,13 +48,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # Deliberately checks out the DEFAULT BRANCH, never the pull request's
-      # code. This job holds a token and must never execute anything a pull
-      # request author controls; it reads a PR's proof and review records as
-      # JSON data over the API instead.
+      # Checks out the ref that fired this workflow, which is safe ONLY
+      # because this workflow has no pull-request trigger: `workflow_dispatch`
+      # and `push` both run code a collaborator pushed, and GitHub takes the
+      # workflow definition from that same ref.
+      #
+      # READ THIS BEFORE ADDING A TRIGGER. The moment a `pull_request`,
+      # `pull_request_target` or `workflow_run` trigger is added, the checked
+      # out code becomes pull-request-controlled while this job holds a
+      # write-scoped token. At that point pin the checkout to
+      # `ref: ${{ github.event.repository.default_branch }}`. The job never
+      # needs a PR's code in any case: it reads a PR's proof and review
+      # records as JSON data over the API, and JSON data is not executed.
+      #
+      # The first attempt at this file DID pin the default branch, and the run
+      # failed with "can't open file .../scripts/lwb_auto_queue.py" because
+      # the script is not on `main` yet. That failure is why this comment
+      # exists rather than a silent assumption.
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.repository.default_branch }}
 
       - uses: actions/setup-python@v7
         with:
