@@ -698,6 +698,193 @@ change to `scripts/lwb_lanes.py`, a shared path, so it needs its own PR
 and its own independent review. Four occurrences and one documented
 prediction are enough evidence that ordering discipline is not holding.
 
+### The second instance of the same post-merge class — observed, then live on `main`
+
+`lwb_check_state_claims.py`'s `Open PRs:` listing has the identical
+structural defect the `main SHA:` field had (above), one field further
+down the same generated block: the PR whose merge publishes the block is,
+by definition, listed as open in the very snapshot that merge produces.
+An independent reviewer of PR #22 — the PR that fixed the `main SHA:`
+defect — predicted exactly this, out of scope for that PR, as finding 4 of
+`reviews/22/independent-verifier.json`, verbatim: *"With gh available,
+main's HANDOFF.md fails with #21 listed as open but gh reports MERGED. CI
+does not see it because gh is not authenticated there. A second post-merge
+trap of the same class, recorded rather than fixed here."*
+
+That prediction was confirmed live on `main` at `ae05882` (PR #22's own
+merge commit): with `gh` authenticated, the gate failed —
+
+    FAIL: HANDOFF.md:49: [stale open-PR listing in generated block] #22
+    listed as open but gh reports MERGED: #22 The state-claim gate could
+    never pass after a merge -- main has been red for four merges (#22)
+
+— and CI stayed green only because the runner's `gh` is unauthenticated,
+so `_pr_state` returned `None` and the line degraded to an
+`UNVERIFIABLE` info instead of a finding, masking the same class of bug
+the `main SHA:` fix had already closed one field above it. The moment CI
+authenticates `gh`, `main` would have gone red on its own push run, the
+same way it did for four consecutive merges before PR #22 (see above).
+
+**The rule, mirrored from `main SHA:` exactly, per the independent
+reviewer's prescription for that field, reusing `_sha_matches` rather than
+a second comparison:**
+
+1. A listed PR that `gh` reports `MERGED` is the EXPECTED post-merge
+   state — not stale — when its merge commit is live `main` itself, or
+   live `main`'s first parent (`main^1`). Reported as `INFO
+   (git-verified)`, not `UNVERIFIABLE` — git proved it.
+2. `MERGED` with a merge commit that is neither live `main` nor `main^1`
+   (merged several commits back) is genuinely stale — `FAIL`, unchanged.
+3. `CLOSED` (not merged) is stale regardless of any commit comparison —
+   `FAIL`, unchanged.
+4. When the merge commit cannot be resolved at all (`gh` gives no
+   `mergeCommit`, or live `main` itself cannot be resolved), that is a
+   DISTINCT finding — `merge commit for listed PR could not be
+   determined` — that still exits non-zero but does not accuse the
+   listing of being stale, mirroring the `main SHA:` shallow-clone
+   asymmetry (an unproven accusation is exactly as dishonest as a
+   silently-passed lie).
+5. `gh` unavailable/unauthenticated (`_pr_state` returns `None`) is
+   unchanged: `UNVERIFIABLE` info, not a failure — this is the path that
+   masked the bug in CI and must keep passing there.
+
+See `scripts/lwb_check_state_claims.py` (`_pr_merge_commit`, and the
+`MERGED` branch of the `Open PRs:` loop inside `_scan_generated_block`)
+and `tests/test_lwb_check_state_claims.py` (the `test_pr_merged_*` and
+`test_pr_closed_*`/`test_pr_gh_unauthenticated_*` group) for the
+mechanics and the six cases each covers.
+
+#### Corrections to this section's first version, all found by the reviewer
+
+Three things the first version of this section and of PR #24's description
+got wrong. They are corrected here rather than quietly edited, because the
+whole point of this document is that a claim is unverified until a command
+confirms it.
+
+- **"Predicted it" overstates the reviewer.** It did not predict the bug;
+  it OBSERVED the failure on `main` while reviewing #22 and marked it
+  PLAUSIBLE and explicitly out of scope. Its words, not a forecast.
+- **"for the sixth recorded time" is wrong.** PR #22's own commit message
+  says *"That makes seven instances of this repo's signature defect"*, so
+  this one is the **eighth**, not the sixth. Two numbers for the same
+  running count, three days apart, in the same repository.
+- **"the unresolvable case never wrongly accuses" was false**, and is the
+  third occurrence of that exact error — see below.
+
+#### The third occurrence of accusing a correct document
+
+The `main SHA:` fix made this mistake twice: first passing every
+unresolvable value, then calling a correct file stale. PR #24's first
+version made it a third time, in the open-PR branch, while its own
+description promised it had been avoided.
+
+In a real `--depth 1 --branch main` clone the reviewer found a listing for
+a PR whose merge commit genuinely IS `main^1` reported as:
+
+```
+[stale open-PR listing in generated block] ... is neither live main (...)
+nor live main's first parent (None)
+```
+
+`None` printed in the message was the tell, and the `main SHA:` line
+directly above it in the same run was reporting the same situation
+correctly as `undeterminable in a shallow clone`. One block, two adjacent
+lines, two different standards.
+
+Now fixed: when `main^1` cannot be resolved and the repo is shallow, the
+open-PR branch reports `open-PR listing undeterminable in a shallow
+clone` and still exits non-zero. Locked by
+`test_pr_merged_at_parent_in_shallow_clone_is_undeterminable_not_stale`,
+which was confirmed RED against the pre-fix script and green after.
+
+The pattern worth naming: **every time this repo adds a check that says
+"X is wrong", the case where X cannot be evaluated gets handled last and
+wrongly.** Three occurrences in two adjacent lines of one file.
+
+## 1.0.0 readiness — what the goal asks for, and what exists
+
+The stated goal is "BuildCraft 1.0.0 fully built and ready to be used by
+other repos with a complete proof of completion protocol that is foolproof
+and ensures both in BuildCraft and where BuildCraft is used that done is
+truly done."
+
+Measured 2026-09-19, each line by command, not inference:
+
+| Goal clause | State |
+|---|---|
+| "1.0.0" | Version is **0.1.0** in `plugins/claude/lwb/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `pyproject.toml` and `core/lwb_core/__init__.py` — but **`plugins/codex/lwb/.codex-plugin/plugin.json` says `0.2.0+codex`**, so the two shipped plugins do not agree on a version. `git tag -l` is **empty** locally and `git ls-remote --tags origin` returns none. `scripts/lwb_release.py` **is** wired into `.github/workflows/release.yml`, which triggers on a **tag push** — so it has never fired, because there has never been a tag. `CHANGELOG.md` has only `## [Unreleased]`. |
+| "fully built" | `core/lwb_core/rules/` contains **one** rule, `lwb_version.py`, whose own docstring calls it "the walking-skeleton rule -- a safe no-op" that "never denies: even if a policy file configures it to `deny`". The shipped `vendor/policy/default.json` configures that one rule at `warn`. |
+| "ready to be used by other repos" | An install path is documented (`docs/install-claude.md`) but has **never been executed against a foreign repo**. `lwb-portable` runs the hook on three OSes **inside this checkout** (`cwd=REPO_ROOT`); `lwb-hosted-runners` asserts this repo's own jobs use hosted runners. Neither proves foreign-repo use. |
+| "where BuildCraft is used ... done is truly done" | **No shipping mechanism exists.** Every proof gate — lanes, state-claims, review independence, prefix, env-leak, proof validation — is a `scripts/` file invoked only from this repo's `.github/workflows/ci.yml`, with hardcoded lane paths (`plugins/claude/`, `plugins/codex/`), bootstrap PR-number exceptions, and this repo's own `LWB_PRIVATE_NEEDLES` secret. **None of it is vendored into the plugin.** A consuming repo that installs `lwb` today gets one no-op rule. |
+| "foolproof" | The only hook the product ships (`matcher: "Agent"`) has never been observed to fire. Open residuals are listed above and in `proof/*.json` `unproven` arrays. |
+
+**The consequence, stated plainly:** the six landed PRs (#17–#22) harden
+*this repository's own CI*. That is the first half of the goal. The second
+half — proof of completion travelling to the repos that *use* BuildCraft —
+has not been started, and closing it is not more gate fixes. It means
+building the protocol as actual `lwb_core` rules that ship in `vendor/`,
+then proving them in a second, separate repository.
+
+#### Corrections to this section, found by the reviewer that checked it
+
+Recorded rather than silently edited: a readiness assessment the owner may
+act on is the wrong place for an unchecked claim.
+
+- **FALSE, now fixed.** The first version said `scripts/lwb_release.py`
+  "is wired into no CI job". It **is** wired —
+  `.github/workflows/release.yml` runs it under a step named "Build zip
+  artifacts (scripts/lwb_release.py)". The accurate statement is that it is
+  wired **only to a tag-push workflow that has never fired**, because there
+  has never been a tag. I had also repeated a recon claim that no release
+  workflow existed; this repo has **three** workflows: `ci.yml`,
+  `handoff.yml`, `release.yml`.
+- **INCOMPLETE, now fixed.** The version row named only the `0.1.0`
+  manifests. The **codex** plugin declares `0.2.0+codex`. Two shipped
+  plugins, two different versions, no tag for either.
+- **OVERSTATED, now fixed.** The lane-guard passage credited the reviewer
+  with reading "every relevant file". It read the files it listed and said
+  so itself; that is a narrower claim.
+
+The substance survived all three: **no delivery path exists for any proof
+gate.** The reviewer re-derived that independently — `scripts/lwb_build.py`
+vendors only `core/lwb_core`, `core/policy/*.json` and `adapters`;
+`pyproject.toml` declares no `[project.scripts]` or entry points; there is
+no setup script or init template; and the `lwb-handoff` skill is a stub
+reading "Not yet implemented … point at `scripts/lwb_handoff.py`" — a
+script that does not exist in a consuming repo at all.
+
+### The lane guard is a nudge, and says so
+
+Worth recording because it is easy to mistake for a hole in the premise.
+`scripts/lwb_check_lane_write.py`'s own docstring calls it "a same-session
+nudge" and states "The CI check is the check of record". An independent
+reviewer confirmed, by reading the files listed here, that **nothing gates
+`Bash`**: `.claude/settings.json` matches only
+`Edit|Write|MultiEdit|NotebookEdit` and carries no permissions or deny
+list, `.codex/hooks.json` matches only `apply_patch`, the plugin hook
+matches `"Agent"`, and `scripts/githooks/pre-commit` has no lane check. A
+shell write into another lane is therefore caught only by `lwb-lanes` in
+CI, at commit level — which is exactly what the docstring claims.
+
+Two defects that are NOT by design, both confirmed by simulating the
+hook's `evaluate()` in-process:
+
+- A worktree **inside** the checkout misclassifies: a claude-lane file at
+  `.claude/worktrees/wt1/plugins/claude/lwb/x.md` classifies as `other`
+  and is DENIED. This blocks honest in-lane work, and it is what drove an
+  implementer to do all its edits through `Bash` instead.
+- A worktree **outside** the checkout is worse: `_relativize` returns
+  `None` for any path outside the repo, which classifies as "not a lane
+  question" and returns **allow**. Out-of-lane edits there are never
+  checked at all.
+
+PLAUSIBLE and unverified: the hook returns an explicit
+`"permissionDecision": "allow"` for every edit it does not deny, which
+under Claude Code's hook semantics may skip the normal permission prompt
+for those edits. Not checked against Claude Code itself. **This one
+touches the owner's permission experience and should be settled before
+anything else in this section.**
+
 ## How this document should be read
 
 Everything above is a claim. Two audit rounds found thirteen blockers in
