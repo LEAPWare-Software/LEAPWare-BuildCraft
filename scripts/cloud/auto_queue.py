@@ -136,6 +136,91 @@ def _all_required_checks_green(sha: str, required: List[str]) -> Tuple[bool, str
     return True, f"all {len(required)} required checks green"
 
 
+def resolve_pr_numbers(event: Dict[str, Any]) -> Optional[List[int]]:
+    """Work out which pull requests the triggering event concerns.
+
+    Three event shapes, all handled here rather than in YAML so this is
+    testable:
+
+    * `workflow_dispatch` -- `event["inputs"]["pr_number"]` names the PR
+      explicitly. Unchanged behaviour.
+    * `workflow_run` (this workflow now listens to both CI and Handoff
+      completing) -- do NOT trust `event["workflow_run"]["pull_requests"]`;
+      GitHub documents it as unreliable and it can be empty even when the
+      commit has an open PR. Resolve from the head sha instead via
+      `commits/{sha}/pulls`, keeping only PRs that are open and target
+      `main`.
+    * anything else (the `schedule` sweep) -- no event data names a PR at
+      all, so every open PR targeting `main` is swept.
+
+    Returns `None` when a lookup could not be completed (an unreadable API
+    call), which callers must treat as "could not determine" and NOT as
+    "no PRs concerned" -- the next scheduled sweep or workflow_run gets
+    another chance rather than this run silently doing nothing forever.
+    """
+    inputs = event.get("inputs") or {}
+    manual = inputs.get("pr_number")
+    if manual:
+        manual_str = str(manual).strip()
+        if not manual_str.isdigit():
+            return None
+        return [int(manual_str)]
+
+    workflow_run = event.get("workflow_run")
+    if workflow_run is not None:
+        sha = workflow_run.get("head_sha")
+        if not sha:
+            return None
+        pulls = _api(f"repos/{REPO}/commits/{sha}/pulls")
+        if pulls is None:
+            return None
+        return [
+            p["number"]
+            for p in pulls
+            if p.get("state") == "open" and (p.get("base") or {}).get("ref") == "main"
+        ]
+
+    # schedule, or any event carrying neither shape above: sweep every open
+    # PR targeting main. This is the retry and the self-heal -- it covers a
+    # workflow_run that never lands, a run that GitHub skips, and a check
+    # that completed before this fix shipped.
+    pulls = _api(f"repos/{REPO}/pulls?state=open&base=main&per_page=100")
+    if pulls is None:
+        return None
+    return [p["number"] for p in pulls]
+
+
+def emit_find_prs() -> int:
+    """CLI entry for the workflow's "Find the pull requests" step.
+
+    Reads the Actions event payload from `GITHUB_EVENT_PATH`, resolves PR
+    numbers via `resolve_pr_numbers`, and prints `prs=<comma-joined>` in
+    `GITHUB_OUTPUT` format -- the same shape the old inline heredoc step
+    emitted, so every downstream step is untouched.
+
+    A lookup failure prints `prs=` (empty) rather than failing the job:
+    this workflow retries every 15 minutes and on the next workflow_run, so
+    a transient API failure here should not need a human.
+    """
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    event: Dict[str, Any] = {}
+    if event_path:
+        try:
+            with open(event_path, encoding="utf-8") as f:
+                event = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"NOTICE: could not read GITHUB_EVENT_PATH: {exc}")
+            event = {}
+
+    numbers = resolve_pr_numbers(event)
+    if numbers is None:
+        print("NOTICE: could not resolve pull requests for this event")
+        print("prs=")
+        return 0
+    print("prs=" + ",".join(str(n) for n in numbers))
+    return 0
+
+
 def enqueue(pr_number: int, sha: str) -> bool:
     """Ask the merge queue to take this PR, pinned to `sha`.
 
@@ -212,4 +297,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--find-prs" in sys.argv:
+        sys.exit(emit_find_prs())
     sys.exit(main())

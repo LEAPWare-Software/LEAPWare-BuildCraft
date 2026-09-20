@@ -40,13 +40,14 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 14:36 UTC
-main SHA: f9b4deadbb441f0c1046a0d73b0434424f1cf13c
-CLI: claude
-Session: conductor-track-a-01XXZR3A
+Generated: 2026-09-20 03:54 UTC
+main SHA: bfe850796969980545811e1ffa551b9143965faf
+CLI: unknown
+Session: unknown
 
 Open PRs:
-(unavailable: no `gh` auth in this environment, or no open PRs)
+#43 Re-cut #42 to fix a wrong-identity commit (supersedes #42) (lwb-correct-27-dispatch-v4)
+#40 Fix lane-collision false positive and asymmetric record-only exemption (owner-directed) (fix/lane-collision-and-identity-record-exemption)
 
 Deliverable proof state (from proof/):
 20/20 proven

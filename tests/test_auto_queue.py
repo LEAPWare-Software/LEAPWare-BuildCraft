@@ -116,3 +116,105 @@ def test_refuses_closed_draft_and_wrong_base(monkeypatch, pr, reason):
     monkeypatch.setattr(auto_queue, "enqueue", lambda *a: called.append(a) or True)
     assert auto_queue.main() == auto_queue.EXIT_NOT_READY, reason
     assert called == [], f"must not enqueue a {reason} pull request"
+
+def test_resolve_pr_numbers_from_workflow_dispatch():
+    """workflow_dispatch's pr_number input names the PR explicitly."""
+    numbers = auto_queue.resolve_pr_numbers({"inputs": {"pr_number": "42"}})
+    assert numbers == [42]
+
+
+def test_resolve_pr_numbers_from_workflow_dispatch_rejects_non_numeric():
+    numbers = auto_queue.resolve_pr_numbers({"inputs": {"pr_number": "not-a-number"}})
+    assert numbers is None
+
+
+def test_resolve_pr_numbers_from_workflow_run_uses_head_sha_not_pull_requests(monkeypatch):
+    """`workflow_run.pull_requests` is documented unreliable and can be
+    empty even when the commit has an open PR -- so it must never be read.
+    Resolution goes through `commits/{sha}/pulls` instead."""
+    event = {
+        "workflow_run": {
+            "head_sha": "deadbeef",
+            # Deliberately empty, as GitHub's own docs say it can be.
+            "pull_requests": [],
+        }
+    }
+    calls = []
+
+    def fake_api(path):
+        calls.append(path)
+        assert path == "repos/LEAPWare-Software/LEAPWare-BuildCraft/commits/deadbeef/pulls"
+        return [{"number": 7, "state": "open", "base": {"ref": "main"}}]
+
+    monkeypatch.setattr(auto_queue, "_api", fake_api)
+    numbers = auto_queue.resolve_pr_numbers(event)
+    assert numbers == [7]
+    assert calls, "must resolve from the head sha, not trust the empty pull_requests list"
+
+
+def test_resolve_pr_numbers_from_workflow_run_excludes_closed_and_wrong_base(monkeypatch):
+    event = {"workflow_run": {"head_sha": "deadbeef", "pull_requests": []}}
+    monkeypatch.setattr(
+        auto_queue,
+        "_api",
+        lambda p: [
+            {"number": 1, "state": "closed", "base": {"ref": "main"}},
+            {"number": 2, "state": "open", "base": {"ref": "other"}},
+            {"number": 3, "state": "open", "base": {"ref": "main"}},
+        ],
+    )
+    numbers = auto_queue.resolve_pr_numbers(event)
+    assert numbers == [3]
+
+
+def test_resolve_pr_numbers_from_workflow_run_missing_sha_is_unresolved():
+    numbers = auto_queue.resolve_pr_numbers({"workflow_run": {}})
+    assert numbers is None
+
+
+def test_resolve_pr_numbers_from_workflow_run_unreadable_api_is_unresolved(monkeypatch):
+    monkeypatch.setattr(auto_queue, "_api", lambda p: None)
+    numbers = auto_queue.resolve_pr_numbers({"workflow_run": {"head_sha": "deadbeef"}})
+    assert numbers is None
+
+
+def test_resolve_pr_numbers_from_schedule_sweeps_every_open_pr(monkeypatch):
+    """Neither `inputs` nor `workflow_run` is present on a schedule event --
+    every open PR targeting main is swept."""
+    calls = []
+
+    def fake_api(path):
+        calls.append(path)
+        assert path == "repos/LEAPWare-Software/LEAPWare-BuildCraft/pulls?state=open&base=main&per_page=100"
+        return [{"number": 5}, {"number": 9}]
+
+    monkeypatch.setattr(auto_queue, "_api", fake_api)
+    numbers = auto_queue.resolve_pr_numbers({})
+    assert numbers == [5, 9]
+    assert calls
+
+
+def test_resolve_pr_numbers_from_schedule_unreadable_api_is_unresolved(monkeypatch):
+    monkeypatch.setattr(auto_queue, "_api", lambda p: None)
+    numbers = auto_queue.resolve_pr_numbers({})
+    assert numbers is None
+
+
+def test_emit_find_prs_prints_github_output_shape(monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    monkeypatch.setattr(auto_queue, "resolve_pr_numbers", lambda event: [1, 2, 3])
+    assert auto_queue.emit_find_prs() == 0
+    out = capsys.readouterr().out
+    assert "prs=1,2,3" in out
+
+
+def test_emit_find_prs_unresolved_prints_empty_prs_and_does_not_fail(monkeypatch, capsys):
+    """A lookup failure must not fail the job -- the schedule sweep and the
+    next workflow_run get another chance."""
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    monkeypatch.setattr(auto_queue, "resolve_pr_numbers", lambda event: None)
+    assert auto_queue.emit_find_prs() == 0
+    out = capsys.readouterr().out
+    assert "prs=" in out
+    assert "prs=1" not in out
+

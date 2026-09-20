@@ -20,9 +20,33 @@ name: Auto-queue
 # EVERY TRIGGER RUNS THE DEFAULT BRANCH'S CODE, never the pull request's -- a PR must
 # never be able to edit the job that decides whether it may merge.
 
+# TRIGGERS.
+#
+# `check_suite` never fires for a suite GitHub Actions itself created --
+# a built-in recursion guard -- so the automatic path built on it never ran
+# once, in this repo's entire history, while ~18 check suites completed on
+# open PRs the same day (measured 2026-09-19). This is that defect's fix.
+#
+# `workflow_run` on BOTH `CI` and `Handoff`: the required contexts come
+# from CI, but Handoff runs on every PR too. Firing only when CI finishes
+# would read Handoff's check while it is still pending, `_all_required_checks_green`
+# returns NOT READY, and nothing retries -- the exact silent stall this
+# workflow exists to fix, just moved. Whichever workflow finishes last
+# drives the successful attempt.
+#
+# `schedule`, every 15 minutes: the retry and the self-heal. It covers a
+# workflow_run that never lands, one GitHub skips, and a check that
+# completed before this fix shipped. Deliberate belt-and-braces, not
+# redundancy to trim.
+#
+# `workflow_dispatch` is unchanged: an explicit PR number, for a human or a
+# routine that already knows which PR it means.
 on:
-  check_suite:
+  workflow_run:
+    workflows: ["CI", "Handoff"]
     types: [completed]
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       pr_number:
@@ -35,7 +59,12 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: auto-queue-${{ github.event.inputs.pr_number || github.event.check_suite.head_sha }}
+  # Keyed on whatever actually distinguishes this run: the dispatch input
+  # when given, else the workflow_run's head sha, else the run id (the
+  # scheduled sweep carries neither, and github.run_id is always unique --
+  # the sweep does not need to serialize against itself, only avoid two
+  # runs believing they share state they don't).
+  group: auto-queue-${{ github.event.inputs.pr_number || github.event.workflow_run.head_sha || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -54,21 +83,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      # THE DECISION LIVES IN scripts/cloud/auto_queue.py -- resolve_pr_numbers
+      # and emit_find_prs -- so it is unit-tested rather than embedded here.
+      # It handles all three event shapes: workflow_dispatch's pr_number
+      # input, workflow_run resolved from the head sha via
+      # `commits/{sha}/pulls` (event.workflow_run.pull_requests is
+      # unreliable and can be empty), and schedule swept as every open PR
+      # targeting main. Emits the same `prs=` GITHUB_OUTPUT this step
+      # always has, so every downstream step is untouched.
       - name: Find the pull requests this event concerns
         id: find
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, os, subprocess
-          event = json.load(open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8"))
-          manual = (event.get("inputs") or {}).get("pr_number")
-          if manual:
-              print(f"prs={manual}")
-          else:
-              prs = [str(p["number"]) for p in (event.get("check_suite") or {}).get("pull_requests") or []]
-              print("prs=" + ",".join(prs))
-          PY
+        run: python scripts/cloud/auto_queue.py --find-prs >> "$GITHUB_OUTPUT"
 
       # THE BUILT-IN TOKEN CANNOT LAND A PULL REQUEST HERE, and the failure
       # is silent. An enqueue made as `github-actions[bot]` does start the
