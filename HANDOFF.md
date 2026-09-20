@@ -40,17 +40,18 @@ Read it before touching a gate.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-20 03:54 UTC
-main SHA: bfe850796969980545811e1ffa551b9143965faf
+Generated: 2026-09-20 04:07 UTC
+main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
 CLI: unknown
 Session: unknown
 
 Open PRs:
+#44 fix(cloud): auto-queue's trigger has fired zero times (lwb-autoqueue-trigger)
 #43 Re-cut #42 to fix a wrong-identity commit (supersedes #42) (lwb-correct-27-dispatch-v4)
 #40 Fix lane-collision false positive and asymmetric record-only exemption (owner-directed) (fix/lane-collision-and-identity-record-exemption)
 
 Deliverable proof state (from proof/):
-20/20 proven
+21/21 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

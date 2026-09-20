@@ -1,0 +1,121 @@
+{
+  "deliverable": "auto-queue-workflow-run-and-schedule-trigger",
+  "pr": 44,
+  "author": "claude-code-sonnet-5-215c760b-2026-09-20",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "cbc66e1",
+  "commands": [
+    {
+      "argv": ["python", "-m", "pytest", "tests/", "-q"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 40%]",
+        "........................................................................ [ 54%]",
+        "........................................................................ [ 67%]",
+        "........................................................................ [ 81%]",
+        "........................................................................ [ 94%]",
+        "............................                                             [100%]",
+        "532 passed in 41.81s"
+      ],
+      "sha256": "13b7acf837ef5733b3ce98a0c6cd6164500624900dce4ac39b583e741f2a987b",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": ["python", "-m", "pytest", "tests/test_auto_queue.py", "-q"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "....................                                                     [100%]",
+        "20 passed in 0.02s"
+      ],
+      "sha256": "2293f65e6203b27ee8d501e60813d051cf5d7fbe19140591e2efd2379942a9b8",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": ["python", "-m", "pytest", "tests/test_workflows_parse.py", "-q"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...                                                                      [100%]",
+        "3 passed in 0.09s"
+      ],
+      "sha256": "0c15948e3e16483bedf87bc0f9680c9fc3067d50fcb935f6c932a701a875dec8",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_prefix.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-prefix check passed"],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_no_instruction_dep.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-no-instruction-dep check passed"],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python", "scripts/lwb_check_hosted_runners.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-hosted-runners check passed"],
+      "sha256": "478ba8f94ab7a99f2aba42d1d15c7858c7fc81e42593314ec2a9ff67b979b261",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {"criterion": "auto-queue.yml no longer triggers on check_suite, the trigger measured to have fired zero times in this repository's history, and instead triggers on workflow_run for BOTH the CI and Handoff workflows", "met": true},
+    {"criterion": "auto-queue.yml adds a schedule trigger (every 15 minutes) sweeping open PRs against main, as the retry and self-heal", "met": true},
+    {"criterion": "workflow_dispatch with its pr_number input is unchanged", "met": true},
+    {"criterion": "PR resolution for all three event shapes lives in scripts/cloud/auto_queue.py (resolve_pr_numbers, emit_find_prs), not embedded as a larger YAML heredoc, and is unit-tested", "met": true},
+    {"criterion": "workflow_run resolution reads commits/{sha}/pulls and never trusts event.workflow_run.pull_requests, which GitHub documents as unreliable and can be empty", "met": true},
+    {"criterion": "concurrency.group is rekeyed so scheduled and workflow_run invocations no longer collapse into one shared group; cancel-in-progress stays false", "met": true},
+    {"criterion": "The AUTO_TOKEN_QUEUE secret requirement (no fallback), the default-branch-only checkout, the permissions block, and the explanatory comments are preserved unchanged", "met": true},
+    {"criterion": "Full test suite passes at this head: 532 passed, captured in commands", "met": true},
+    {"criterion": "tests/test_auto_queue.py's 20 tests (10 original refusal-path tests plus 10 new resolve_pr_numbers and emit_find_prs tests) pass at this head", "met": true},
+    {"criterion": "auto-queue.yml still parses as valid workflow YAML: tests/test_workflows_parse.py passes", "met": true},
+    {"criterion": "lwb-prefix, lwb-no-instruction-dep and lwb-hosted-runners all pass at this head, and are three of six commands in this record that are independently re-executable", "met": true},
+    {"criterion": "No local filesystem path, private project name, or machine name is committed; lwb_check_env_leak.py --range origin/main..HEAD passes clean", "met": true}
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown (this session's own transcript was not read to compute usage fields at record-writing time)"
+  },
+  "mutations": [
+    ".github/workflows/auto-queue.yml: check_suite replaced by workflow_run on [CI, Handoff] plus a 15-minute schedule sweep; concurrency.group rekeyed; the find-PRs step now calls scripts/cloud/auto_queue.py --find-prs instead of an inline heredoc",
+    "scripts/cloud/auto_queue.py: added resolve_pr_numbers() and emit_find_prs(), the testable PR-resolution logic for all three trigger shapes",
+    "tests/test_auto_queue.py: added 10 tests covering resolve_pr_numbers and emit_find_prs across workflow_dispatch, workflow_run (including the unreliable pull_requests field and lookup failure), and schedule",
+    "proof/44.json: this record, added by a follow-up commit once PR #44's number was known",
+    "HANDOFF.md: generated lwb-handoff block regenerated alongside this record"
+  ],
+  "unproven": [
+    "NO INDEPENDENT REVIEW RECORD EXISTED WHEN THIS RECORD WAS WRITTEN. reviews/44/ is empty; checked_by is the placeholder pending-independent-reviewer-routine, naming no reviewer. lwb-lanes will fail until an independent review record lands, since .github/, scripts/, tests/, proof/ and HANDOFF.md are all shared paths.",
+    "THE NEW TRIGGERS HAVE NEVER FIRED IN GITHUB ACTIONS. workflow_run and schedule only run from the default branch, so neither can execute until this PR lands on main. Their unit tests pass; their behaviour as real Actions triggers is designed, not yet observed.",
+    "3 of 6 commands in this record are independently re-executable (lwb_check_prefix, lwb_check_no_instruction_dep, lwb_check_hosted_runners). The other three are pytest invocations carrying a wall clock and progress-bar width, marked verifiable false with reason nondeterministic-output.",
+    "Token accounting for this record is entirely unknown; this session's own transcript usage was not summed before writing this record.",
+    "lwb_lanes.py and lwb_check_proof.py --pr were not run against this exact head in this record because PR #44 did not exist at the time commands were captured (both need a PR number); the PR description reports which checks are green from gh pr view once CI has run."
+  ]
+}
