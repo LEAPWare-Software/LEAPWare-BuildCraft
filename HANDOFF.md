@@ -8,48 +8,51 @@ next step. Session start, re-derive commands, hard rules and traps live in
 
 In order. Do not start step *n+1* before step *n* is done and proven.
 
-Detail for every item: `docs/maintainers/proof-of-completion-plan.md`.
-Read it before touching a gate.
+**THE PLAN IS `docs/requirements/build-plan.md`** -- seven phases,
+owner-approved 2026-09-19. Read it before starting anything. Session
+detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
+`docs/maintainers/proof-of-completion-plan.md`.
 
-1. **DONE.** Scaffold, ruleset, mission. Repo is **PUBLIC** (Apache-2.0):
-   all commits world-readable. Decisions:
-   `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
-   Branch tips and PR state are not written here; re-derive per
+**THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
+that no WORTHY AND VETTED tool already does it before building anything.
+
+1. **DONE: #7-#27, #31.** Decisions: `docs/requirements/decisions.md`
+   -- READ FIRST, do not re-decide. `main`'s tip is #34, NOT green:
+   `lwb-proof-coverage` fails (#34 shipped with no proof/34.json, not
+   in proof/exempt.json) -- #34's gap. Re-derive branch/PR state per
    `docs/handoff-protocol.md`.
-2. **DONE. Proof of completion in CI: #17-#22.** `main` green.
-3. **IN FLIGHT:** #23 re-execute hardening, #24 open-PR post-merge. Both
-   carry an independent AGREE.
-4. **WHAT ACTUALLY BLOCKS 1.0.0 -- not a gate fix.** Version **0.1.0**,
-   zero tags, no release ever run; `core/lwb_core/rules/` holds ONE
-   rule, a self-declared no-op; every gate is a `scripts/` file wired to
-   THIS repo's CI. **A consuming repo installs `lwb` and gets a no-op.**
-   Plan doc, "1.0.0 readiness".
-5. **SETTLE FIRST -- touches the owner's permission prompts.** The lane
-   hook returns explicit `"permissionDecision": "allow"` for every edit
-   it does not deny, which may suppress the normal prompt. PLAUSIBLE.
-6. **Lane guard is a NUDGE by design**, so the ungated `Bash` path is
-   not a broken premise. Two real defects: a worktree inside the
-   checkout is denied wrongly, one outside is never checked.
-7. **The shipped hook has never been seen to fire** (`"matcher":
-   "Agent"`). Needs a NEW session, marker registered BEFORE start.
-   The *lane* hook does fire and deny, so the mechanism works.
-8. **Then:** re-execution blocking; the fork gap; install the plugin
-   here.
-9. Every deliverable: proof record, pushed, CI green, announced
+2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
+   every 2h; a separate reviewer routine writes the gating record
+   hourly. D27's rule: separate cron entries, no trigger path
+   conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
+   reviewer was manually fired by its author's session
+   (`reviews/27/dispatch-correction.md`); no gate caught it.
+3. **IN FLIGHT:** #39 (this PR -- re-cuts dead #38/#37/#35/#30, don't
+   touch any). Segment-collision gate defect fixed (author id renamed);
+   blocked only on `lwb-lanes`: 0 reviews in reviews/39/ -- needs a fresh
+   review, not an owner call. #29 (runbook, conflicts w/ main), #32 (#27
+   correction). Re-derive SHAs.
+4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
+   0 armed to deny, 2 of 8 skills working. **A consuming repo installs
+   `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
+5. **DEFECT PATTERN:** "I could not check" must never share a
+   representation with "I checked and found nothing". Live in Codex's
+   lane. The hook has still never been seen to fire from `hooks.json`.
+6. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 14:36 UTC
-main SHA: f9b4deadbb441f0c1046a0d73b0434424f1cf13c
+Generated: 2026-09-19 20:02 UTC
+main SHA: bfe850796969980545811e1ffa551b9143965faf
 CLI: claude
-Session: conductor-track-a-01XXZR3A
+Session: conductor-track-a-e4242f53
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-20/20 proven
+21/21 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

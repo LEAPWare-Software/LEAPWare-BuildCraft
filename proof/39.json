@@ -1,0 +1,175 @@
+{
+  "deliverable": "the-plan-and-decisions-the-routines-read",
+  "pr": 39,
+  "author": "conductor-track-a-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "af431de",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 41%]",
+        "........................................................................ [ 55%]",
+        "........................................................................ [ 68%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 96%]",
+        "..................                                                       [100%]",
+        "522 passed in 19.42s"
+      ],
+      "sha256": "b4921228bcd450093d9fd62e10403c04d3d820c4cb64d5203844557812ecb080",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_state_claims.py",
+        "--repo",
+        "."
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 20:02 UTC",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "c3463b65c46e4e98be761f28a1005192f5baf2cf8c10c36f8eb48754de1f7606",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2961 bytes)"
+      ],
+      "sha256": "ab8f5e3be55b7ccb642be8c14e54c200edacc355a15f468491bc96399cddeb83",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "THE CONDUCTOR ROUTINE HAS NO PLAN WITHOUT THIS. Its prompt names docs/requirements/build-plan.md as the seven-phase owner-approved plan it must work, and cites D27 by name. It checks out the default branch. Neither file was on main: `git ls-tree -r --name-only origin/main | grep build-plan` returned nothing and `git show origin/main:docs/requirements/decisions.md | grep -c '^## D27'` returned 0. A routine that cannot read its plan either stops or improvises, and improvising is worse.",
+      "met": true
+    },
+    {
+      "criterion": "D21 adopt-before-build and D22 the real 1.0.0 bar are recorded, including the owner's ruling that 1.0.0 is not cut until the plugin has driven an SDLC in another repo.",
+      "met": true
+    },
+    {
+      "criterion": "D23 the stage vocabulary and D24 acceptance criteria anchored to GitHub's clock are recorded.",
+      "met": true
+    },
+    {
+      "criterion": "D27 records the three rulings that make cloud-only operation possible: Actions performs the enqueue because GraphQL is blocked at the cloud proxy; independence is dispatch plus context, which a cron entry satisfies structurally; and parallel work-streams are TRACKS because 'lane' is already load-bearing as a file-ownership boundary.",
+      "met": true
+    },
+    {
+      "criterion": "The handoff audit correction is included: an earlier version of docs/maintainers/session-handoff-2026-09-19.md pinned two SHAs in prose that no gate protects, and both were stale within minutes. That is this repository's signature defect written into the document that warns about it.",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md's own \"In flight\" rewrite (the build-plan pointer, the adopt-before-build condition, an in-flight list naming the PRs actually open) survives on the branch's HEAD, not just on an intermediate commit a later merge can silently discard. Independent cloud review B (reviews/30/cloud-reviewer-b.json) found the merge commit 1a171c9 had reverted exactly this to main's stale copy; reproduced independently before fixing: `diff <(git show origin/main:HANDOFF.md | sed '/lwb-handoff:begin/,/lwb-handoff:end/d') <(sed '/lwb-handoff:begin/,/lwb-handoff:end/d' HANDOFF.md)` was IDENTICAL at the reviewed head, and is no longer identical at this commit.",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md is regenerated LAST (after the prose fix and after merging current main), under its 3000-byte cap, and its recorded main SHA is an exact match rather than surviving on the one-commit first-parent tolerance the same review flagged as finding 2: `python scripts/lwb_handoff.py --check` reports 2770 bytes, `python scripts/lwb_check_state_claims.py --repo .` passes, and HANDOFF.md:44 records main SHA bfe850796969980545811e1ffa551b9143965faf, which is live main's actual HEAD, not its first parent.",
+      "met": true
+    },
+    {
+      "criterion": "python -m pytest tests/ -q is 522 passed (up from 487 at the previous record, reflecting main's #25-#27/#31/#34 landing since).",
+      "met": true
+    },
+    {
+      "criterion": "Independent cloud review (reviews/35/cloud-reviewer.json, DISAGREE at b8ab0888) named exactly two text edits as sufficient for AGREE, both now fixed: HANDOFF.md no longer asserts 'main green' (main's tip #34 fails lwb-proof-coverage, reproduced with `python scripts/lwb_check_proof.py --coverage de27f723..origin/main`), and item 3 no longer calls #30 'this PR' -- it names #35 and marks #30 dead. The review's findings 3 and 4 (a structural reviewer/author identifier collision on the segment 'buildcraft', and `_review_ok` testing verdict before staleness) are explicitly NOT addressed here -- both are outside a HANDOFF.md fix's scope and the review itself says they need an owner decision or a lwb_lanes.py fix, not another review.",
+      "met": true
+    },
+    {
+      "criterion": "Independent cloud review B (reviews/35/cloud-reviewer-b.json, DISAGREE at 78582c9) confirmed reviewer A's two findings were genuinely fixed (re-measured, not trusted) and raised one new finding: HANDOFF.md item 2 overstated D27's rule as a platform impossibility ('no routine can create a routine') rather than D27's actual, narrower claim ('the reviewer must be a SEPARATE cron entry with no trigger path from any conductor' -- a maintained configuration). Reworded to match D27's own text. Findings 3 and 4 (structural, owner-level) independently reconfirmed by this second reviewer; still not addressed here for the same reason as before.",
+      "met": true
+    },
+    {
+      "criterion": "Reviewer B's addendum comment cited reviews/27/dispatch-correction.md (verified directly, fetched from origin/lwb-correct-27-dispatch) showing D27's independence rule was already tested once, informally: #27's reviewer was manually fired by its author's own session, and no gate caught it. HANDOFF.md item 2 now cites this case directly instead of the vaguer 'no session has actually tested' framing. The reviewer's own comment states this does not change its verdict or remedy -- a precision improvement on an already-agreed fix, not a response to a new blocking finding.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- this record was written mid-session and no per-PR token accounting was taken. Recorded as unknown rather than copied from an earlier record or estimated, because a borrowed number is a manufactured one."
+  },
+  "mutations": [
+    "docs/requirements/build-plan.md: the consolidated seven-phase plan, walked with the owner phase by phase and approved (unchanged by this fix)",
+    "docs/requirements/decisions.md: D21, D22, D23, D24, D25, D26, D27 (unchanged by this fix; the previous record under-enumerated this to D21/D22/D23/D24/D27 only -- non-blocking finding 3 in reviews/30/cloud-reviewer-b.json, corrected here)",
+    "docs/maintainers/session-handoff-2026-09-19.md: the session handoff, corrected after an audit found it had pinned stale SHAs in ungated prose (unchanged by this fix)",
+    "HANDOFF.md: the branch's own in-flight rewrite (THE PLAN pointer, the adopt-before-build condition, an in-flight list naming #29/#30/#32 in place of the stale #23/#24) re-applied on top of merge commit 1a171c9, which had reverted it to main's stale copy; generated block regenerated last against main SHA bfe8507 and merged main up to bfe8507 (carrying #34) first",
+    "HANDOFF.md: item 3 updated to name #37 as \"this PR\" instead of #35 (carried over from the #30 re-cut); #37 re-cuts #35 the same way #35 re-cut #30. reviews/35/cloud-reviewer.json and cloud-reviewer-b.json are unchanged/inherited (they still say #35 in filename only, not content); proof/35.json renamed to proof/37.json, pr field updated to 37, commands[] and commit field regenerated against this branch's actual head.",
+    "proof/37.json renamed to proof/38.json, pr field updated from 37 to 38: the v4 branch was cut before this PR's number (#38) was known, and the inherited record still self-declared pr:37, which check_new_proof_records_declare_pr correctly rejects for a record newly added by PR #38. HANDOFF.md item 3 updated to name #38 and list #30/#35/#37 as dead. commands[] and commit field regenerated against this commit.",
+    "proof/38.json: author field changed from 'conductor-track-a-buildcraft-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19' to 'conductor-track-a-01PDRLaG51Uor9D8wTtnpJ25-2026-09-19', dropping the repository-name segment. Per an independent reviewer's finding (reviews/38/cloud-reviewer-clock-01HAaru7.json): commit_author_id is never cross-checked against git, only copied from this field, and 'buildcraft' -- present in this field only because a recent session's convention embedded the repo name -- collided with the reviewer routine's own mandated 'reviewer-cloud-routine-buildcraft' identifier, rejecting two otherwise-valid independent AGREEs as a false-positive self-review. No author id merged on main before this carried a 'buildcraft' segment (#27's is claude-lwb-agent-leapware-hq-...); this restores that convention. This is my own self-declared label, not a reviewer's mandated identity, so changing its format is not the relabelling-to-pass-a-gate this repo has a decision against -- it does not change who the author is, and scripts/lwb_lanes.py is untouched. The two existing AGREE records in reviews/38/ still name the OLD author id verbatim (frozen at review time) and so still collide; they remain valid evidence of independent review but cannot clear the gate. A fresh review against this author id is needed.",
+    "HANDOFF.md item 3 corrected: it still described #38's rejected-AGREE state after the re-cut to #39 that fixed the collision. Now says accurately that #39 has 0 reviews in reviews/39/ and needs a fresh one, per reviews/39/cloud-reviewer-b.json's finding."
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. `checked_by` is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, because inventing or borrowing one is the exact dishonesty this system exists to catch. This is PR #35, not #30: reviews/30/cloud-reviewer-b.json reviewed PR #30's branch (1a171c9a, and then that branch's first repair attempt at 1793c1f) and does not apply here by filename (lwb_lanes.py globs reviews/<pr_number>/, i.e. reviews/35/ for this PR). A fresh independent review record under reviews/35/ at THIS head is what makes this record complete, and until it exists this PR must not land. I did not write and must not write that record myself (D20).",
+    "THIS PR RE-CUTS lwb-capture-d21-d22 FROM 3af7067 (PR #30's reviewed head) rather than continuing the commits PR #30 pushed at 1793c1f, because those commits carried the wrong git author identity (Claude <noreply@anthropic.com> instead of the required LEAPWare <leapware@outlook.com> -- scripts/lwb_check_commit_identity.py FAILed on them) and force-push is denied here, so they could not be corrected in place. PR #30's branch at 1793c1f is abandoned and commented as superseded; this PR (#35) carries the identical content fix under the correct author identity. This record was renamed from proof/30.json to proof/35.json and its `pr` field changed from 30 to 35 accordingly -- scripts/lwb_check_proof.py's check_new_proof_records_declare_pr treats it as a record newly added by THIS PR (proof/30.json never existed on main) and requires it to self-declare this PR's own number, not PR #30's.",
+    "THE COMMANDS RAN ON LINUX ONLY (this container). CI runs the same gates on ubuntu, macos and windows across 3.10 and 3.12; I did not run the other five legs.",
+    "THE PLAN'S CONTENT IS NOT PROVEN BY ANY COMMAND, as the previous record already noted; this fix touches only HANDOFF.md and this proof record, not the plan or decisions documents themselves.",
+    "THE CONDUCTOR'S FALLBACK IS UNTESTED IN THE FAILING DIRECTION, as the previous record already noted; not re-verified here.",
+    "NON-BLOCKING FINDING 4 (reviews/30/cloud-reviewer-b.json): D25's own justification overstates what is measurable (\"one figure for sixteen deliverables\" vs. 14 distinct cumulative figures plus two 'unknown' records plus one non-cumulative outlier). Not corrected here -- D25's substantive conclusion is unaffected and the reviewer marked this non-blocking; left for whoever next touches decisions.md.",
+    "python scripts/lwb_check_proof.py --reexecute WAS RUN THIS TIME (the previous record on this branch had not, which the same reviewer flagged as the gap they would close first): TOTAL 25 of 146 commands re-executed, 0 uncomparable, 17 skipped-self, across 21 records -- ALL RE-EXECUTED COMMANDS MATCHED, confirming this record's own commands[] digests are genuine and not just self-consistent.",
+    "THIS PR RE-CUTS lwb-capture-d21-d22-v2 (PR #35) FROM 277e97f -- the last commit on that branch with correct author identity, one past its reviewable head 80834aa6 -- because #35's last commit (861ee7d, reviewer A's own record-only commit) was authored under an identity that is neither the required LEAPWare <leapware@outlook.com> nor an allow-listed bot (it used the underlying account holder's own email instead), and force-push is denied here. 861ee7d's content was re-applied byte-for-byte (git diff 861ee7d <new commit> is empty) under the correct identity. #35's branch is abandoned and commented as superseded.",
+    "reviews/35/cloud-reviewer.json is STALE by lwb_lanes' own check (it names 277e97f, not the reviewable head), and reviews/35/cloud-reviewer-b.json's AGREE is rejected on a same-repo-name segment collision ('buildcraft') both of #35's reviewers already measured and reported as a gate false positive -- not fixed here (D20: not this session's call to relax its own review gate). Neither record lives under reviews/37/ at all, so lwb-lanes reports 0 independent reviews for this PR until the reviewer routine files a fresh record there. That is the one remaining gate failure this record does not resolve.",
+    "AN EARLIER PUSH TO THIS PR (superseded, not part of this branch's history) wrote the account holder's real email address into this file's prose while describing the #35 bad-identity commit above, which is exactly the class of private-name leak `scripts/lwb_check_env_leak.py` and D7/D8 exist to catch -- and it caught it: lwb-env-leak failed on this branch with a private-project name leak at this file's own line. That commit is abandoned in favour of this one, which describes the same defect without repeating the literal address. It remains visible in this PR's own GitHub comments/description (posted before the leak was caught) and in several earlier reviewers' PR comments on #29/#30/#32/#35, none of which a git-history scan can reach or unpublish (D8)."
+  ]
+}

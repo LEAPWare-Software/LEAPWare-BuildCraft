@@ -618,6 +618,351 @@ what remain, and they are owed.
    before `SubagentStop` fires, so subagent capture is lossy.
 4. Then items 2-7 above.
 
+## D21 — Trial the adoptable components BEFORE writing more rules · 2026-09-19
+
+Owner-decided 2026-09-19, in answer to a direct question.
+
+Principle 4 ("adopt before building") had never been acted on. D12 surveyed
+15 SDLC responsibilities and named 8 adoptable components — Spec Kit,
+Superpowers, Anthropic's `code-review` and `security-review`, Trail of
+Bits, Sentry/Datadog MCP, PagerDuty MCP, Dependabot — and D13 set the
+standard each must clear. **Zero had been trialled into the product**, and
+no adoption register, pinned version, commit hash or licence record exists
+for any of them.
+
+Meanwhile 8 rules sit `PROPOSED` in `mission.md`. The temptation was to
+start writing them.
+
+**The decision: run the D13 scoped trials on the surveyed components
+first.** Building our own rules before trialling what already exists would
+contradict Principle 4 as written, and would risk rebuilding maintained
+work. The likely shape of the outcome is that several SDLC responsibilities
+get covered by someone else's component, and BuildCraft builds only the
+glue plus the gates nobody else provides — but that is an expectation, not
+a finding, and the trials decide it.
+
+This is slower to a first visible rule. That is accepted.
+
+**Status: CAPTURED, NOT STARTED.** The owner's instruction was "capture it
+but stand by". No trial has been run. Do not begin one without the owner
+saying so.
+
+## D22 — 1.0.0 requires driving an SDLC in a REAL repo, not a demo · 2026-09-19
+
+Owner-decided 2026-09-19, same exchange.
+
+The owner's bar for 1.0.0 is that BuildCraft **has driven an SDLC in
+another repository**. Asked whether that means a real project or a
+purpose-built demo, the answer is a **real LEAPWare repo doing real work**:
+`lwb` installed in an actual project, governing real changes end to end,
+with stages enforced, gates firing and evidence recorded.
+
+A purpose-built demo repo was explicitly not chosen. The reasoning the
+option carried, and which the choice accepts: a demo is a rehearsal we
+control, and it cannot surprise us the way real work does.
+
+**Consequence, stated plainly so it is not rediscovered later:** no version
+of this plugin is 1.0.0 until that has happened. Everything built to date —
+the proof-of-completion layer, the lane fix, `lwb_proof_required` — governs
+THIS repository's own contributions or warns in a foreign repo. None of it
+has driven an SDLC anywhere.
+
+**A correction belongs in this record.** On 2026-09-19 the author asked the
+owner whether to cut 1.0.0, offering options including "publish 1.0.0 now"
+and "publish 1.0.0 and arm deny". That question should not have been
+asked. It was prompted by a session goal-tracker repeatedly reporting the
+version number as unmet, which is not a reason to release. The owner's
+reply — "I am unclear why you think we are at a 1.0.0 release level" — was
+correct, and the audit that followed found 0 of 15 stages, 0 of 1 roles,
+2 of ~10 plugin rules, 0 armed to deny, 2 of 8 working skills, and no
+adoption register. See `docs/maintainers/proof-of-completion-plan.md`,
+"1.0.0 readiness".
+
+## D23 — The stage vocabulary, finally written down · 2026-09-19
+
+Owner-decided 2026-09-19. **This is the rewrite D15 required and item 8 of
+required work.** D15 settled HOW stages are derived; it explicitly did not
+claim the derivation had been done, and it had not been — for a day, the
+plan named seven stages while labelling them "history, not the
+vocabulary".
+
+Derivation rule applied, from D15: each stage is named for the
+responsibility it covers and carries the component that covers it; a
+responsibility with no component and no gate does not become a stage.
+
+**THIRTEEN STAGES:**
+
+| # | Stage | Component | Provided by |
+|---|---|---|---|
+| 1 | requirements | GitHub Spec Kit | adopt |
+| 2 | architecture | thin — ADR tooling | adopt, owner ruled it IN |
+| 3 | implementation | Superpowers | adopt |
+| 4 | verification | Anthropic `code-review` | adopt |
+| 5 | security | `security-review` + Trail of Bits | adopt |
+| 6 | documentation | thin | adopt, owner ruled it IN |
+| 7 | build integrity | — | lwb builds |
+| 8 | data changes | — | lwb builds |
+| 9 | release | — | lwb builds |
+| 10 | observability | Datadog / Sentry MCP | adopt |
+| 11 | incident response | PagerDuty MCP | **HOLD — no work** |
+| 12 | vulnerability handling | Dependabot | adopt |
+| 13 | handoff | `claude-mem` CONTESTED | lwb's own gate |
+
+**Owner rulings that changed the derived list:**
+
+- **Retirement / decommissioning is ELIMINATED.** It was one of the four
+  responsibilities D12 said lwb must build. It is not a stage.
+- **Incident response is HELD.** It stays in the vocabulary; no work is to
+  be done on it.
+- **Architecture and documentation STAY, and are critical.** The
+  derivation rule would have dropped both — thin tooling, no gate — and
+  the owner overruled that directly: "Architecture is critical as well as
+  docs. must be in." So these two are stages by owner ruling rather than
+  by derivation, which is recorded here so no later reader "corrects" the
+  list back.
+
+**A CONDITION THE OWNER ATTACHED TO THE WHOLE LIST, to be stated loudly in
+the build plan and not buried:** we must absolutely, positively have
+double-checked that there are no WORTHY AND VETTED tools or plugins for
+each stage before building anything ourselves. This is Principle 4 given
+teeth. It applies to all thirteen — including the stages D12 assigned to
+lwb to build, because that survey is a year-zero snapshot and the
+conclusion "nothing credible exists" is exactly the kind of claim this
+repo has learned not to take on trust.
+
+**Two gaps in the source map, found while deriving and NOT invented over:**
+
+1. **D12 claims fifteen responsibilities and names fourteen.** The missing
+   one is in the group with credible adoptable components.
+2. **D12 claims eight adoptable components and names seven.** Same gap,
+   seen from the other side.
+
+The fifteenth responsibility is written down nowhere in this repo. It was
+not fabricated to make the count work. Recovering it means re-running the
+survey against its original source.
+
+**`operations` is gone**, as D15 intended — a stage with no gate. Its work
+is now stages 10 and 11, each named for what it actually does.
+
+**Proof of completion is deliberately NOT a stage.** It is the evidence
+layer that runs across all thirteen, which is why it is Phase 1
+infrastructure rather than a step in the line — see D24.
+
+## D24 — Acceptance criteria are anchored to GitHub's clock, not ours · 2026-09-19
+
+Owner-decided 2026-09-19. Closes the design gap in quality-floor item 1.
+
+**The floor's FIRST item has never had a mechanical check.** `mission.md`
+states it plainly: *"nothing records or timestamps acceptance criteria
+before work starts -- so it is verified by the reviewer reading the PR's
+own chronology. Closing that is required work, not an accepted gap."*
+
+Why it matters more than the other four floor items: every one of those
+grades work AFTER the fact -- tests pass, gates green, evidence recorded.
+Only item 1 stops an agent choosing the target after seeing where the
+arrow landed. Without it, work can be built and criteria written
+afterwards to describe whatever was built, and every downstream check goes
+green. It is the cheapest way to fake *done*, and the one we could not
+detect.
+
+**Why it was unsolved rather than merely unbuilt.** Every approach that
+keeps the evidence inside our own control fails:
+
+| approach | why it fails |
+|---|---|
+| criteria in a committed file | nothing stops writing it last and committing it first |
+| git commit timestamps | settable to any value |
+| commit ORDER | history can be rewritten before pushing |
+| the agent attests it | same agent doing the work -- self-attestation, the identical weakness that makes `reviewer_id` an audit trail rather than proof (D16) |
+
+The pattern: **any evidence we produce, we can forge.** The proof has to
+come from a clock we do not own.
+
+**THE DECISION: work starts with a GitHub issue stating what done means,
+and the gate compares GitHub's own creation timestamp against the first
+commit of the deliverable.** We cannot forge GitHub's clock. The evidence
+is external by construction.
+
+**The cost, accepted explicitly:** this changes how work STARTS, not just
+what we check at the end. Every deliverable opens with an issue, every
+time, with no exception that can be argued into existence later. A gate
+whose precondition is skippable is not a gate -- this repository has
+documented eight instances of exactly that failure.
+
+**Not yet designed, and not to be hand-waved when it is:** what counts as
+"the first commit of a deliverable" when a branch is merged forward or a
+deliverable spans branches; and what happens to work that legitimately
+begins before its scope is known. Both need answering before the rule is
+written, and neither is answered here.
+
+This lands in Phase 1 as item 1.5. It is the only item in that phase that
+changes the owner's process rather than our code, which is why it was the
+owner's call and not the CTO's.
+
+## D25 — Efficiency claims are order-of-magnitude only, limits stated every time · 2026-09-19
+
+Owner-decided 2026-09-19.
+
+The mission makes measured efficiency half the goal. The instrument we
+have is not fit to adjudicate close calls, and pretending otherwise would
+be the same species of false confidence this repository exists to remove.
+
+**What is wrong with the instrument, measured not assumed:**
+
+1. **Not attributable.** The `tokens` block in every proof record is
+   CUMULATIVE across PRs 12-27. One figure for sixteen deliverables. The
+   record's own `source` field says so.
+2. **Excludes every subagent.** This session dispatched roughly 149
+   subagent runs; none appears. The records call themselves *"a floor, not
+   a total"*, which is honest and means the number is a lower bound of
+   unknown tightness.
+3. **Three of eight fields are structurally unknowable.** `retries`,
+   `setup_overhead`, `tool_overhead` — `proof/schema.json` documents that
+   no source exists for them on any current runtime. Not uncollected:
+   uncollectable.
+4. **Wall time is session duration, not work duration.** It includes every
+   minute spent waiting on a reviewer.
+5. **Two instruments disagree in units.** The session spend line reports
+   weighted tokens; the proof records report raw input. Neither is
+   complete and they are not comparable.
+
+**THE DECISION: use measured cost to reject configurations that are
+dramatically more expensive, never to choose between close ones. Every
+published number states what it excludes.**
+
+This is not a lowering of the bar — the mission already demands *"the
+tested frontier and its uncertainty rather than an absolute optimum"*.
+D25 makes that operative rather than aspirational.
+
+**What would lift the ceiling, and is not in scope here:** per-deliverable
+attribution needs a start boundary, which D24's GitHub issue anchor
+supplies as a side effect; subagent capture is lossy by the runtime's
+design, already recorded in the decision log; and the three unknowable
+fields need the runtime to expose them, which we cannot fix from here.
+
+## D26 — First subjects for driving a real repo · 2026-09-19
+
+Owner-decided 2026-09-19, sequencing D22's real-repo bar.
+
+**SessionKeeper or Pulse first; ShellUX for the real bar, after its v1
+release ships.**
+
+Criteria applied: live work flowing, not mid-release, tolerant of a day's
+friction, someone actively in it, and — the one that decided it —
+**ideally not Python**.
+
+**The assumption most worth breaking:** every gate we have written is
+Python, run by Python, checking Python conventions. If BuildCraft only
+works in Python repositories we would never discover that by testing on
+Python repositories, and five of the six candidates are Python. ShellUX is
+TypeScript, which is why it carries the real bar.
+
+**Why not ShellUX first:** it is mid-v1-release. Governing a release with
+software that has never governed anything is the worst available first
+test — highest stakes, least proven tool. First contact belongs somewhere
+a day of friction costs nothing.
+
+**Excluded: Watchtower.** The owner has ruled it will not be there long
+term, so it is not a subject.
+
+**Not the bar, but on the path:** installing lwb in BuildCraft itself is
+dogfooding and is already required work. It does not answer the
+foreign-repo question, so it is a prerequisite rather than the bar.
+
+## D27 — The three decisions that make cloud-only migration possible · 2026-09-19
+
+Owner ordered migration of all BuildCraft work to the cloud on
+2026-09-19, approved directly in an inline survey. Three problems stood in
+the way. These are the CTO rulings on each, recorded here because they
+were issued to a cloud agent mid-run and would otherwise exist only in a
+transcript.
+
+### 1. Merging from the cloud — GitHub Actions does the queueing
+
+**The problem, and nobody had noticed it.** BuildCraft merges via the
+GraphQL mutation `enqueuePullRequest`: auto-merge is disabled on this
+repo and the ruleset requires the merge queue. ShellUX MEASURED that
+**GraphQL is blocked by the cloud proxy**. So every merge performed today
+would have failed from a cloud routine. The repository's entire merge path
+was unusable in the world we are migrating to.
+
+**The ruling:** a GitHub Actions workflow performs the enqueue. It runs
+INSIDE GitHub, so no proxy sits between it and the API.
+
+The reason this is right rather than a workaround: **the thing doing the
+enqueue should be the thing that can already see the checks.** An outside
+caller has to ask; a workflow already knows. It watches for a PR that is
+simultaneously all-checks-green and carrying a valid independent review
+record, and enqueues that.
+
+The proxy's CCR route may be documented as a FALLBACK, clearly marked
+measured or not measured. It is not the primary path.
+
+### 2. Independent review without a second human — the hard one
+
+**The problem.** The gate requires a review whose `reviewer_id` differs
+from the commit author and whose `reviewer_was_dispatched_by_author` is
+false. Until now that meant another session, run by another person, on
+another machine. In a cloud world there is nobody at a keyboard, and a
+reviewer spawned by the builder is self-approval with extra steps.
+
+This is not hypothetical: on 2026-09-19 PR #27 sat blocked for an hour
+because the only reachable reviewer's session had been paused by its own
+owner. Correctness was irrelevant.
+
+**The principle, already settled here and merely applied:** independence
+is a property of the REVIEWER'S IDENTITY, not of being a different human.
+PR #6 established that when it replaced "one record per CLI vendor" with
+distinct reviewer identities. D20 then settled that a single SESSION
+cannot produce one.
+
+**The ruling — a reviewer is independent when all three hold:**
+
+1. it was NOT dispatched by the author;
+2. it cannot see the author's context or reasoning;
+3. it reads only what is on GitHub.
+
+**A cron-scheduled routine satisfies all three. A subagent of the builder
+satisfies none.** The clock dispatches it, so
+`reviewer_was_dispatched_by_author` is honestly false.
+
+**TWO sources, because one is a single point of failure and today proved
+it:**
+
+- **Primary:** a reviewer routine on its own cron schedule, never spawned
+  by any conductor.
+- **Secondary, cross-repo:** ShellUX's watcher already reviews BuildCraft
+  PRs and publishes to its own `reviews/buildcraft` branch. Made
+  reciprocal. Different repository, schedule and identity.
+
+**THE STRUCTURAL RULE, and it is the part that matters:** a conductor
+routine must be **structurally incapable** of dispatching its own
+reviewer. Not a line of prose saying "do not review your own work" — this
+repository has documented eight instances of a rule that lived only in
+prose being violated, including by the author who wrote it. The reviewer
+must be a SEPARATE cron entry with no trigger path from any conductor.
+
+**WHAT THIS DOES NOT BUY, stated so the runbook cannot imply otherwise:**
+every reviewer is still the same model on the same account. This is
+separation of CONTEXT and DISPATCH. It is not separation of interest. It
+is a real improvement on self-review and it is not the same thing as an
+adversary.
+
+### 3. "Lane" means two different things — rename the new one
+
+In BuildCraft a **lane is an agent's FILE-OWNERSHIP boundary**
+(`plugins/claude/` vs `plugins/codex/`), enforced by `scripts/lwb_lanes.py`
+and a PreToolUse hook. That meaning is load-bearing in code and in CI and
+does not change.
+
+In ShellUX's runbook a "lane" is a parallel work-stream.
+
+**The ruling:** parallel work-streams in BuildCraft are **TRACKS**. Never
+"lane". The runbook carries an explicit note near the top that the two
+repositories use the word differently and that anyone porting text between
+them must translate — because a future routine will read one document and
+act in the other repository, and the collision would be silent.
+
 ### HANDOFF.md in-flight detail, trimmed for the byte cap · 2026-09-18
 
 Full detail on the first two in-flight steps, moved here so HANDOFF.md
