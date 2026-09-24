@@ -84,7 +84,7 @@ what evidence looks like — does not hold: proof records are tool-agnostic.
 | 1.5 | **Acceptance criteria recorded before work starts** — quality-floor item 1. See D24 |
 | 1.6 | Define *authorised*, then build `no_unauthorised_destructive_action` — required-work item 10; the plan's second deny-capable rule |
 | 1.7 | **More than one reachable reviewer identity** — see "Why 1.7 exists" below |
-| 1.8 | Confirm the hook fires from `hooks.json` — never once observed in this product's life |
+| 1.8 | **CONFIRMED 2026-09-24, Linux/Claude Code 2.1.282 only.** Both `hooks.json` matchers (`Bash`, `Agent`) were observed firing in a real, live Claude Code session with the plugin loaded via `--plugin-dir` — a ledger line appeared for each. See `docs/maintainers/hook-fires-verification-2026-09-24.md` for the exact reproduction, environment, and what this does *not* cover (other OSes/versions, other permission modes, deny-mode policy behavior). |
 
 **Done when:** a consuming repo installs `lwb` and cannot publish work that
 lacks evidence — and we can show that happening in a repo that is not ours.
