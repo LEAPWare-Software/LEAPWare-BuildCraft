@@ -16,22 +16,21 @@ detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 **THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
 that no WORTHY AND VETTED tool already does it before building anything.
 
-1. **DONE: #7-#27, #31.** Decisions: `docs/requirements/decisions.md`
-   -- READ FIRST, do not re-decide. `main`'s tip is #34, NOT green:
-   `lwb-proof-coverage` fails (#34 shipped with no proof/34.json, not
-   in proof/exempt.json) -- #34's gap. Re-derive branch/PR state per
-   `docs/handoff-protocol.md`.
+1. **DONE: #7-#27, #31, #39.** Decisions: `docs/requirements/decisions.md`
+   -- READ FIRST, do not re-decide. Re-derive branch/PR state per
+   `docs/handoff-protocol.md`; it drifts fast here.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
    every 2h; a separate reviewer routine writes the gating record
    hourly. D27's rule: separate cron entries, no trigger path
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT:** #39 (this PR -- re-cuts dead #38/#37/#35/#30, don't
-   touch any). Segment-collision gate defect fixed (author id renamed);
-   blocked only on `lwb-lanes`: 0 reviews in reviews/39/ -- needs a fresh
-   review, not an owner call. #29 (runbook, conflicts w/ main), #32 (#27
-   correction). Re-derive SHAs.
+3. **IN FLIGHT:** #51 (Phase 1 item 1.2 -- `lwb_proof_required`'s
+   `deny` now fails closed when it cannot read git; CI green except
+   `lwb-lanes`: 0 reviews in reviews/51/, needs a fresh review, not an
+   owner call). Also green and awaiting Auto-queue: #45, #46, #48, #50
+   (#50 is item 1.1). Dead re-cuts, don't touch: #40, #44, #47, #49 --
+   each superseded by the PR just named, red CI by design.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
