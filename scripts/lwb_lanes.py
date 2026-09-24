@@ -554,13 +554,18 @@ def _id_segments(value: str) -> set[str]:
     <date>' shape: used to check for a shared segment even against this
     repo's own historical, free-form ids. IGNORED_ID_SEGMENTS (segments
     naming the product itself, not a session) are dropped here too, so
-    every caller built on this set is automatically immune to them."""
+    every caller built on this set is automatically immune to them. The
+    IGNORED_ID_SEGMENTS membership test is case-insensitive -- an id
+    author should not be able to dodge the stoplist by capitalizing
+    "BuildCraft" -- but the segment kept in the returned set is the
+    original, un-lowered text, so real shared tokens (compared elsewhere
+    case-sensitively) are unaffected."""
     m = _DATE_SUFFIX_RE.search(value)
     remainder = value[: m.start()] if m else value
     return {
         seg
         for seg in remainder.split("-")
-        if seg and seg not in IGNORED_ID_SEGMENTS
+        if seg and seg.lower() not in IGNORED_ID_SEGMENTS
     }
 
 

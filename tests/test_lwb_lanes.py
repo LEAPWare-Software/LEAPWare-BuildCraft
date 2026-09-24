@@ -1072,6 +1072,26 @@ def test_shared_long_segment_still_flags_a_real_shared_token_alongside_product_n
     assert shared == "f8da3f9e"
 
 
+def test_shared_long_segment_ignores_product_name_regardless_of_case():
+    """The stoplist match is case-insensitive: an id author must not be
+    able to dodge it by capitalizing "BuildCraft" -- measured as a real
+    behaviour of the fix this test guards, not just documented intent."""
+    assert lwb_lanes._shared_long_segment(
+        "claude-cto-BuildCraft-2026-09-19",
+        "human-reviewer-buildcraft-2026-09-20",
+    ) is None
+    assert lwb_lanes._shared_long_segment(
+        "claude-cto-LeapWare-2026-09-19",
+        "human-reviewer-LEAPWARE-2026-09-20",
+    ) is None
+    # The un-lowered segment is still what's kept in the returned set, so
+    # this does not quietly make ALL segment comparisons case-insensitive.
+    assert lwb_lanes._id_segments("claude-cto-BuildCraft-2026-09-19") == {
+        "claude",
+        "cto",
+    }
+
+
 def test_review_ok_at_cutoff_accepts_ids_sharing_only_the_product_name(tmp_path):
     """End-to-end: a review record pair that used to collide purely on
     "buildcraft" must now pass `_review_ok` cleanly."""
