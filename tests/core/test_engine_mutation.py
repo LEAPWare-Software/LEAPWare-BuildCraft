@@ -13,7 +13,8 @@ same treatment further down: a real `RepoFacts` fixture that gives each of
 them something to say, evaluated against the REAL registry first (proving
 they are actually wired into `RULES`), then again against a registry with
 that one rule filtered out (proving the registry, not a hardcoded call, is
-what produces the finding).
+what produces the finding). `lwb_no_unauthorised_destructive_action`
+(Phase 1 item 1.6) gets the same treatment further down still.
 """
 
 import lwb_core.engine as engine_module
@@ -98,5 +99,48 @@ def test_removing_lwb_proof_integrity_from_the_registry_removes_its_finding(monk
     )
     policy = Policy(rules={"lwb_proof_integrity": RuleConfig(mode=RuleMode.WARN)})
     decision = engine_module.evaluate(_publish_event(), policy)
+    assert decision.permit is True
+    assert decision.findings == []
+
+
+# --------------------------------------------------------------------
+# lwb_no_unauthorised_destructive_action (Phase 1 item 1.6): same
+# load-bearing proof, for the plan's second deny-capable rule (D9).
+# --------------------------------------------------------------------
+
+
+def _force_push_event() -> Event:
+    repo = RepoFacts(branch="main", proof_ids=())
+    return Event(
+        hook_event="PreToolUse",
+        tool_name="Bash",
+        tool_input={"command": "git push -f origin main"},
+        repo=repo,
+    )
+
+
+def test_real_registry_reports_lwb_no_unauthorised_destructive_action():
+    policy = Policy(
+        rules={"lwb_no_unauthorised_destructive_action": RuleConfig(mode=RuleMode.WARN)}
+    )
+    decision = engine_module.evaluate(_force_push_event(), policy)
+    assert decision.permit is True
+    assert [f.rule_id for f in decision.findings] == [
+        "lwb_no_unauthorised_destructive_action"
+    ]
+
+
+def test_removing_lwb_no_unauthorised_destructive_action_from_the_registry_removes_its_finding(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        engine_module,
+        "RULES",
+        [r for r in REAL_RULES if r.rule_id != "lwb_no_unauthorised_destructive_action"],
+    )
+    policy = Policy(
+        rules={"lwb_no_unauthorised_destructive_action": RuleConfig(mode=RuleMode.WARN)}
+    )
+    decision = engine_module.evaluate(_force_push_event(), policy)
     assert decision.permit is True
     assert decision.findings == []

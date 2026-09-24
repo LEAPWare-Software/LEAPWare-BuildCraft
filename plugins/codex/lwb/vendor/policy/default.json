@@ -16,6 +16,10 @@
     "lwb_proof_integrity": {
       "mode": "warn",
       "options": {}
+    },
+    "lwb_no_unauthorised_destructive_action": {
+      "mode": "warn",
+      "options": {}
     }
   }
 }
