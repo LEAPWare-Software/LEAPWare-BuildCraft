@@ -115,6 +115,134 @@ def test_ci_workflow_still_declares_the_jobs_the_ruleset_requires():
         )
 
 
+def test_auto_queue_workflow_triggers_on_workflow_run_and_schedule_not_check_suite():
+    """The headline fix PR #44 exists for: `check_suite` never fires for a
+    suite GitHub Actions itself created, so the auto-queue workflow had
+    literally never run in this repository's history. A mutation
+    reverting `on:` back to `check_suite:`, or pointing `workflow_run`'s
+    `workflows` list at names that do not exist, must fail this test --
+    nothing else in this file asserts on the `on:` section at all.
+
+    PyYAML resolves the bare scalar key `on` to the boolean `True` (YAML
+    1.1's implicit typing), not the string `"on"` -- `data[True]`, not
+    `data["on"]`, is the trigger block.
+    """
+    yaml = _require_yaml()
+    path = REPO_ROOT / ".github" / "workflows" / "auto-queue.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    on = data.get(True)
+    assert on is not None, "auto-queue.yml has no 'on:' trigger block at all"
+    assert "check_suite" not in on, (
+        "check_suite never fires for a suite GitHub Actions itself created -- "
+        "this is the exact defect PR #44 fixes; it must not come back"
+    )
+
+    workflow_run = on.get("workflow_run")
+    assert workflow_run is not None, "auto-queue.yml must trigger on workflow_run"
+    workflows = workflow_run.get("workflows") or []
+    for name in ("CI", "Handoff"):
+        assert name in workflows, (
+            f"workflow_run.workflows is missing {name!r}: {workflows!r} -- CI "
+            "alone already produces every context the branch ruleset requires "
+            "and its workflow_run event fires only once all of CI's jobs have "
+            "finished, so firing on CI is already sufficient for correctness; "
+            "listening to Handoff too is deliberate belt-and-braces (a second "
+            "chance against a missed, delayed, or skipped CI-only trigger), "
+            "not a correctness requirement -- but both names must stay listed"
+        )
+
+    assert "schedule" in on, "auto-queue.yml must keep its schedule sweep as the retry/self-heal"
+
+    dispatch = on.get("workflow_dispatch")
+    assert dispatch is not None, "auto-queue.yml must keep workflow_dispatch for an explicit PR number"
+    pr_number_input = (dispatch.get("inputs") or {}).get("pr_number") or {}
+    assert pr_number_input.get("required") is True, "workflow_dispatch's pr_number input must stay required"
+    assert pr_number_input.get("type") == "string", "workflow_dispatch's pr_number input must stay a string"
+
+
+def test_auto_queue_find_step_actually_invokes_the_script():
+    """N1, independent review of PR #44. The 'on:' test above proves the
+    workflow trigger fires; it says nothing about whether the "Find the
+    pull requests" step still invokes the script the trigger fix depends
+    on. PROBED: replacing that step's `run:` with
+    `echo "prs=" >> "$GITHUB_OUTPUT"` (disconnecting the script from the
+    workflow entirely) left the full test suite green, because nothing
+    asserted the step's `run:` field at all. This closes that gap directly."""
+    yaml = _require_yaml()
+    path = REPO_ROOT / ".github" / "workflows" / "auto-queue.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    steps = data["jobs"]["queue"]["steps"]
+    find_steps = [s for s in steps if s.get("id") == "find"]
+    assert find_steps, "auto-queue.yml has no step with id: find"
+    run = find_steps[0].get("run") or ""
+    assert "auto_queue.py" in run and "--find-prs" in run, (
+        f"the 'find' step's run: no longer invokes the script: {run!r} -- "
+        "the workflow's trigger fix is disconnected from the code it is "
+        "meant to drive"
+    )
+
+
+def test_auto_queue_trigger_workflow_names_exist_in_tracked_workflows():
+    """N2, independent review of PR #44. `workflow_run.workflows` names
+    "CI" and "Handoff" as hardcoded strings; nothing checked them against
+    the real workflow files' own `name:` fields. PROBED: renaming ci.yml's
+    `name: CI` to `name: Continuous Integration` left the full suite green
+    -- the workflow_run trigger goes silently dead and nothing here would
+    catch it. This cross-checks every entry against every tracked
+    workflow's declared name."""
+    yaml = _require_yaml()
+    real_names = set()
+    for path in _tracked_workflow_files():
+        if not path.is_file():
+            continue
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        name = (data or {}).get("name")
+        if name:
+            real_names.add(name)
+
+    auto_queue_path = REPO_ROOT / ".github" / "workflows" / "auto-queue.yml"
+    data = yaml.safe_load(auto_queue_path.read_text(encoding="utf-8"))
+    workflows = ((data.get(True) or {}).get("workflow_run") or {}).get("workflows") or []
+    assert workflows, "auto-queue.yml's workflow_run.workflows is empty"
+    for name in workflows:
+        assert name in real_names, (
+            f"auto-queue.yml's workflow_run.workflows names {name!r}, which is "
+            f"not the `name:` of any tracked workflow ({sorted(real_names)!r}) "
+            "-- a rename of the real workflow would silently kill this trigger"
+        )
+
+
+def test_auto_queue_job_skips_non_success_workflow_run_conclusions():
+    """N3, independent review of PR #44 (and its predecessor's N1).
+    `workflow_run: types: [completed]` fires for a 'failure', 'cancelled'
+    or 'skipped' conclusion just as readily as 'success', and nothing
+    checked that sibling field -- so a failed CI run drove a full
+    (harmless but wasteful) resolve-and-enqueue attempt. This asserts a
+    conclusion-gating condition exists on the queue job (or an equivalent
+    step-level condition covering every step)."""
+    yaml = _require_yaml()
+    path = REPO_ROOT / ".github" / "workflows" / "auto-queue.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    queue = data["jobs"]["queue"]
+    job_if = queue.get("if") or ""
+    step_ifs = [s.get("if") or "" for s in queue.get("steps", [])]
+
+    def gates_conclusion(expr: str) -> bool:
+        return "workflow_run" in expr and "conclusion" in expr and "success" in expr
+
+    assert gates_conclusion(job_if) or all(
+        gates_conclusion(expr) for expr in step_ifs if step_ifs
+    ), (
+        "no job-level or step-level 'if:' in auto-queue.yml's queue job checks "
+        "github.event.workflow_run.conclusion == 'success' -- a failed or "
+        "cancelled CI/Handoff run would still drive a full resolve-and-enqueue "
+        f"attempt (job if: {job_if!r})"
+    )
+
+
 def test_step_names_with_a_colon_are_quoted():
     """The specific mistake that caused this, caught at its own shape.
 
