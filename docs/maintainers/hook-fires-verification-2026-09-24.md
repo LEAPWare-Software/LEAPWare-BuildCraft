@@ -104,7 +104,7 @@ non-interactively.
 $ cd /tmp/lwb-hook-scratch/work
 $ LWB_LEDGER_PATH=/tmp/lwb-hook-scratch/work/ledger-bash.jsonl \
   claude -p "Run the shell command: echo hello-lwb-hook-test    Use the Bash tool to run it, then tell me exactly what it printed." \
-    --plugin-dir /home/user/LEAPWare-BuildCraft/plugins/claude/lwb \
+    --plugin-dir <repo>/plugins/claude/lwb \
     --settings /tmp/lwb-hook-scratch/work/settings.json \
     --permission-mode dontAsk \
     --output-format json \
@@ -132,7 +132,7 @@ exactly. The ledger file did not exist before this run.
 ```
 $ LWB_LEDGER_PATH=/tmp/lwb-hook-scratch/work/ledger-agent.jsonl \
   claude -p "Use the Task tool to dispatch a general-purpose subagent with the instruction: 'Reply with the exact text: subagent-lwb-hook-test-ok'. Wait for it to finish and then tell me exactly what the subagent returned." \
-    --plugin-dir /home/user/LEAPWare-BuildCraft/plugins/claude/lwb \
+    --plugin-dir <repo>/plugins/claude/lwb \
     --settings /tmp/lwb-hook-scratch/work/settings.json \
     --permission-mode dontAsk \
     --output-format json \
@@ -167,7 +167,7 @@ empirically by `tool_name: "Agent"` in the ledger line produced by a
 Anyone with `claude` CLI `2.1.282` (or checking their own version first)
 and network access to the Anthropic API can rerun the two commands in
 section 1 and 2 verbatim (substituting their own checkout path for
-`/home/user/LEAPWare-BuildCraft` and an isolated scratch directory for
+`<repo>` and an isolated scratch directory for
 `/tmp/lwb-hook-scratch/work`) and either see a ledger line appear each
 time, matching the shapes above, or not. `LWB_LEDGER_PATH` isolates the
 observation from any other ledger a real install might have.
