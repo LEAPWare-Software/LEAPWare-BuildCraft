@@ -1,8 +1,9 @@
 {
   "deliverable": "ship-lwb-proof-coverage-and-lwb-proof-integrity-1.1",
+  "pr": 50,
   "author": "claude-code-track-a-session_012CYfXUsJMrpqknbwzPFLGC",
   "checked_by": "pending-independent-reviewer-routine",
-  "commit": "560b68aab9255d9a9edf3bb65deeb9b334dc845f",
+  "commit": "b7343d232cc26b1338727b281b11b36d86058c97",
   "commands": [
     {
       "argv": [
