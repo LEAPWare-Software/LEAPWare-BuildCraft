@@ -1,0 +1,215 @@
+{
+  "deliverable": "auto-queue-trigger-recut",
+  "pr": 47,
+  "author": "claude-sonnet5-recut44-session-2026-09-24",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "626de5af0bc4c1a49bf2f0113c4107e4d3413bb9",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 26%]",
+        "........................................................................ [ 40%]",
+        "........................................................................ [ 53%]",
+        "........................................................................ [ 66%]",
+        "........................................................................ [ 80%]",
+        "........................................................................ [ 93%]",
+        "....................................                                     [100%]",
+        "540 passed in 23.41s"
+      ],
+      "sha256": "4c3787a9aae91cee6f30ce50d3c2bc0a0ec402de0ccd703566b191ac77c4c152",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        ".......                                                                  [100%]",
+        "7 passed in 0.13s"
+      ],
+      "sha256": "f9e270a1148f8079728fc97df1841a3afa34d3e9b6eb4dd211e305897b916afd",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+        "--head",
+        "626de5af0bc4c1a49bf2f0113c4107e4d3413bb9"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+      "resolved_head": "626de5af0bc4c1a49bf2f0113c4107e4d3413bb9"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+        "--head",
+        "626de5af0bc4c1a49bf2f0113c4107e4d3413bb9",
+        "--pr-number",
+        "47"
+      ],
+      "exit": 1,
+      "expect_exit": 1,
+      "tail": [
+        "FAIL: 626de5af0bc4: touches a shared path and has 0 independent review(s) in reviews/47/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)"
+      ],
+      "sha256": "0821ec41bc6c572bdbf44e9213e395107cfd420a042c752c315c3b11caf00b61",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+      "resolved_head": "626de5af0bc4c1a49bf2f0113c4107e4d3413bb9"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_hosted_runners.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-hosted-runners check passed"
+      ],
+      "sha256": "478ba8f94ab7a99f2aba42d1d15c7858c7fc81e42593314ec2a9ff67b979b261",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2952 bytes)"
+      ],
+      "sha256": "4d1d986fdfca23bce64ef9fd1bf89ec982cfa43645bc209633e2fe6c530827c1",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    }
+  ],
+  "mutations": [
+    ".github/workflows/auto-queue.yml",
+    "scripts/cloud/auto_queue.py",
+    "tests/test_auto_queue.py",
+    "tests/test_workflows_parse.py"
+  ],
+  "unproven": [
+    "lwb-env-leak was not run locally: LWB_PRIVATE_NEEDLES is a CI-only secret, unset in this environment, so a local run would report UNCONFIGURED rather than a real pass.",
+    "lwb-lanes currently fails (recorded above, expect_exit=1) with '0 independent review(s) in reviews/47/, needs 1' -- expected and unresolved as of this record: this PR has not yet received its independent review. This record does not, and cannot, prove that gate green; a separate reviewer routine's AGREE record is what will.",
+    "lwb_build.py --check / plugin validators were not run: this PR touches neither core/, adapters/, nor plugins/, so no vendor rebuild is implicated, but they were not exercised either way.",
+    "Windows/macOS CI legs were not run locally; everything above ran on Linux/CPython in this container only.",
+    "This record's own PR number (47) is a best guess made before the PR was opened, following the precedent set by PR #45/#46 (see their own proof records' history of renumbering after the fact). If the real PR number differs, a follow-up commit renames this file and re-declares its 'pr' field, and this sentence is corrected then.",
+    "The B1 fix's consequence for a real GitHub Actions runner (how it would have parsed a corrupted $GITHUB_OUTPUT line before the fix) is reasoned from the documented name=value format, not observed on a live runner -- the same limit the independent review that found B1 stated about itself."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "PR #44's real content (auto-queue.yml's workflow_run+schedule+workflow_dispatch trigger fix, scripts/cloud/auto_queue.py's resolve_pr_numbers/emit_find_prs, and their tests) ported onto a fresh branch off current main, verified against origin/lwb-autoqueue-trigger's diff rather than re-derived from memory",
+      "met": true
+    },
+    {
+      "criterion": "B1 (proof-of-completion overclaim: _api()'s stderr behavior was untested) fixed with two new tests that monkeypatch _run and call _api() directly, confirmed non-vacuous by reverting _api()'s stderr prints to stdout and observing the new tests (and only the new tests) fail",
+      "met": true
+    },
+    {
+      "criterion": "B2 (false justification for the Handoff trigger, measured against the live branch ruleset) corrected in auto-queue.yml's comment and tests/test_workflows_parse.py's assertion message, without changing any behavior",
+      "met": true
+    },
+    {
+      "criterion": "N1 (find step's run: not asserted to invoke auto_queue.py --find-prs) fixed with a new parse-level test, confirmed non-vacuous by probing a disconnected run: line",
+      "met": true
+    },
+    {
+      "criterion": "N2 (workflow_run.workflows not cross-checked against real workflow name: fields) fixed with a new parse-level test, confirmed non-vacuous by probing a renamed CI workflow",
+      "met": true
+    },
+    {
+      "criterion": "N3 (workflow_run fires on non-success conclusions too) fixed with a job-level if: condition gating on conclusion == 'success', plus a new parse-level test, confirmed non-vacuous by probing the condition's removal",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green, no new failures, no reduction in test count from skips",
+      "met": true
+    },
+    {
+      "criterion": "reviews/ untouched by this work; B3 from the prior review (CI red purely from stale reviews/44/ DISAGREE records) not chased, since a fresh branch's empty reviews/47/ resolves it structurally",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
