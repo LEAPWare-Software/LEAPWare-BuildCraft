@@ -16,7 +16,7 @@ detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 **THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
 that no WORTHY AND VETTED tool already does it before building anything.
 
-1. **DONE: #7-#31, #39.** Decisions: `docs/requirements/decisions.md`
+1. **DONE: #7-#27, #31, #39.** Decisions: `docs/requirements/decisions.md`
    -- READ FIRST, do not re-decide. Branch tips and PR state are not
    written here; re-derive per `docs/handoff-protocol.md`.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
@@ -30,8 +30,8 @@ that no WORTHY AND VETTED tool already does it before building anything.
    leaked domain, force-push denied -- and superseded). Reviewable
    head `bc6874c` had an independent AGREE; this merge lands a real
    commit after it, so that AGREE is now STALE -- needs a fresh
-   review. #29 (runbook, conflicts w/ main) also open. Re-derive
-   PR/review state per `docs/handoff-protocol.md`.
+   review. #29 (runbook) is CLOSED, unmerged, not superseded.
+   Re-derive PR/review state per `docs/handoff-protocol.md`.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
