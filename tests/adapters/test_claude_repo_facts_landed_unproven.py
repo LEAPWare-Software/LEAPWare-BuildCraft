@@ -107,6 +107,55 @@ def test_a_squash_merge_subject_with_a_matching_record_is_silent(tmp_path):
     assert collect_landed_unproven(tmp_path) == ()
 
 
+def test_a_record_named_after_its_branch_but_declaring_the_pr_is_silent(tmp_path):
+    """A record need not be FILENAMED after its PR to prove it -- it can be
+    named after its branch (this repository's own `proof/<branch>.json`
+    style) and declare the PR in its content instead, exactly as
+    `scripts/lwb_check_proof.py::check_coverage` already accepts via
+    `data["pr"]`. Found missing by an independent reviewer of PR #49: the
+    filename-only match previously false-positived on this exact shape,
+    including this repository's own proof records."""
+    _init_repo(tmp_path)
+    _commit(tmp_path, "Ship the thing (#77)")
+    (tmp_path / "proof").mkdir()
+    (tmp_path / "proof" / "my-feature-branch.json").write_text(
+        json.dumps({"pr": 77}), encoding="utf-8"
+    )
+    assert collect_landed_unproven(tmp_path) == ()
+
+
+def test_a_declared_pr_that_does_not_match_is_still_reported(tmp_path):
+    _init_repo(tmp_path)
+    sha = _commit(tmp_path, "Ship the thing (#77)")
+    (tmp_path / "proof").mkdir()
+    (tmp_path / "proof" / "my-feature-branch.json").write_text(
+        json.dumps({"pr": 78}), encoding="utf-8"
+    )
+    gaps = collect_landed_unproven(tmp_path)
+    assert len(gaps) == 1
+    assert sha[:12] in gaps[0]
+    assert "#77" in gaps[0]
+
+
+def test_a_non_integer_declared_pr_is_ignored_not_stringified(tmp_path):
+    """`"pr": "77"` (a string) and `"pr": true` (a bool, which `isinstance(x,
+    int)` would otherwise accept in Python) must not count -- only a real
+    JSON integer, matching `check_coverage`'s own `isinstance(..., int)`
+    guard on `data.get("pr")`."""
+    _init_repo(tmp_path)
+    _commit(tmp_path, "Ship the thing (#77)")
+    (tmp_path / "proof").mkdir()
+    (tmp_path / "proof" / "string-pr.json").write_text(
+        json.dumps({"pr": "77"}), encoding="utf-8"
+    )
+    (tmp_path / "proof" / "bool-pr.json").write_text(
+        json.dumps({"pr": True}), encoding="utf-8"
+    )
+    gaps = collect_landed_unproven(tmp_path)
+    assert len(gaps) == 1
+    assert "#77" in gaps[0]
+
+
 def test_a_squash_merge_subject_exempted_by_sha_is_silent(tmp_path):
     _init_repo(tmp_path)
     sha = _commit(tmp_path, "Ship the thing (#41)")
