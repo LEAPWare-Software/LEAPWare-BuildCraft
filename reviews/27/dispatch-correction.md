@@ -112,12 +112,15 @@ version of this sentence shows it was true when first written, on the
 #32-era branch where the reviewable head really was the base; it stopped
 being true here once real content commits started landing on top, and
 re-deriving it today (`resolve_reviewable_head` from this branch's tip)
-resolves to `7da6f47` -- a commit that modifies `HANDOFF.md`, not a
-record-only commit and not the base. So this PR is not currently a live
-instance: its green `lwb-lanes` does attest to review of `7da6f47`'s
-content. The review record that demonstrated the hole (`reviews/32/`)
-does not exist in this tree,
-on `main`, or anywhere reachable from a fresh clone: PR #32 was closed
+resolves to whatever commit most recently touched something other than
+`reviews/` or `proof/` -- not a record-only commit and not the base.
+Whichever commit that currently is will keep changing as further content
+lands, so it is deliberately not named here by sha; re-derive it fresh
+rather than trusting a fixed value written into this file. So this PR is
+not currently a live instance: its green `lwb-lanes` does attest to
+review of that commit's content. The review record that demonstrated
+the hole (`reviews/32/`) does not exist in this tree, on `main`, or
+anywhere reachable from a fresh clone: PR #32 was closed
 unmerged, and the re-cut that carried this document forward (PR #41)
 deliberately left #32's reviewer-record commits behind. It still exists
 only on PR #32's own closed, unmerged branch on GitHub
