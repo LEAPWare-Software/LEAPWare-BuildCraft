@@ -43,7 +43,7 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 16:31 UTC
+Generated: 2026-09-24 17:05 UTC
 main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
 CLI: claude
 Session: lwb-no-unauthorised-destructive-action-52
@@ -52,7 +52,7 @@ Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-22/22 proven
+23/23 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
