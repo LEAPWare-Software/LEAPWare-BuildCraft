@@ -1467,6 +1467,114 @@ def test_independent_reviews_stale_is_downgraded_but_disagree_is_not_in_the_same
 
 
 # ---------------------------------------------------------------------------
+# PR #56 finding F1 (reviews/56/cloud-reviewer-b.json): the STALE-vs-other
+# classification used to be `_is_stale_only_rejection`, a bare substring
+# search ("STALE" in record_errors[0]) over `_review_ok`'s formatted error
+# TEXT. Every one of those messages is built as f"{rel}: ...", and `rel` is
+# the review record's OWN FILENAME -- reviews/README.md says explicitly that
+# any filename is accepted, so the record's author fully controls it. A
+# record with a genuine DISAGREE verdict, or a genuine self-review identity
+# collision, filed at a path that merely CONTAINS the substring "STALE" (with
+# nothing to do with actual staleness) produced an error message containing
+# "STALE" purely because of the filename, and the old check misclassified it
+# as routine staleness -- silently demoting a live DISAGREE (or a detected
+# self-review) to a mere notice instead of failing the gate. This is exactly
+# the "a DISAGREE is silently outvoted" bug an earlier review round already
+# found and this code was supposed to have fixed.
+#
+# The fix replaces the substring search with a structured `rejection_kind`
+# tag that `_review_ok` sets itself, at the exact branch that rejects a
+# record, never inferred afterward from message text. These tests go through
+# `independent_reviews` (the real entry point that decides pass/fail), not
+# `_review_ok` in isolation, because the exploit is specifically about what
+# `independent_reviews` does with the classification.
+# ---------------------------------------------------------------------------
+
+
+def test_independent_reviews_disagree_at_a_stale_named_path_still_fails(tmp_path):
+    """The exact reproduction from finding F1: a genuine DISAGREE record
+    filed at a path/filename containing the literal substring "STALE",
+    alongside a separate fresh, valid AGREE record from a different
+    reviewer. REQUIRED_INDEPENDENT_REVIEWS=1 is already satisfied by the
+    AGREE alone, but the DISAGREE must not be silently demoted just
+    because its filename happens to contain "STALE" -- the gate must
+    still fail."""
+    _write_review(
+        tmp_path, "whatever-STALE-whatever.json",
+        reviewer_id="disagreeing-reviewer", verdict="DISAGREE",
+    )
+    _write_review(tmp_path, "agree-reviewer.json", reviewer_id="agreeing-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False, errors
+    assert any("DISAGREE" in e for e in errors), errors
+    # It must not have been swallowed into a notice either -- a live
+    # objection is never "not counted toward ... but enough already
+    # exist", however its filename happens to read.
+    assert not any("DISAGREE" in n for n in notices), notices
+
+
+def test_independent_reviews_self_review_collision_at_a_stale_named_path_still_fails(tmp_path):
+    """Same exploit, the other non-stale rejection reason: a
+    reviewer_id == commit_author_id self-review collision filed at a
+    "STALE"-containing path must keep failing the gate even alongside a
+    sufficient fresh AGREE record."""
+    _write_review(
+        tmp_path, "collide-STALE-collide.json",
+        reviewer_id="same-id", commit_author_id="same-id",
+    )
+    _write_review(tmp_path, "agree-reviewer.json", reviewer_id="agreeing-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False, errors
+    assert any("equals" in e for e in errors), errors
+    assert not any("equals" in n for n in notices), notices
+
+
+def test_independent_reviews_genuinely_stale_at_a_stale_named_path_is_still_downgraded(tmp_path):
+    """Confirms the fix does not over-narrow: a record that IS genuinely
+    stale (reviewed_commit does not match the reviewable head), filed at a
+    path that also happens to contain "STALE", must still be correctly
+    downgraded to a notice once a sufficient fresh AGREE exists elsewhere
+    -- the filename must not matter either way, for staleness any more
+    than for a non-stale rejection."""
+    _write_review(
+        tmp_path, "old-STALE-reviewer.json",
+        reviewer_id="old-reviewer", reviewed_commit="0123456",
+    )
+    _write_review(
+        tmp_path, "fresh-reviewer.json",
+        reviewer_id="fresh-reviewer", reviewed_commit=HEAD_SHA,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is True, errors
+    assert errors == []
+    assert any("STALE" in n for n in notices), notices
+
+
+# ---------------------------------------------------------------------------
 # Finding B (second round of independent review): commit_files reporting a
 # merge's real first-parent diff must not feed the LANE-OWNERSHIP check --
 # only the shared-path / review-freshness determination. A merge did not

@@ -641,8 +641,35 @@ def _review_ok(
     pr_number: int,
     errors: list[str],
     notices: Optional[list[str]] = None,
+    rejection_kind: Optional[list[str]] = None,
 ) -> Optional[str]:
     """Validate one review record. Returns its reviewer_id, or None if invalid.
+
+    `rejection_kind`, when given, is a caller-owned empty list that this
+    function appends exactly one tag to -- "stale" or "other" -- at the
+    SPECIFIC CODE LOCATION of whichever rejection branch actually returns
+    `None`, as a direct consequence of which branch ran. It is a
+    structured signal the caller reads as data, never a message the
+    caller re-parses as text.
+
+    This replaces a prior design (`_is_stale_only_rejection`) that
+    inferred "was this rejection routine staleness" by substring-searching
+    the formatted `errors` text for the literal marker "STALE". That was
+    exploitable: every message this function builds is `f"{rel}: ..."`,
+    and `rel` is the review record's OWN FILENAME -- `reviews/README.md`
+    says explicitly that any filename is accepted (vendor-agnostic
+    reviewer identity), so the record's author fully controls it. A
+    record with a genuine DISAGREE verdict, or a genuine self-review
+    identity collision, filed at a path merely containing the substring
+    "STALE" (e.g. `reviews/56/whatever-STALE-whatever.json`) produced an
+    error message containing "STALE" for a reason that had nothing to do
+    with staleness, and the old substring check misclassified it as
+    routine churn -- silently demoting a live DISAGREE (or a detected
+    self-review collision) to a non-fatal notice. Found by independent
+    review of PR #56 (reviews/56/cloud-reviewer-b.json, finding F1).
+    Tagging the classification at its true source, at the exact branch
+    that produced it, removes author-controlled text from the decision
+    entirely.
 
     `pr_number` is the AUTHORITATIVE PR number -- the one `independent_reviews`
     globbed `reviews/<pr_number>/` for -- not something read out of the
@@ -678,13 +705,19 @@ def _review_ok(
         data = json.loads(review_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         errors.append(f"{rel}: invalid JSON: {exc}")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     if not isinstance(data, dict):
         errors.append(f"{rel}: not a JSON object")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     schema_errors_before = len(errors)
     _validate_against_schema(data, rel, errors)
     if len(errors) > schema_errors_before:
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
 
     # The record's own `pr` must agree with the directory it was found
@@ -702,21 +735,29 @@ def _review_ok(
             f"was found under (reviews/{pr_number}/) -- a review record must name the "
             "PR it actually belongs to"
         )
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
 
     if data.get("verdict") != "AGREE":
         errors.append(f"{rel}: verdict is {data.get('verdict')!r}, want 'AGREE'")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     reviewer_id = data.get("reviewer_id")
     author_id = data.get("commit_author_id")
     if not reviewer_id or not author_id:
         errors.append(f"{rel}: missing 'reviewer_id' or 'commit_author_id'")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     if reviewer_id == author_id:
         errors.append(
             f"{rel}: reviewer_id equals commit_author_id ({reviewer_id!r}) — "
             "a reviewer may not be the commit's own author"
         )
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     reviewed_commit = data.get("reviewed_commit")
     # isinstance guard, not just truthiness: a non-string reviewed_commit
@@ -738,6 +779,8 @@ def _review_ok(
             "under reviews/ and proof/ are excluded when computing this "
             "head); the change must be re-reviewed"
         )
+        if rejection_kind is not None:
+            rejection_kind.append("stale")
         return None
 
     # From REVIEWER_ID_FORMAT_CUTOFF_PR onward: both ids must be parseable,
@@ -755,6 +798,8 @@ def _review_ok(
         reviewer_parsed = _parse_identity(reviewer_id, "reviewer_id", rel, errors)
         author_parsed = _parse_identity(author_id, "commit_author_id", rel, errors)
         if reviewer_parsed is None or author_parsed is None:
+            if rejection_kind is not None:
+                rejection_kind.append("other")
             return None
         shared_segment = _shared_long_segment(reviewer_id, author_id)
         if shared_segment is not None:
@@ -765,6 +810,8 @@ def _review_ok(
                 "same session or dispatch reviewing its own work, not an independent "
                 "reviewer"
             )
+            if rejection_kind is not None:
+                rejection_kind.append("other")
             return None
         dispatched = data.get("reviewer_was_dispatched_by_author")
         if not isinstance(dispatched, bool):
@@ -774,6 +821,8 @@ def _review_ok(
                 "establish independence on its own and requires this record to declare "
                 "the relationship honestly instead of leaving it unstated"
             )
+            if rejection_kind is not None:
+                rejection_kind.append("other")
             return None
         if dispatched and notices is not None:
             notices.append(
@@ -786,26 +835,15 @@ def _review_ok(
     return str(reviewer_id)
 
 
-def _is_stale_only_rejection(record_errors: list[str]) -> bool:
-    """True when a single `_review_ok` call's own error list is nothing
-    but the STALE rejection.
-
-    `_review_ok` is untouched by this file's stale-veto fix (see
-    `independent_reviews` below) and has no structured "reason" field --
-    it reports a failure as a plain string appended to the list it is
-    given. STALE is the one rejection reason this fix treats as routine
-    churn (see `independent_reviews`), and `_review_ok` always reports it
-    as exactly one string containing the literal marker "STALE" (its only
-    use anywhere in this module outside prose comments -- see the STALE
-    branch of `_review_ok`), and never combines it with any other
-    rejection in the same call (each of `_review_ok`'s failure branches
-    returns immediately after its own single `errors.append`). Checking
-    for that marker, rather than changing `_review_ok` to return a
-    structured reason, keeps `_review_ok`'s signature, behavior and
-    existing direct unit tests completely untouched -- the constraint
-    this whole file's review-freshness fix was built under.
-    """
-    return len(record_errors) == 1 and "STALE" in record_errors[0]
+# `_is_stale_only_rejection` (a substring search for "STALE" over
+# `_review_ok`'s formatted error text) has been removed. It was
+# exploitable: `_review_ok`'s messages interpolate the review record's OWN
+# FILENAME (`rel`) and other author-controlled values, so a non-stale
+# rejection filed under a "STALE"-containing path was misclassified as
+# routine staleness and silently demoted -- see `_review_ok`'s
+# `rejection_kind` parameter, which now reports this classification
+# directly from the branch that produced it, as a structured tag rather
+# than text to be re-parsed.
 
 
 def independent_reviews(
@@ -849,8 +887,13 @@ def independent_reviews(
     rounds superseding each other; dissent and identity problems are not,
     and must never be outvoted by an unrelated valid record. So each
     record's errors are now judged on their own: a record whose rejection
-    is STALE and STALE alone (see `_is_stale_only_rejection`) goes into a
-    separate, still-downgradable bucket; every other rejection reason is
+    is STALE and STALE alone -- per the structured `rejection_kind` tag
+    `_review_ok` itself sets at the STALE branch, never inferred here from
+    message text (see `_review_ok`'s `rejection_kind` docs; a prior,
+    text-substring-based version of this check, `_is_stale_only_rejection`,
+    was found exploitable and removed -- see reviews/56/cloud-reviewer-b.json
+    finding F1) -- goes into a separate, still-downgradable bucket; every
+    other rejection reason is
     appended straight to the caller's `errors` UNCONDITIONALLY, exactly as
     before this whole fix existed, and also forces this function's own
     return value to False -- a directory holding a live objection or a
@@ -874,11 +917,21 @@ def independent_reviews(
     hard_error_found = False
     for record in records:
         record_errors: list[str] = []
-        reviewer_id = _review_ok(record, head_sha, pr_number, record_errors, notices)
+        record_kind: list[str] = []
+        reviewer_id = _review_ok(
+            record, head_sha, pr_number, record_errors, notices, record_kind
+        )
         if reviewer_id is not None:
             reviewer_ids.add(reviewer_id)
             continue
-        if _is_stale_only_rejection(record_errors):
+        # `record_kind` is set by `_review_ok` itself, at the exact
+        # rejection branch that ran -- never inferred here by re-reading
+        # `record_errors`' formatted text (see `_review_ok`'s
+        # `rejection_kind` docs). Exactly one tag is appended per call, so
+        # this is the structured equivalent of the old
+        # "len(record_errors) == 1 and marker in text" check, without the
+        # text.
+        if record_kind == ["stale"]:
             stale_errors.extend(record_errors)
         else:
             # DISAGREE, a bad/self-review identity, a malformed record, a
