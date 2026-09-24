@@ -160,6 +160,16 @@ _DATE_SHAPED_RE = re.compile(r"^\d{4}-?\d{2}-?\d{2}$")
 # cost of a false positive is a gate someone switches off.
 MIN_SHARED_SEGMENT_LENGTH = 8
 
+# Segments that only name the product, not a session or reviewer. Two
+# unrelated ids can each legitimately contain "buildcraft" (this repo's own
+# name), "leapware" (the owner/org name) or "lwb" (the CLI prefix) without
+# that meaning anything about who reviewed what -- measured as a real false
+# positive: two independently-authored ids collided on "buildcraft" alone,
+# well past MIN_SHARED_SEGMENT_LENGTH, with no actual shared session behind
+# it. Excluded in `_id_segments` itself so neither `_shared_long_segment`
+# nor anything else built on segment sets ever sees them as candidates.
+IGNORED_ID_SEGMENTS = frozenset({"buildcraft", "leapware", "lwb"})
+
 # How many DISTINCT independent reviewers a shared-path change needs. The
 # old rule was "one record per CLI vendor", which read as two but was really
 # one-each and could never be met with a single CLI in operation. One
@@ -294,35 +304,59 @@ def resolve_head_sha(rev_range: str) -> Optional[str]:
     return sha or None
 
 
-def _is_record_only_commit(sha: str) -> bool:
-    """True when every file `sha` touches lives under `reviews/` or `proof/`.
+def _is_record_only_commit(sha: str, pr_number: int) -> bool:
+    """True when every file `sha` touches lives under `reviews/<pr_number>/`
+    or is exactly `proof/<pr_number>.json` -- THIS PR's own review/proof
+    files, not anyone else's.
+
+    This used to accept ANY commit touching only `reviews/` or `proof/`
+    ANYWHERE, not just this PR's own records -- found by adversarial
+    review: an "impostor" commit that only edits, say,
+    `reviews/<some-other-pr>/schema-like-file` (guts of the very files
+    that define the review gates) sailed through both the identity check
+    and this walk, dodging identity review entirely on the grounds that it
+    "only touched reviews/". Scoping to `pr_number` closes that: a commit
+    is record-only only when it could plausibly be THIS PR's own reviewer
+    filing their own record, never a change to some other PR's review
+    history. `pr_number` falsy (0, "no PR context") means the exemption
+    never applies -- there is no PR whose records a commit could honestly
+    be filing.
 
     A commit with no files at all (e.g. an empty commit) is NOT record-only
     — `all()` over an empty list is vacuously True, which would wrongly let
     a no-op commit skip past the walk.
     """
+    if not pr_number:
+        return False
     files = commit_files(sha)
     if not files:
         return False
+    reviews_prefix = f"reviews/{pr_number}/"
+    proof_file = f"proof/{pr_number}.json"
     for f in files:
         posix = f.replace("\\", "/")
-        if not (posix.startswith("reviews/") or posix.startswith("proof/")):
+        if not (posix.startswith(reviews_prefix) or posix == proof_file):
             return False
     return True
 
 
-def resolve_reviewable_head(rev_range: str) -> Optional[str]:
+def resolve_reviewable_head(rev_range: str, pr_number: int) -> Optional[str]:
     """Resolve the sha a review record's `reviewed_commit` must match.
 
     The raw branch head is the wrong thing to compare against: committing a
     review record itself advances the head past the sha that record names,
     so no committed record could ever match the raw head. This walks back
     from the head, skipping any commit whose changed files are ALL under
-    `reviews/` or `proof/` (pure record-keeping, nothing that needs its own
-    review), and returns the first commit that changed anything else --
-    the "reviewable head". If every commit from the head backward is
-    record-only, there is nothing to skip past, so this falls back to the
-    raw head rather than walking off into unrelated history.
+    `reviews/<pr_number>/` or are exactly `proof/<pr_number>.json` (THIS
+    PR's own pure record-keeping, nothing that needs its own review -- see
+    `_is_record_only_commit`), and returns the first commit that changed
+    anything else -- the "reviewable head". If every commit from the head
+    backward is record-only, there is nothing to skip past, so this falls
+    back to the raw head rather than walking off into unrelated history.
+
+    `pr_number` is threaded through to `_is_record_only_commit` so a
+    record-only-shaped commit filed under a DIFFERENT PR's `reviews/` or
+    `proof/` path is never mistaken for this PR's own record-keeping.
 
     Returns None if the head cannot be resolved at all, so callers fail
     loudly instead of silently skipping the freshness check.
@@ -346,7 +380,7 @@ def resolve_reviewable_head(rev_range: str) -> Optional[str]:
         return head_sha
 
     for sha in shas:
-        if not _is_record_only_commit(sha):
+        if not _is_record_only_commit(sha, pr_number):
             return sha
 
     # Every commit from the head backward is record-only: nothing to skip
@@ -518,10 +552,16 @@ def _id_segments(value: str) -> set[str]:
     "19" as a shared segment. Works on ANY id ending in a real date, not
     only one that otherwise fits the '<role-and-model>-<session-token>-
     <date>' shape: used to check for a shared segment even against this
-    repo's own historical, free-form ids."""
+    repo's own historical, free-form ids. IGNORED_ID_SEGMENTS (segments
+    naming the product itself, not a session) are dropped here too, so
+    every caller built on this set is automatically immune to them."""
     m = _DATE_SUFFIX_RE.search(value)
     remainder = value[: m.start()] if m else value
-    return {seg for seg in remainder.split("-") if seg}
+    return {
+        seg
+        for seg in remainder.split("-")
+        if seg and seg not in IGNORED_ID_SEGMENTS
+    }
 
 
 def _shared_long_segment(id_a: str, id_b: str) -> Optional[str]:
@@ -781,7 +821,7 @@ def check_lanes(
         return []
 
     errors: list[str] = []
-    head_sha = resolve_reviewable_head(rev_range)
+    head_sha = resolve_reviewable_head(rev_range, pr_number)
     if head_sha is None:
         errors.append(f"{rev_range}: could not resolve reviewable head sha for freshness check")
 
