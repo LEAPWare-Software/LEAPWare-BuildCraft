@@ -140,7 +140,8 @@
       ],
       "sha256": "ab8f5e3be55b7ccb642be8c14e54c200edacc355a15f468491bc96399cddeb83",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
@@ -155,7 +156,8 @@
       ],
       "sha256": "11c384419b8c98fd8fde3ad60e731b833c28bd65063870560a712e2ecee50ab0",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     }
   ],
   "mutations": [
