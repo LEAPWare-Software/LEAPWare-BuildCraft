@@ -3,7 +3,7 @@
   "pr": 43,
   "author": "coordinator-opus5-f8da3f9e-2026-09-19",
   "checked_by": "UNCHECKED-pending-independent-review",
-  "commit": "3509d2f",
+  "commit": "e2d9f60",
   "commands": [
     {
       "argv": [
@@ -16,17 +16,17 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "........................................................................ [ 14%]",
-        "........................................................................ [ 28%]",
-        "........................................................................ [ 42%]",
-        "........................................................................ [ 56%]",
-        "........................................................................ [ 70%]",
-        "........................................................................ [ 84%]",
-        "........................................................................ [ 98%]",
-        "........                                                                 [100%]",
-        "512 passed in 49.44s"
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 41%]",
+        "........................................................................ [ 55%]",
+        "........................................................................ [ 68%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 96%]",
+        "..................                                                       [100%]",
+        "522 passed in 20.36s"
       ],
-      "sha256": "9fa931d809fca0bc82c66a879233a0e128675ef97d67939fd76cd7140bc784f9",
+      "sha256": "a5e6ad2f78e3b9922c5c3d7bf0bff60d062d1cbe1b7a116bdc024feebc5ae4c8",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -41,12 +41,10 @@
       "exit": 0,
       "expect_exit": 0,
       "tail": [
-        "HANDOFF.md:43: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 11:34 UTC",
-        "HANDOFF.md:44: INFO (git-verified): recorded main SHA 9b374b52a56e04e6b443f9aa9d86fa51a0d8a47c is live main's first parent 9b374b52a56e04e6b443f9aa9d86fa51a0d8a47c (live main is now f9b4deadbb441f0c1046a0d73b0434424f1cf13c) -- verified by git",
-        "HANDOFF.md:49: INFO (git-verified): #27 listed as open but gh reports MERGED -- its merge commit f9b4deadbb441f0c1046a0d73b0434424f1cf13c is live main itself (f9b4deadbb441f0c1046a0d73b0434424f1cf13c); this is the expected post-merge state, not a stale listing",
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-24 06:08 UTC",
         "lwb-check-state-claims check passed"
       ],
-      "sha256": "b46eda93c8c6fdfd55b63fdecbeb803b0b12230927b1826d512a86bd45d0c2a9",
+      "sha256": "e7d59dd75f42e2398009de8d57e47d50b0fdef939916d38ae87c5886e976a765",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -60,9 +58,9 @@
       "expect_exit": 0,
       "tail": [
         "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
-        "lwb-proof check passed (19 record(s))"
+        "lwb-proof check passed (22 record(s))"
       ],
-      "sha256": "76e3444b5a681d370182c71251c2f1b8e9b98effebcce0d52366a56262e42190",
+      "sha256": "bba9b28c8981416ced186c309ec37561ab51ce48fa1456970df1a5bd74d1af27",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
