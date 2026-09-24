@@ -16,7 +16,7 @@ detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 **THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
 that no WORTHY AND VETTED tool already does it before building anything.
 
-1. **DONE: #7-#27, #31, #39.** Decisions: `docs/requirements/decisions.md`
+1. **DONE: #7-#39, #50.** Decisions: `docs/requirements/decisions.md`
    -- READ FIRST, do not re-decide. Re-derive branch/PR state per
    `docs/handoff-protocol.md`; it drifts fast here.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
@@ -26,12 +26,12 @@ that no WORTHY AND VETTED tool already does it before building anything.
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
 3. **IN FLIGHT:** #51 (Phase 1 item 1.2 -- `lwb_proof_required`'s
-   `deny` now fails closed when it cannot read git; CI green except
-   `lwb-lanes`: 0 reviews in reviews/51/, needs a fresh review, not an
-   owner call). Also green and awaiting Auto-queue: #45, #46, #48, #50
-   (#50 is item 1.1). Dead re-cuts, don't touch: #40, #44, #47, #49 --
-   each superseded by the PR just named, red CI by design.
-4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
+   `deny` now fails closed when it cannot read git; 2 independent AGREE
+   reviews in reviews/51/, CI green, merging main to clear a conflict
+   with #50). Item 1.1 landed as #50 (4 rules on `main` now). Also
+   green and awaiting Auto-queue: #45, #46, #48. Dead re-cuts, don't
+   touch: #40, #44, #47, #49 -- each superseded, red CI by design.
+4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 4 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
 5. **DEFECT PATTERN:** "I could not check" must never share a
@@ -42,8 +42,8 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 14:36 UTC
-main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
+Generated: 2026-09-24 17:46 UTC
+main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
 CLI: claude
 Session: 01oyCUXLqcRyXy8deLZYtH
 
@@ -51,7 +51,7 @@ Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-22/22 proven
+23/23 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
