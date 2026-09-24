@@ -1191,3 +1191,202 @@ def test_independent_reviews_ordinary_single_valid_record_still_passes(tmp_path)
     assert ok is True, errors
     assert errors == []
     assert notices == []
+
+
+
+# ---------------------------------------------------------------------------
+# commit_files / _is_record_only_commit and MERGE commits.
+#
+# Plain `git diff-tree` (no -m/-c/--cc) prints NOTHING for a multi-parent
+# (merge) commit -- confirmed live against this repo's own history, not
+# just in these fixtures. `commit_files` used to run exactly that call
+# unconditionally, so every merge commit looked like it changed zero
+# files, and `_is_record_only_commit`'s own vacuous-`all()` guard then
+# (correctly, given that wrong input) treated a review-record-only merge
+# as a real content change -- stopping resolve_reviewable_head's walk at
+# the merge and staling the very records it had just brought in. These
+# tests exercise the fix: a merge's file list must come from its diff
+# against its FIRST PARENT specifically.
+# ---------------------------------------------------------------------------
+
+
+def _branch_name(repo) -> str:
+    return _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+
+
+def _merge_no_ff(repo, onto_branch: str, other_ref: str, message: str) -> str:
+    subprocess.run(["git", "checkout", "-q", onto_branch], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "merge", "--no-ff", "-q", "-m", message, other_ref],
+        cwd=repo,
+        check=True,
+    )
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_commit_files_uses_first_parent_diff_for_a_merge_commit(tmp_path):
+    """The live defect, reproduced in a throwaway repo: a merge whose
+    first-parent diff touches only reviews/ must report exactly those
+    files, not the empty list plain diff-tree gives a merge."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+
+    merge_sha = _merge_no_ff(repo, main_branch, "side", "merge review record")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        files = lwb_lanes.commit_files(merge_sha)
+        parents = lwb_lanes._commit_parents(merge_sha)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert files == ["reviews/9/verifier.json"]
+    assert len(parents) == 2
+    assert parents[0] == substantive
+
+
+def test_reviewable_head_skips_a_merge_that_only_brought_in_review_records(tmp_path):
+    """The consequence that actually matters: resolve_reviewable_head must
+    walk PAST a merge commit whose only content, relative to its first
+    parent, is under reviews/ or proof/ -- exactly like it already skips
+    an ordinary record-only commit."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+
+    _merge_no_ff(repo, main_branch, "side", "merge review record")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        got = lwb_lanes.resolve_reviewable_head("HEAD")
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == substantive
+
+
+def test_reviewable_head_does_not_skip_a_merge_carrying_real_content_too(tmp_path):
+    """The case that must NOT regress: a merge must never be able to
+    smuggle real content past the review requirement just by also
+    carrying a reviews/ file alongside it. A merge whose first-parent
+    diff touches BOTH a review record AND a real file is not record-only,
+    and resolve_reviewable_head must return the merge itself, not walk
+    past it."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+    _commit(repo, "core/other.py", "more code\n", "real content on the side branch too")
+
+    merge_sha = _merge_no_ff(repo, main_branch, "side", "merge side branch")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        files = lwb_lanes.commit_files(merge_sha)
+        got = lwb_lanes.resolve_reviewable_head("HEAD")
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert set(files) == {"reviews/9/verifier.json", "core/other.py"}
+    assert got == merge_sha
+
+
+def test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff(tmp_path):
+    """A merge whose first-parent diff is EMPTY (its tree is byte-identical
+    to its first parent's -- e.g. an `-s ours` no-op merge) is not the
+    same ambiguous case an ordinary empty commit is. `commit_files`
+    diffing a merge against its first parent specifically makes an empty
+    result here a PROVEN claim that nothing changed, so this is treated as
+    record-only (skippable) -- the opposite of the ordinary-commit guard,
+    and deliberately so: refusing to skip it would reproduce the exact
+    staling bug this mechanism exists to prevent, by stopping the walk at
+    a merge that changed nothing."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "unrelated.txt", "on the side branch only\n", "side content")
+
+    subprocess.run(["git", "checkout", "-q", main_branch], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "merge", "--no-ff", "-q", "-s", "ours", "-m", "ours merge, keep main's tree", "side"],
+        cwd=repo,
+        check=True,
+    )
+    merge_sha = _git(repo, "rev-parse", "HEAD")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        files = lwb_lanes.commit_files(merge_sha)
+        record_only = lwb_lanes._is_record_only_commit(merge_sha)
+        got = lwb_lanes.resolve_reviewable_head("HEAD")
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert files == []
+    assert record_only is True
+    assert got == substantive
+
+
+def test_is_record_only_commit_still_false_for_an_ordinary_empty_commit(tmp_path):
+    """Unchanged from before: a genuinely empty ORDINARY (non-merge) commit
+    stays NOT record-only -- the ambiguity this guard exists for is a
+    property of a single-parent commit having nothing to say about itself,
+    not something the merge fix should touch."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-q", "-m", "deliberately empty"],
+        cwd=repo,
+        check=True,
+    )
+    empty_sha = _git(repo, "rev-parse", "HEAD")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        assert lwb_lanes.commit_files(empty_sha) == []
+        assert len(lwb_lanes._commit_parents(empty_sha)) == 1
+        record_only = lwb_lanes._is_record_only_commit(empty_sha)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert record_only is False
+
+
+def test_commit_parents_root_commit_has_none_and_ordinary_commit_has_one(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    root = _commit(repo, "seed.txt", "seed\n", "seed")
+    child = _commit(repo, "core/thing.py", "code\n", "child")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        assert lwb_lanes._commit_parents(root) == []
+        assert lwb_lanes._commit_parents(child) == [root]
+    finally:
+        lwb_lanes.REPO_ROOT = original_root

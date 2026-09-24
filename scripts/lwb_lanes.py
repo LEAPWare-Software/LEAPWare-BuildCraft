@@ -258,11 +258,66 @@ def commit_agent(sha: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def commit_files(sha: str) -> list[str]:
-    # --root: a root commit (no parent, e.g. the first commit of a fresh
-    # test repo) otherwise shows no files at all under plain diff-tree.
+def _commit_parents(sha: str) -> list[str]:
+    """The parent shas of `sha`, in commit order. Empty for a root commit."""
     result = subprocess.run(
-        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha],
+        ["git", "rev-list", "--parents", "-n", "1", sha],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
+    tokens = result.stdout.split()
+    # tokens[0] is `sha` itself; everything after it is a parent.
+    return tokens[1:]
+
+
+def commit_files(sha: str) -> list[str]:
+    """The repo-relative paths `sha` changed.
+
+    For an ordinary (0- or 1-parent) commit this is unchanged from before:
+    a plain `--root` diff-tree (the `--root` flag matters only for a root
+    commit, which otherwise shows no files at all).
+
+    For a MERGE commit (2+ parents) this used to run that exact same plain
+    diff-tree call, and plain `diff-tree` with no `-m`/`-c`/`--cc` flag
+    prints NOTHING for a multi-parent commit -- not "this commit changed
+    nothing", but "diff-tree has nothing to say about a multi-parent
+    commit without being told how to collapse it to one tree first". That
+    silently starved every caller of a merge commit's real file list.
+    Confirmed live against this repo's own history: a `--no-ff` merge that
+    brought a reviewer's freshly-pushed record into a PR branch (a merge
+    whose first-parent diff touches only `reviews/<pr>/*.json`) showed a
+    plain diff-tree as empty, which `_is_record_only_commit` then read as
+    "no files changed" and (correctly, per its own vacuous-`all()` guard)
+    treated as NOT record-only -- so a merge that changed only review
+    records was judged as if it were a real content change, stopping
+    `resolve_reviewable_head`'s walk there and staling the very records
+    the merge had just brought in.
+    `-m` (the combined/multi-parent diff-tree mode) is not the fix either
+    -- it prints the union of the diff against EVERY parent, so for an
+    ordinary "merge origin/main into my branch" commit it pulls in the
+    entirety of main's own diff too, which is not what changed on the
+    branch being reviewed.
+    The correct comparison for a merge is against its FIRST parent only:
+    what this merge introduced, read the way `git log --first-parent`
+    reads history -- exactly the two-tree diff `git diff-tree
+    --no-commit-id --name-only -r <sha>^1 <sha>` (equivalently `git diff
+    --name-only <sha>^1 <sha>`) computes, with no special multi-parent
+    machinery involved at all.
+    """
+    parents = _commit_parents(sha)
+    if len(parents) >= 2:
+        argv = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", f"{sha}^1", sha]
+    else:
+        # --root: a root commit (no parent, e.g. the first commit of a
+        # fresh test repo) otherwise shows no files at all under plain
+        # diff-tree.
+        argv = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha]
+    result = subprocess.run(
+        argv,
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -297,13 +352,33 @@ def resolve_head_sha(rev_range: str) -> Optional[str]:
 def _is_record_only_commit(sha: str) -> bool:
     """True when every file `sha` touches lives under `reviews/` or `proof/`.
 
-    A commit with no files at all (e.g. an empty commit) is NOT record-only
-    — `all()` over an empty list is vacuously True, which would wrongly let
-    a no-op commit skip past the walk.
+    An empty file list (`commit_files(sha) == []`) can mean two genuinely
+    different things, and they must not share a return value:
+
+    - An ORDINARY (non-merge) commit with zero changed files is AMBIGUOUS.
+      Nothing here can tell a deliberate empty commit apart from anything
+      else an empty diff could represent, so this stays NOT record-only --
+      `all()` over an empty list is vacuously True, which would wrongly
+      let an unexplained no-op commit skip past the walk. This is the
+      original guard, unchanged for the non-merge case.
+
+    - A MERGE commit whose first-parent diff is empty is NOT ambiguous in
+      that way. `commit_files` (see its docstring) diffs a merge against
+      its first parent specifically, so an empty result here is a proven
+      claim: this merge's tree is byte-identical to its first parent's --
+      it changed literally nothing relative to the mainline it merged
+      into (a `-s ours` merge, or merging in a tree already identical to
+      the branch). Treating that as record-only (skippable) does NOT
+      carry the risk the non-merge guard exists to avoid: there is no
+      content to accidentally skip past, because there is none. Refusing
+      to skip it would instead reproduce the very staling bug this whole
+      mechanism exists to prevent -- it would stop the walk at a merge
+      that changed nothing and judge a review record for the real,
+      substantive commit underneath as stale against that merge's sha.
     """
     files = commit_files(sha)
     if not files:
-        return False
+        return len(_commit_parents(sha)) >= 2
     for f in files:
         posix = f.replace("\\", "/")
         if not (posix.startswith("reviews/") or posix.startswith("proof/")):
