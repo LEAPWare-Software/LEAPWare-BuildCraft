@@ -1,0 +1,218 @@
+{
+  "deliverable": "auto-queue-loop-fix-recut",
+  "pr": 48,
+  "author": "claude-sonnet5-recut47loopfix-session-2026-09-24",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "fe54159f5fe15aeccb67b79ce7a3bf60789b304b",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 26%]",
+        "........................................................................ [ 39%]",
+        "........................................................................ [ 53%]",
+        "........................................................................ [ 66%]",
+        "........................................................................ [ 79%]",
+        "........................................................................ [ 93%]",
+        ".....................................                                    [100%]",
+        "541 passed in 23.46s"
+      ],
+      "sha256": "fc2bf304bf280e6a5b15e88515f4be226f9cb45a463a6123bdf2e1873741c7c3",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........                                                                 [100%]",
+        "8 passed in 0.15s"
+      ],
+      "sha256": "7d033b6114e3b7e226dd134ddf87559ce2573e4749f27f5567211d071d888ecc",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+        "--head",
+        "fe54159f5fe15aeccb67b79ce7a3bf60789b304b"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+      "resolved_head": "fe54159f5fe15aeccb67b79ce7a3bf60789b304b"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+        "--head",
+        "fe54159f5fe15aeccb67b79ce7a3bf60789b304b",
+        "--pr-number",
+        "48"
+      ],
+      "exit": 1,
+      "expect_exit": 1,
+      "tail": [
+        "FAIL: fe54159f5fe1: touches a shared path and has 0 independent review(s) in reviews/48/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)"
+      ],
+      "sha256": "bb1138f423e5c1af5636b98106f8e4ebcbaffcd990ea65655bd839411a1f7a0c",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+      "resolved_head": "fe54159f5fe15aeccb67b79ce7a3bf60789b304b"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_hosted_runners.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-hosted-runners check passed"
+      ],
+      "sha256": "478ba8f94ab7a99f2aba42d1d15c7858c7fc81e42593314ec2a9ff67b979b261",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2967 bytes)"
+      ],
+      "sha256": "c4db8d574ca7c7785066948ca157e14206fca2f82fe3a105be89c845c3103f41",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    }
+  ],
+  "mutations": [
+    ".github/workflows/auto-queue.yml",
+    "scripts/cloud/auto_queue.py",
+    "tests/test_auto_queue.py",
+    "tests/test_workflows_parse.py",
+    "proof/48.json",
+    "HANDOFF.md"
+  ],
+  "unproven": [
+    "lwb-env-leak was not run locally: LWB_PRIVATE_NEEDLES is a CI-only secret, unset in this environment, so a local run would report UNCONFIGURED rather than a real pass.",
+    "lwb-lanes currently fails (recorded above, expect_exit=1) with '0 independent review(s) in reviews/48/, needs 1' -- expected and unresolved as of this record: this PR has not yet received its independent review. This record does not, and cannot, prove that gate green; a separate reviewer routine's AGREE record is what will.",
+    "lwb_build.py --check / plugin validators were not run: this PR touches neither core/, adapters/, nor plugins/, so no vendor rebuild is implicated, but they were not exercised either way.",
+    "Windows/macOS CI legs were not run locally; everything above ran on Linux/CPython in this container only.",
+    "This record's own PR number (48) is a best guess made before the PR was opened (the highest existing PR at commit time was #47), following the precedent set by PR #45/#46/#47 (see their own proof records' history of renumbering after the fact). If the real PR number differs, a follow-up commit renames this file and re-declares its 'pr' field, and this sentence is corrected then.",
+    "The reviewer's secondary, optional suggestion (treating 'already queued' as NOT READY rather than an error inside enqueue()) was deliberately NOT implemented -- it needs parsing GraphQL error text, which is fragile, and the reviewer offered it as an 'and/or', not a requirement. The loop-abort fix alone resolves the blocking defect (every PR behind an erroring one being silently unconsidered); the recurring-red nuisance from an already-queued PR failing every tick is a known, accepted follow-up, not fixed here.",
+    "The fix's consequence for a real GitHub Actions runner (how bash -e actually behaves across the loop body on a live Actions runner, versus the shell-semantics probe reasoned about here) was not observed on a live runner; this record proves the fix by parse-level regression test and by reproducing the reviewer's own bash -e probe shape locally, not by dispatching the real workflow."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "PR #47's real content ported onto a fresh branch off current main, verified against origin/main..origin/lwb-recut-44-autoqueue-trigger's diff (auto-queue.yml, scripts/cloud/auto_queue.py, tests/test_auto_queue.py, tests/test_workflows_parse.py) rather than re-derived from memory, excluding reviews/47/, proof/47.json and that branch's HANDOFF.md",
+      "met": true
+    },
+    {
+      "criterion": "B1 (the 'Enqueue if ready' step aborts the whole loop, starving every PR behind the first one that errors, because Actions runs run: blocks under bash -e by default) fixed with the reviewer's own minimal suggestion: a running exit code (rc) tracked across iterations and exit \"$rc\" after the loop, so every PR gets its own attempt while the step still fails overall on any error",
+      "met": true
+    },
+    {
+      "criterion": "Regression test added (test_auto_queue_enqueue_step_does_not_abort_the_loop_on_first_failure in tests/test_workflows_parse.py) asserting the step's run: text invokes auto_queue.py with a trailing '|| ...' on every loop iteration and re-raises a recorded failure after the loop, confirmed non-vacuous by reverting only the loop-abort fix (restoring the old 3-line loop body) and observing this new test (and only this new test) fail, then re-applying the fix and observing it pass again with 541/541 total",
+      "met": true
+    },
+    {
+      "criterion": "Reviewer's secondary, optional suggestion (treat 'already queued' as NOT READY rather than an error in enqueue()) deliberately NOT implemented, per the task's explicit instruction that the loop-continuation fix alone resolves the blocking defect",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green with no reduction in test count from skips: 540 (PR #47 baseline) -> 541 (added the one new regression test)",
+      "met": true
+    },
+    {
+      "criterion": "tests/test_workflows_parse.py -q green on its own and the edited auto-queue.yml remains valid YAML (an unparseable workflow produces NO CI run at all, not a red one)",
+      "met": true
+    },
+    {
+      "criterion": "reviews/ untouched by this work; reviews/47/cloud-reviewer-b.json's DISAGREE not deleted, edited, or superseded in place -- a fresh branch's empty reviews/48/ resolves the permanent-DISAGREE trap structurally, the same mechanic that produced #45, #46 and #47",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md's generated block regenerated via scripts/lwb_handoff.py --write as the LAST change on the branch, in the same commit as this proof record, so the proof-count/ordering trap documented in docs/handoff-protocol.md is not repeated",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
