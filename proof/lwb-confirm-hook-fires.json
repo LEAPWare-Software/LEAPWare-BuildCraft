@@ -1,5 +1,6 @@
 {
   "deliverable": "1.8-confirm-hook-fires-from-hooksjson",
+  "pr": 57,
   "author": "claude-code-track-a-session_012SWAwJYJ1cUjtpPZFhHZK2",
   "checked_by": "UNCHECKED-pending-independent-review",
   "commit": "195b942fcb86467d66307a51bde1c23715501086",
@@ -161,7 +162,7 @@
   ],
   "unproven": [
     "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string UNCHECKED-pending-independent-review, per this repo's convention (e.g. proof/39.json), rather than an invented or borrowed reviewer identity.",
-    "NO PR NUMBER IS DECLARED YET. Per the task this record was written under, I was told not to open a PR myself -- the parent session does that. proof/README.md's PR-authority rule requires a record ADDED by a PR to self-declare that PR's own number; whoever opens the PR for this branch must add a \"pr\" field here equal to that PR's number before it can clear lwb-proof-pr / check_new_proof_records_declare_pr.",
+    "PR NUMBER: resolved after this record was first authored. The subagent that did the verification work was told not to open a PR itself; the parent conductor session opened PR #57 for this branch and added \"pr\": 57 to this record in a follow-up commit, per proof/README.md's PR-authority rule.",
     "THE LIVE CLAUDE CODE SESSIONS THEMSELVES (the actual evidence for item 1.8) are not re-run as commands[] entries in this record -- each costs real Anthropic API usage, is not byte-for-byte reproducible (fresh session_id, timestamps, model routing), and running them again here would not change what already happened. Their exact commands, full transcripts' relevant fields, and the ledger files they produced are captured verbatim in docs/maintainers/hook-fires-verification-2026-09-24.md; the two `cat .../ledger-*.jsonl` commands[] entries above reproduce the ledger evidence that record quotes, byte for byte, with sha256 digests of their own.",
     "OS/VERSION COVERAGE: every command above, and both live Claude Code sessions, ran on one Linux container (Ubuntu 24.04.4 LTS, Python 3.11.15, Claude Code 2.1.282) only. Windows and macOS were not exercised for the live-session evidence; scripts/lwb_check_hook_launch.py (launch-mechanics only, not a live session) is the only piece of this that CI runs cross-platform.",
     "PERMISSION MODE: only --permission-mode dontAsk (with a --settings allow-list for Bash/Task) was exercised end-to-end. --dangerously-skip-permissions and --permission-mode bypassPermissions were tried first and refused outright by the CLI in this root-privileged container (\"cannot be used with root/sudo privileges\"), so they were never observed either firing or not firing the hook. Other permission modes were not tried.",
