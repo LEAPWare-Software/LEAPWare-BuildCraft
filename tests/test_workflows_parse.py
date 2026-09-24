@@ -115,6 +115,49 @@ def test_ci_workflow_still_declares_the_jobs_the_ruleset_requires():
         )
 
 
+def test_auto_queue_workflow_triggers_on_workflow_run_and_schedule_not_check_suite():
+    """The headline fix PR #44 exists for: `check_suite` never fires for a
+    suite GitHub Actions itself created, so the auto-queue workflow had
+    literally never run in this repository's history. A mutation
+    reverting `on:` back to `check_suite:`, or pointing `workflow_run`'s
+    `workflows` list at names that do not exist, must fail this test --
+    nothing else in this file asserts on the `on:` section at all.
+
+    PyYAML resolves the bare scalar key `on` to the boolean `True` (YAML
+    1.1's implicit typing), not the string `"on"` -- `data[True]`, not
+    `data["on"]`, is the trigger block.
+    """
+    yaml = _require_yaml()
+    path = REPO_ROOT / ".github" / "workflows" / "auto-queue.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    on = data.get(True)
+    assert on is not None, "auto-queue.yml has no 'on:' trigger block at all"
+    assert "check_suite" not in on, (
+        "check_suite never fires for a suite GitHub Actions itself created -- "
+        "this is the exact defect PR #44 fixes; it must not come back"
+    )
+
+    workflow_run = on.get("workflow_run")
+    assert workflow_run is not None, "auto-queue.yml must trigger on workflow_run"
+    workflows = workflow_run.get("workflows") or []
+    for name in ("CI", "Handoff"):
+        assert name in workflows, (
+            f"workflow_run.workflows is missing {name!r}: {workflows!r} -- the "
+            "required contexts come from CI, and Handoff runs on every PR too, "
+            "so firing on only one of them reintroduces the silent stall this "
+            "workflow exists to fix"
+        )
+
+    assert "schedule" in on, "auto-queue.yml must keep its schedule sweep as the retry/self-heal"
+
+    dispatch = on.get("workflow_dispatch")
+    assert dispatch is not None, "auto-queue.yml must keep workflow_dispatch for an explicit PR number"
+    pr_number_input = (dispatch.get("inputs") or {}).get("pr_number") or {}
+    assert pr_number_input.get("required") is True, "workflow_dispatch's pr_number input must stay required"
+    assert pr_number_input.get("type") == "string", "workflow_dispatch's pr_number input must stay a string"
+
+
 def test_step_names_with_a_colon_are_quoted():
     """The specific mistake that caused this, caught at its own shape.
 
