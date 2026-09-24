@@ -67,7 +67,7 @@ None. `options` is accepted by the schema and ignored by this rule.
 |---|---|
 | `off` | No check runs (the engine skips OFF rules before calling this one). |
 | `warn` | **Shipped default.** The finding is recorded (ledger, `permissionDecisionReason`) and the command proceeds. |
-| `deny` | The publish is blocked: `permissionDecision: "deny"`. |
+| `deny` | The publish is blocked: `permissionDecision: "deny"`. As of build-plan item 1.2, this also blocks when the rule cannot see enough to judge (`event.repo is None` or `event.repo.facts_incomplete`), with an honest "could not verify" reason -- see "DENY is advisory, not a security control" below. |
 
 Unlike `lwb_version`, which hardcodes WARN and can never deny, this rule
 uses `config.mode` verbatim — it **is** armable by policy.
@@ -110,58 +110,109 @@ process spawn. A worktree's `.git` pointer file is followed, so the
 
 ## When it says nothing, on purpose
 
+**In `warn` (and `off`), unchanged by build-plan item 1.2:**
+
 - `event.repo is None` — the adapter gathered no facts. **Absence of
   evidence is not evidence of absence.** This is what keeps the rule inert
   under an adapter that has not been taught to collect repo facts.
-- The command is not inside a git repository at all.
+- The command is not inside a git repository at all (also surfaces as
+  `event.repo is None` -- the adapter walked up to the filesystem root and
+  found no `.git`).
+- `event.repo.facts_incomplete` is True — the adapter looked but could not
+  fully read what it found (a proof directory or `.git/HEAD` existed but
+  was not READABLE). "Could not check", not "checked, found nothing".
 - Detached HEAD with no PR number on the command line: there is no
-  identifier for the claim, so there is nothing to ask for.
+  identifier for the claim, so there is nothing to ask for. **This one
+  stays silent in EVERY mode, including `deny`** — see below.
+
+**In `deny`, as of build-plan item 1.2, the first two of those four are NO
+LONGER silent** — see "Now fails closed" below. The third
+(`facts_incomplete`) is also no longer silent in `deny`. Only the fourth
+(detached HEAD, no PR number) remains silent in every mode; that is a
+deliberate, documented scope decision, not an oversight — see "Confirmed
+bypasses" below.
 
 ## DENY is advisory, not a security control
 
 `deny` mode blocks a publish this rule can SEE and can prove has no
 matching record. It is not a security boundary, and must not be relied
 on as one. An adversarial user -- or an agent trying to get past it --
-can defeat it. Confirmed bypasses, from independent review of PR #26:
+can defeat it.
 
-- **No facts, so silent, so permitted.** `event.repo is None` always
-  means allow (see "When it says nothing" above). Every one of these
-  permits under `deny` with no record at all. Precisely: a bare repo or a
-  missing `.git` yields no facts (`event.repo is None`), while a corrupt or
-  detached HEAD yields `RepoFacts(branch=None)` — different mechanisms,
-  identical outcome. An earlier version of this section said all four
-  "yield no facts"; the independent reviewer corrected it:
-  a bare repository, a directory with no `.git`, a corrupt `HEAD`, and a
-  detached HEAD.
+### Now fails closed (build-plan item 1.2)
+
+Until this change, `deny` mode PERMITTED a publishing command whenever it
+could not see enough to judge — `event.repo is None`, or
+`event.repo.facts_incomplete` — which is exactly the plan item's own
+framing: *"today it permits when it cannot read git, advertising
+enforcement it cannot deliver."* That gap is now closed, in `deny` only:
+
+- **`event.repo is None`.** A bare repository, a directory with no `.git`
+  at all, an adapter that gathers no facts, or a repo-facts collector that
+  crashed upstream — every one of these used to mean silent allow under
+  `deny`. Now, when the command is a genuine publish, `deny` returns a
+  Finding, with a reason that says plainly it could not verify anything —
+  never worded as "0 records found, none matching" (that exact false
+  framing is "Attack C", below).
+- **`event.repo.facts_incomplete` is True.** A proof directory or
+  `.git/HEAD` that exists but could not be read (permission denied, an I/O
+  error) — previously silent under `deny` for the same reason. Now denies,
+  with the same honest "could not verify" wording, carrying
+  `facts_incomplete_reason` when the adapter supplied one.
+
+**`warn` (and `off`) are UNCHANGED for both cases, deliberately**, per the
+plan item's own text: *"at `warn` a fail-closed default would warn on
+every Bash call in every repository with no `.git` or an unreadable one,
+which is worse than the blind spots it would close."* Only `deny` gained
+this behavior.
+
+This does not turn `deny` into a security control — a rule that fails
+closed on facts it cannot see is still trusting the adapter's own
+`cwd`-scoped view of the world (see the `cwd` limit below), and every
+other confirmed bypass in this section is unaffected. It closes exactly
+one documented gap: `deny` no longer silently downgrades itself to
+"report only" the moment it cannot read git.
+
+### Confirmed bypasses that remain, from independent review of PR #26 (and
+still open after 1.2)
+
+- **Detached HEAD, no PR number, in EVERY mode including `deny` — left
+  out of scope for build-plan item 1.2, by deliberate decision.**
+  `RepoFacts(branch=None, facts_incomplete=False)` means the adapter read
+  git just fine; there is simply no identifier for the claim being made.
+  This is a *different* kind of gap from "cannot read git" — the rule CAN
+  read git here — so it is not covered by 1.2's "fails closed when it
+  cannot read git" framing, and 1.2 does not change it. **Detaching HEAD
+  in one call and pushing in the next still defeats `deny` entirely**: the
+  first call reports no branch and passes; the second publishes with
+  `repo.branch is None` and no PR number, which this rule still treats as
+  having no identifier for the claim, and therefore nothing to ask for
+  (see "When it says nothing" above). No single Bash call needs to look
+  suspicious for either step. Closing this is a candidate for a LATER,
+  separate item, not this one.
 - **Undetected commands.** The command parser only recognizes a
   publish as the FIRST token of a segment (see "Under-match,
   deliberately"). All of these publish for real and are not seen:
   `git -C . push`, `(git push)`, `command git push`, `FOO=1 git push`,
   `echo $(git push)`, and `git.exe push`.
 
-**Detaching HEAD in one call and pushing in the next defeats `deny`
-entirely.** The first call reports no branch and passes; the second
-publishes with `repo.branch is None` and no PR number, which this rule
-already treats as having no identifier for the claim, and therefore
-nothing to ask for (see "When it says nothing"). No single Bash call
-needs to look suspicious for either step.
-
 **KNOWN LIMIT:** facts are gathered from the hook event's `cwd` -- the
 session's own working directory at the time of the call -- not from
 wherever a command actually runs. `cd ../other-repo && git push` is
 judged against the session repo's branch and proof records, not
 `../other-repo`'s (reviewer finding 4; plausible, not reproduced in this
-fix).
+fix). This is unaffected by 1.2: fail-closed still only fires when the
+SESSION repo's own facts are missing or incomplete, not when a command
+`cd`s into a different one that this rule never observes at all.
 
-**What would have to change before `deny` could be called a control:**
-`deny` would have to fail CLOSED -- block, not permit -- when a
-publishing command is seen but `event.repo is None` or the facts are
-otherwise incomplete. That is a deliberate, separate change: it is NOT
-made in this fix, because at `warn` a fail-closed default would warn on
-every Bash call in every repository with no `.git` or an unreadable one,
-which is worse than the blind spots it would close. Until that change
-ships, treat `deny` as a report-only gate with a stricter default, not
-as enforcement.
+**What changed, stated exactly so it cannot be overclaimed:** `deny` now
+fails CLOSED — blocks, not permits — when a publishing command is seen but
+`event.repo is None` or the facts are otherwise incomplete
+(`facts_incomplete`). That WAS the deliberate, separate change described
+here before item 1.2 shipped; it is now done. It does NOT make `deny` a
+security control (see above), it does NOT change `warn`'s behavior for
+either case, and it does NOT close the detached-HEAD-no-PR-number gap or
+the parser under-match list, both of which remain open by name.
 
 ## Parser blind spots, deliberately under-matching
 

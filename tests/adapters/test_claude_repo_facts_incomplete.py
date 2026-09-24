@@ -162,20 +162,40 @@ def _push_event(repo: RepoFacts) -> Event:
     return parse_event(raw, repo=repo)
 
 
-def test_incomplete_facts_do_not_produce_a_false_deny():
+def test_incomplete_facts_deny_honestly_not_falsely_under_deny():
     """Attack C from the independent review, at the layer that actually
     decides it: a proof directory that could not be counted, WITH a real
-    violation on the branch, under DENY mode. Before this fix,
+    violation on the branch, under DENY mode. Before the Attack C fix,
     `event.repo.proof_ids == ()` (an empty tuple is what an unreadable
     directory ALSO produced) was indistinguishable from "walked it, it
-    is empty" -- so the rule denied and claimed a count it never
-    actually obtained. After the fix, `facts_incomplete` makes the rule
-    stay silent instead."""
+    is empty" -- so the rule denied and claimed a count it never actually
+    obtained: "0 record(s) found ... none matching". That fix made the
+    rule stay silent instead.
+
+    Build-plan item 1.2 adds a THIRD outcome for DENY specifically: the
+    rule denies again, but now HONESTLY -- "could not verify", never the
+    false "0 record(s) found" framing Attack C exists to prevent. This is
+    not a reversion of the Attack C fix: the reason string is the thing
+    that must never lie, not the permit/deny bit itself."""
     repo = RepoFacts(branch="feature-x", proof_ids=(), facts_incomplete=True,
                       facts_incomplete_reason="could not read proof/: PermissionError")
     decision = evaluate(_push_event(repo), _DENY)
+    assert decision.permit is False
+    assert "could not verify" in (decision.deny_reason or "")
+    assert "record(s) found" not in (decision.deny_reason or "")
+
+
+def test_incomplete_facts_still_silent_under_warn():
+    """Same repo shape as above, WARN mode: unchanged by build-plan 1.2.
+    This is the direction that protects the ORIGINAL Attack C fix -- a
+    fail-closed WARN was explicitly rejected as "worse than the blind
+    spots it would close" (docs/rules/lwb-proof-required.md)."""
+    repo = RepoFacts(branch="feature-x", proof_ids=(), facts_incomplete=True,
+                      facts_incomplete_reason="could not read proof/: PermissionError")
+    warn = Policy(rules={"lwb_proof_required": RuleConfig(mode=RuleMode.WARN)})
+    decision = evaluate(_push_event(repo), warn)
     assert decision.permit is True
-    assert decision.deny_reason is None
+    assert decision.warnings == []
 
 
 def test_incomplete_facts_still_deny_normally_once_readable():
@@ -282,24 +302,53 @@ def test_shipped_hook_surfaces_an_unreadable_head_as_incomplete_not_silent(tmp_p
     payload = _run_hook(work, _hook_json("git push -u origin HEAD", work), _ARMED, tmp_path)
     output = payload["hookSpecificOutput"]
 
-    assert output["permissionDecision"] == "allow", output
+    # Build-plan item 1.2: armed DENY now fails closed on incomplete facts,
+    # so this is no longer a silent "allow" -- it is a deny with an honest
+    # reason, PLUS the separate hook-level "repo facts incomplete" marker
+    # this test originally existed to pin. Both must be present: the
+    # marker names WHY the facts are incomplete, the deny reason names
+    # that lwb_proof_required could not verify anything because of it.
+    assert output["permissionDecision"] == "deny", output
     reason = output.get("permissionDecisionReason", "")
     assert "lwb: repo facts incomplete" in reason
+    assert "could not verify" in reason
 
 
-def test_shipped_hook_a_genuine_clean_pass_carries_no_incompleteness_marker(tmp_path):
-    """Control: a LEGITIMATELY empty repo (no .git at all --
-    collect_repo_facts returns None outright) must stay exactly as quiet
-    as before. The marker must appear ONLY for a read that actually
-    failed, never for the ordinary no-repo case."""
+def test_shipped_hook_a_genuine_no_repo_case_also_now_fails_closed_under_deny(tmp_path):
+    """A LEGITIMATELY empty repo (no `.git` at all -- `collect_repo_facts`
+    returns None outright, so no `facts_incomplete` marker ever applies)
+    used to render as a silent "allow" even under an armed DENY policy --
+    exactly the "No facts, so silent, so permitted" bypass build-plan item
+    1.2 closes. It must now deny too, honestly, with neither hook-level
+    incompleteness marker (there is nothing incomplete here -- there are
+    no facts at all, a different situation)."""
     work = tmp_path / "consumer"
     work.mkdir()
 
     payload = _run_hook(work, _hook_json("git push -u origin HEAD", work), _ARMED, tmp_path)
     output = payload["hookSpecificOutput"]
 
+    assert output["permissionDecision"] == "deny", output
+    reason = output.get("permissionDecisionReason", "")
+    assert "could not verify" in reason
+    assert "lwb: repo facts incomplete" not in reason
+    assert "lwb: repo facts unavailable" not in reason
+
+
+def test_shipped_hook_a_genuine_no_repo_case_stays_a_silent_allow_under_warn(tmp_path):
+    """Same no-`.git`-at-all case as above, but the shipped default policy
+    (WARN) -- unchanged by build-plan 1.2. Confirms the fail-closed change
+    is scoped to an explicitly ARMED deny policy, not to every install."""
+    work = tmp_path / "consumer"
+    work.mkdir()
+
+    warn_policy = {"$schema": "./schema.json", "rules": {"lwb_proof_required": {"mode": "warn"}}}
+    payload = _run_hook(work, _hook_json("git push -u origin HEAD", work), warn_policy, tmp_path)
+    output = payload["hookSpecificOutput"]
+
     assert output["permissionDecision"] == "allow", output
     reason = output.get("permissionDecisionReason", "")
+    assert "could not verify" not in reason
     assert "lwb: repo facts incomplete" not in reason
     assert "lwb: repo facts unavailable" not in reason
 
