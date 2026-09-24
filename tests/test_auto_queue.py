@@ -116,3 +116,192 @@ def test_refuses_closed_draft_and_wrong_base(monkeypatch, pr, reason):
     monkeypatch.setattr(auto_queue, "enqueue", lambda *a: called.append(a) or True)
     assert auto_queue.main() == auto_queue.EXIT_NOT_READY, reason
     assert called == [], f"must not enqueue a {reason} pull request"
+
+def test_resolve_pr_numbers_from_workflow_dispatch():
+    """workflow_dispatch's pr_number input names the PR explicitly."""
+    numbers = auto_queue.resolve_pr_numbers({"inputs": {"pr_number": "42"}}, "workflow_dispatch")
+    assert numbers == [42]
+
+
+def test_resolve_pr_numbers_from_workflow_dispatch_rejects_non_numeric():
+    numbers = auto_queue.resolve_pr_numbers(
+        {"inputs": {"pr_number": "not-a-number"}}, "workflow_dispatch"
+    )
+    assert numbers is None
+
+
+def test_resolve_pr_numbers_from_workflow_run_uses_head_sha_not_pull_requests(monkeypatch):
+    """`workflow_run.pull_requests` is documented unreliable and can be
+    empty even when the commit has an open PR -- so it must never be read.
+    Resolution goes through `commits/{sha}/pulls` instead."""
+    event = {
+        "workflow_run": {
+            "head_sha": "deadbeef",
+            # Deliberately empty, as GitHub's own docs say it can be.
+            "pull_requests": [],
+        }
+    }
+    calls = []
+
+    def fake_api(path):
+        calls.append(path)
+        assert path == "repos/LEAPWare-Software/LEAPWare-BuildCraft/commits/deadbeef/pulls"
+        return [{"number": 7, "state": "open", "base": {"ref": "main"}}]
+
+    monkeypatch.setattr(auto_queue, "_api", fake_api)
+    numbers = auto_queue.resolve_pr_numbers(event, "workflow_run")
+    assert numbers == [7]
+    assert calls, "must resolve from the head sha, not trust the empty pull_requests list"
+
+
+def test_resolve_pr_numbers_from_workflow_run_excludes_closed_and_wrong_base(monkeypatch):
+    event = {"workflow_run": {"head_sha": "deadbeef", "pull_requests": []}}
+    monkeypatch.setattr(
+        auto_queue,
+        "_api",
+        lambda p: [
+            {"number": 1, "state": "closed", "base": {"ref": "main"}},
+            {"number": 2, "state": "open", "base": {"ref": "other"}},
+            {"number": 3, "state": "open", "base": {"ref": "main"}},
+        ],
+    )
+    numbers = auto_queue.resolve_pr_numbers(event, "workflow_run")
+    assert numbers == [3]
+
+
+def test_resolve_pr_numbers_from_workflow_run_missing_sha_is_unresolved():
+    numbers = auto_queue.resolve_pr_numbers({"workflow_run": {}}, "workflow_run")
+    assert numbers is None
+
+
+def test_resolve_pr_numbers_from_workflow_run_unreadable_api_is_unresolved(monkeypatch):
+    monkeypatch.setattr(auto_queue, "_api", lambda p: None)
+    numbers = auto_queue.resolve_pr_numbers({"workflow_run": {"head_sha": "deadbeef"}}, "workflow_run")
+    assert numbers is None
+
+
+def test_resolve_pr_numbers_from_schedule_sweeps_every_open_pr(monkeypatch):
+    """Neither `inputs` nor `workflow_run` is present on a schedule event --
+    every open PR targeting main is swept. This is the legitimate case
+    that an event-shape-only check used to over-generalize from: an empty
+    event dict sweeps ONLY because event_name is genuinely "schedule"."""
+    calls = []
+
+    def fake_api(path):
+        calls.append(path)
+        assert path == "repos/LEAPWare-Software/LEAPWare-BuildCraft/pulls?state=open&base=main&per_page=100"
+        return [{"number": 5}, {"number": 9}]
+
+    monkeypatch.setattr(auto_queue, "_api", fake_api)
+    numbers = auto_queue.resolve_pr_numbers({}, "schedule")
+    assert numbers == [5, 9]
+    assert calls
+
+
+def test_resolve_pr_numbers_from_schedule_unreadable_api_is_unresolved(monkeypatch):
+    monkeypatch.setattr(auto_queue, "_api", lambda p: None)
+    numbers = auto_queue.resolve_pr_numbers({}, "schedule")
+    assert numbers is None
+
+
+def test_resolve_pr_numbers_non_schedule_event_with_empty_payload_does_not_sweep(monkeypatch):
+    """The bug an independent reviewer found: an unreadable/missing event
+    payload must NOT silently escalate a targeted run into a repo-wide
+    sweep. `event_name` (not the event dict's shape) is what gates the
+    sweep, so a workflow_dispatch or workflow_run event that arrives with
+    an empty/unreadable `{}` payload must come back unresolved, and must
+    never fall through to the "sweep every open PR" API call."""
+    calls = []
+    monkeypatch.setattr(auto_queue, "_api", lambda p: calls.append(p) or None)
+
+    for event_name in ("workflow_dispatch", "workflow_run"):
+        numbers = auto_queue.resolve_pr_numbers({}, event_name)
+        assert numbers is None, f"event_name={event_name!r} must not sweep on an empty payload"
+
+    assert calls == [], "an empty payload on a non-schedule event must never call the API at all"
+
+
+def test_resolve_pr_numbers_schedule_event_name_still_sweeps_with_empty_event(monkeypatch):
+    """The legitimate case the fix above must not break: event_name ==
+    "schedule" sweeps correctly even with a genuinely empty event dict."""
+    monkeypatch.setattr(
+        auto_queue,
+        "_api",
+        lambda p: [{"number": 11}, {"number": 12}],
+    )
+    numbers = auto_queue.resolve_pr_numbers({}, "schedule")
+    assert numbers == [11, 12]
+
+
+def test_emit_find_prs_prints_github_output_shape(monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    monkeypatch.setattr(auto_queue, "resolve_pr_numbers", lambda event, event_name: [1, 2, 3])
+    assert auto_queue.emit_find_prs() == 0
+    out = capsys.readouterr().out
+    assert "prs=1,2,3" in out
+
+
+def test_emit_find_prs_unresolved_prints_empty_prs_and_does_not_fail(monkeypatch, capsys):
+    """A lookup failure must not fail the job -- the schedule sweep and the
+    next workflow_run get another chance.
+
+    This also pins the fix for a real defect: `emit_find_prs` used to print
+    its own `NOTICE: ...` diagnostic to stdout, which the workflow appends
+    straight into `$GITHUB_OUTPUT` -- a NOTICE line with no `=` in it makes
+    the Actions runner treat that file as malformed and fail the step
+    outright. So this asserts the actual LINE STRUCTURE of stdout, not a
+    substring: stdout must be exactly the `prs=` line and nothing else, and
+    the NOTICE text must land on stderr instead.
+
+    Scope, stated precisely because an earlier version of this docstring
+    overclaimed it: `resolve_pr_numbers` is stubbed out here, so `_api` is
+    never called and this test pins ONLY `emit_find_prs`'s own NOTICE.
+    `_api`'s own stderr-vs-stdout behaviour is pinned separately by
+    `test_api_sends_notice_diagnostics_to_stderr_on_a_failing_call` and
+    `test_api_sends_notice_diagnostics_to_stderr_on_non_json_output` below.
+    """
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    monkeypatch.setattr(auto_queue, "resolve_pr_numbers", lambda event, event_name: None)
+    assert auto_queue.emit_find_prs() == 0
+    captured = capsys.readouterr()
+    stdout_lines = [line for line in captured.out.splitlines() if line.strip()]
+    assert stdout_lines == ["prs="], (
+        "stdout must contain ONLY the prs= GITHUB_OUTPUT line -- anything else "
+        f"here lands in $GITHUB_OUTPUT too: {stdout_lines!r}"
+    )
+    assert "NOTICE" in captured.err
+    assert "NOTICE" not in captured.out
+
+
+def test_api_sends_notice_diagnostics_to_stderr_on_a_failing_call(monkeypatch, capsys):
+    """`_api` itself, actually exercised -- not `resolve_pr_numbers` or
+    `emit_find_prs` standing in for it.
+
+    Found by independent review of PR #44 (finding B1): the test above
+    stubs `resolve_pr_numbers` directly, so `_api` is never called during
+    it, and its assertions can only ever observe `emit_find_prs`'s own
+    NOTICE print. `_api`'s two NOTICE prints (a failing `gh` invocation,
+    and non-JSON output) were therefore shipped correct but untested. This
+    monkeypatches `_run` -- one level below `_api` -- to simulate `gh api`
+    exiting non-zero, and calls `_api` directly.
+    """
+    monkeypatch.setattr(auto_queue, "_run", lambda args: (1, "", "boom: gh not authenticated"))
+    result = auto_queue._api("repos/x/y/pulls")
+    assert result is None
+    captured = capsys.readouterr()
+    assert captured.out == "", f"_api must not print to stdout: {captured.out!r}"
+    assert "NOTICE" in captured.err
+    assert "boom: gh not authenticated" in captured.err
+
+
+def test_api_sends_notice_diagnostics_to_stderr_on_non_json_output(monkeypatch, capsys):
+    """`_api`'s other stderr branch: a `gh api` call that exits 0 but
+    returns output that is not valid JSON."""
+    monkeypatch.setattr(auto_queue, "_run", lambda args: (0, "not json at all", ""))
+    result = auto_queue._api("repos/x/y/pulls")
+    assert result is None
+    captured = capsys.readouterr()
+    assert captured.out == "", f"_api must not print to stdout: {captured.out!r}"
+    assert "NOTICE" in captured.err
+    assert "non-JSON" in captured.err
+

@@ -20,9 +20,40 @@ name: Auto-queue
 # EVERY TRIGGER RUNS THE DEFAULT BRANCH'S CODE, never the pull request's -- a PR must
 # never be able to edit the job that decides whether it may merge.
 
+# TRIGGERS.
+#
+# `check_suite` never fires for a suite GitHub Actions itself created --
+# a built-in recursion guard -- so the automatic path built on it never ran
+# once, in this repo's entire history, while ~18 check suites completed on
+# open PRs the same day (measured 2026-09-19). This is that defect's fix.
+#
+# `workflow_run` on BOTH `CI` and `Handoff`. CORRECTED CLAIM (found false by
+# independent review of PR #44, finding B2): an earlier version of this
+# comment said firing on CI alone would read Handoff's check while still
+# pending and stall. Measured against the live ruleset
+# (`gh api repos/.../rules/branches/main`): `Handoff` is not among main's
+# required status-check contexts at all -- only `test (*)` and
+# `lwb-portable (*)` legs are required, and every one of those is produced
+# by the CI workflow. CI's own `workflow_run` "completed" event fires only
+# once ALL of CI's jobs (which produce all the required contexts) have
+# finished, so firing on CI alone is already sufficient for correctness.
+# Listening to Handoff finishing too is not required for that reason -- it
+# is harmless belt-and-braces, a second chance in case a CI-triggered run
+# is missed, delayed, or skipped, not a correctness requirement.
+#
+# `schedule`, every 15 minutes: the retry and the self-heal. It covers a
+# workflow_run that never lands, one GitHub skips, and a check that
+# completed before this fix shipped. Deliberate belt-and-braces, not
+# redundancy to trim.
+#
+# `workflow_dispatch` is unchanged: an explicit PR number, for a human or a
+# routine that already knows which PR it means.
 on:
-  check_suite:
+  workflow_run:
+    workflows: ["CI", "Handoff"]
     types: [completed]
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       pr_number:
@@ -35,7 +66,12 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: auto-queue-${{ github.event.inputs.pr_number || github.event.check_suite.head_sha }}
+  # Keyed on whatever actually distinguishes this run: the dispatch input
+  # when given, else the workflow_run's head sha, else the run id (the
+  # scheduled sweep carries neither, and github.run_id is always unique --
+  # the sweep does not need to serialize against itself, only avoid two
+  # runs believing they share state they don't).
+  group: auto-queue-${{ github.event.inputs.pr_number || github.event.workflow_run.head_sha || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -43,6 +79,14 @@ jobs:
     name: "Enqueue when every required check is green"
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # `workflow_run: types: [completed]` fires for conclusion 'failure',
+    # 'cancelled' and 'skipped' just as readily as 'success' -- nothing else
+    # in this workflow inspects that sibling field, so a failed CI run would
+    # otherwise still drive a full (harmless but wasteful) resolve-and-enqueue
+    # attempt. Non-workflow_run triggers (schedule, workflow_dispatch) carry
+    # no conclusion at all and must not be gated by it.
+    # N3, independent review of PR #44.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     steps:
       # The default branch only. None of these triggers may run pull request code.
       - name: Check out the default branch
@@ -54,21 +98,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      # THE DECISION LIVES IN scripts/cloud/auto_queue.py -- resolve_pr_numbers
+      # and emit_find_prs -- so it is unit-tested rather than embedded here.
+      # It handles all three event shapes: workflow_dispatch's pr_number
+      # input, workflow_run resolved from the head sha via
+      # `commits/{sha}/pulls` (event.workflow_run.pull_requests is
+      # unreliable and can be empty), and schedule swept as every open PR
+      # targeting main. Emits the same `prs=` GITHUB_OUTPUT this step
+      # always has, so every downstream step is untouched.
       - name: Find the pull requests this event concerns
         id: find
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, os, subprocess
-          event = json.load(open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8"))
-          manual = (event.get("inputs") or {}).get("pr_number")
-          if manual:
-              print(f"prs={manual}")
-          else:
-              prs = [str(p["number"]) for p in (event.get("check_suite") or {}).get("pull_requests") or []]
-              print("prs=" + ",".join(prs))
-          PY
+        run: python scripts/cloud/auto_queue.py --find-prs >> "$GITHUB_OUTPUT"
 
       # THE BUILT-IN TOKEN CANNOT LAND A PULL REQUEST HERE, and the failure
       # is silent. An enqueue made as `github-actions[bot]` does start the
@@ -103,13 +145,30 @@ jobs:
           fi
           echo "AUTO_TOKEN_QUEUE is present."
 
+      # B1, independent review of PR #47 (this workflow's prior recut of
+      # #44): Actions runs `run:` blocks under `bash -e` by default, and
+      # `auto_queue.py`'s main() returns EXIT_ERROR (1) for several
+      # ordinary, expected outcomes -- e.g. a rejected enqueue mutation if
+      # anything was pushed between the check passing and this job running
+      # (see the module docstring), an unreadable PR, or an unreadable
+      # ruleset. Under `-e`, the first such nonzero exit aborted the whole
+      # step immediately, so every PR after it in that tick's list was
+      # silently never considered -- and the schedule sweep lists PRs
+      # newest-first, so the newest open PR gated every older one. `rc`
+      # tracks failures across iterations instead of letting `-e` kill the
+      # loop early: every PR in the list now gets its own attempt
+      # regardless of an earlier one's outcome, and the step still fails
+      # overall (via `exit "$rc"`) if any PR errored, so genuine problems
+      # stay visible in CI.
       - name: Enqueue if ready
         if: steps.find.outputs.prs != ''
         env:
           GH_TOKEN: ${{ secrets.AUTO_TOKEN_QUEUE }}
         run: |
+          rc=0
           for pr in $(echo "${{ steps.find.outputs.prs }}" | tr ',' ' '); do
             echo "::group::PR #$pr"
-            LWB_PR_NUMBER="$pr" python scripts/cloud/auto_queue.py
+            LWB_PR_NUMBER="$pr" python scripts/cloud/auto_queue.py || rc=1
             echo "::endgroup::"
           done
+          exit "$rc"
