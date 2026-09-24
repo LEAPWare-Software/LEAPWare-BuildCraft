@@ -35,7 +35,7 @@ import os
 import re
 import zlib
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from lwb_core.events import RepoFacts
 
@@ -419,6 +419,58 @@ def _read_exempt_shas(repo_root: Path) -> Dict[str, str]:
     return {}
 
 
+def _collect_proven_pr_numbers(repo_root: Path) -> Set[str]:
+    """PR numbers every proof record DECLARES in its own content (`"pr": N`).
+
+    `collect_proof_ids_ex` answers "which records exist" from FILENAMES
+    alone, by design (see its own docstring) -- but `scripts/lwb_check_proof.py`'s
+    `check_coverage`, the CI job this function mirrors, matches a landed
+    squash-merge by BOTH its filename-embedded id and any record's `"pr"`
+    field, because a record is legitimately allowed to be named after its
+    branch (`proof/<branch>.json`) rather than its PR number and still
+    prove that PR by declaring it in content. Without this, a record named
+    for its branch was invisible to `collect_landed_unproven`'s `pr not in
+    known` test even though it names the very PR being checked --
+    including, concretely, this repository's own `proof/<branch>.json`
+    style records. Found by an independent reviewer of PR #49, reproduced
+    against CI's own logic.
+
+    Bounded exactly like `collect_matched_proof_facts`: each file capped at
+    `_MAX_PROOF_RECORD_BYTES`, at most `_MAX_RECORDS` files walked (shared
+    with `collect_proof_ids_ex`, applied here independently since this is a
+    separate walk), and every per-file failure (oversized, unreadable, not
+    JSON, not an object, `"pr"` not an int) is skipped rather than raised --
+    the same fail-quiet contract as the rest of this module. Returns an
+    empty set on any directory-level failure too; this is a best-effort
+    widening of what already-known coverage looks like, not a fact whose
+    absence should ever surface as `facts_incomplete`.
+    """
+    proven: Set[str] = set()
+    count = 0
+    for relative in PROOF_DIRS:
+        directory = repo_root.joinpath(*relative.split("/"))
+        try:
+            entries = sorted(directory.rglob("*.json"))
+        except OSError:
+            continue
+        for path in entries:
+            if count >= _MAX_RECORDS:
+                return proven
+            count += 1
+            try:
+                if not path.is_file() or path.stat().st_size > _MAX_PROOF_RECORD_BYTES:
+                    continue
+                data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            pr = data.get("pr")
+            if isinstance(pr, int) and not isinstance(pr, bool):
+                proven.add(str(pr))
+    return proven
+
+
 def collect_landed_unproven(repo_root: Path) -> Tuple[str, ...]:
     """Best-effort, bounded, LOCAL scan for landed deliverables with no record.
 
@@ -429,7 +481,14 @@ def collect_landed_unproven(repo_root: Path) -> Tuple[str, ...]:
     module can run: rather than `git log` over a range, it walks loose
     commit objects directly (see `_read_loose_commit`), first-parent
     only, from HEAD, up to `_MAX_LANDED_WALK` commits, stopping the
-    moment it reaches one that is not a loose object.
+    moment it reaches one that is not a loose object. A "matching record"
+    means the same two things `check_coverage` accepts: an id derived from
+    the record's FILENAME (`collect_proof_ids_ex`) or a `"pr"` field
+    DECLARED IN the record's content (`_collect_proven_pr_numbers`) -- a
+    record named after its branch rather than its PR number still counts.
+    An earlier version of this function checked only the filename half,
+    which false-positived on exactly this repository's own branch-named
+    records; found by an independent reviewer of PR #49.
 
     That stopping point is an ACCEPTED, NAMED limit, not a bug: a fresh
     clone transfers its history as a packfile, and `git gc` packs loose
@@ -461,7 +520,7 @@ def collect_landed_unproven(repo_root: Path) -> Tuple[str, ...]:
         known_ids, _ = collect_proof_ids_ex(repo_root)
     except OSError:
         return ()
-    known = set(known_ids)
+    known = set(known_ids) | _collect_proven_pr_numbers(repo_root)
     exempt = _read_exempt_shas(repo_root)
 
     found: List[str] = []
