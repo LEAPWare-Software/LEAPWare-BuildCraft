@@ -27,11 +27,11 @@ that no WORTHY AND VETTED tool already does it before building anything.
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT:** #39 (this PR -- re-cuts dead #38/#37/#35/#30, don't
-   touch any). Segment-collision gate defect fixed (author id renamed);
-   blocked only on `lwb-lanes`: 0 reviews in reviews/39/ -- needs a fresh
-   review, not an owner call. #29 (runbook, conflicts w/ main), #32 (#27
-   correction). Re-derive SHAs.
+3. **IN FLIGHT.** #39 MERGED, #29 CLOSED unmerged. #27 correction:
+   #32->#41->#42->#43 each PERMANENTLY BLOCKED in turn, superseded by
+   the next re-cut. **#46 is now IN FLIGHT**, needs its own review
+   naming its head (none yet, by design, D20). Re-derive PR/review
+   state per `docs/handoff-protocol.md`.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
@@ -43,16 +43,16 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 20:02 UTC
-main SHA: bfe850796969980545811e1ffa551b9143965faf
+Generated: 2026-09-24 07:45 UTC
+main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
 CLI: claude
-Session: conductor-track-a-e4242f53
+Session: session_01EkvcWAEAV2sJYoN51CPrTF
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-21/21 proven
+22/22 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
