@@ -1,0 +1,173 @@
+{
+  "deliverable": "1.8-confirm-hook-fires-from-hooksjson",
+  "author": "claude-code-track-a-session_012SWAwJYJ1cUjtpPZFhHZK2",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "195b942fcb86467d66307a51bde1c23715501086",
+  "commands": [
+    {
+      "argv": ["python3", "-m", "pytest", "tests/", "-q"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 12%]",
+        "........................................................................ [ 24%]",
+        "........................................................................ [ 36%]",
+        "........................................................................ [ 48%]",
+        "........................................................................ [ 60%]",
+        "........................................................................ [ 72%]",
+        "........................................................................ [ 85%]",
+        "........................................................................ [ 97%]",
+        "................                                                         [100%]",
+        "592 passed in 24.93s"
+      ],
+      "sha256": "06246e1b29bf9c45dcca3115f854d63e8f6cd4aabaa6a31fc507971779b12a1c",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": ["python3", "scripts/lwb_build.py", "--check"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python3", "scripts/lwb_check_hook_launch.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-portable check passed"],
+      "sha256": "b48fc74400ced6df61ac28ff5edec0a81eb23026b48768bb20d1e52c93f08d7d",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python3", "scripts/lwb_validate_claude_plugin.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["Claude plugin validation passed"],
+      "sha256": "619ada789ca468110703bf240cbe66ae005fcda31587c5b2854057af0facf306",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python3", "scripts/lwb_check_prefix.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-prefix check passed"],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python3", "scripts/lwb_check_no_instruction_dep.py"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": ["lwb-no-instruction-dep check passed"],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": ["python3", "scripts/lwb_check_state_claims.py", "--repo", "."],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:47: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-24 13:07 UTC",
+        "HANDOFF.md:48: INFO (git-verified): recorded main SHA e5f29bfaccec90199f983b778c1d7689b8c24d33 is live main's first parent e5f29bfaccec90199f983b778c1d7689b8c24d33 (live main is now 6afc545646faa9b241ffe60ee4c612f50e4437f8) -- verified by git",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "f9ac46cbfa390abb5f523043969d1b5780ebbb6d46d4738d74af22d034630660",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": ["cat", "/tmp/lwb-hook-scratch/proof-build/ledger-bash.jsonl"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "{\"timestamp\": \"2026-09-24T20:17:34.440553+00:00\", \"hook_event\": \"PreToolUse\", \"tool_name\": \"Bash\", \"session_id\": \"03c8c1e5-6749-5af0-94c6-8fd72836d10c\", \"permit\": true, \"deny_reason\": null, \"warnings\": [\"lwb 0.1.0: reporting only, no policy enforced yet\"], \"findings\": [{\"rule_id\": \"lwb_version\", \"mode\": \"warn\", \"reason\": \"lwb 0.1.0: reporting only, no policy enforced yet\"}]}"
+      ],
+      "sha256": "62d4f007ce0f63457e740789ed271e3cefa87b2a191cac34c16ad3ffa30b9d91",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": ["cat", "/tmp/lwb-hook-scratch/proof-build/ledger-agent.jsonl"],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "{\"timestamp\": \"2026-09-24T20:17:48.746823+00:00\", \"hook_event\": \"PreToolUse\", \"tool_name\": \"Agent\", \"session_id\": \"03c8c1e5-6749-5af0-94c6-8fd72836d10c\", \"permit\": true, \"deny_reason\": null, \"warnings\": [\"lwb 0.1.0: reporting only, no policy enforced yet\"], \"findings\": [{\"rule_id\": \"lwb_version\", \"mode\": \"warn\", \"reason\": \"lwb 0.1.0: reporting only, no policy enforced yet\"}]}"
+      ],
+      "sha256": "4fb950dbc317accafa2ca9abc312b58781428bcbf9c02ca930cee8a5889fb76e",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "A real, live, non-simulated Claude Code session (not scripts/lwb_check_hook_launch.py's subprocess simulation of the launch command) loads the lwb plugin via Claude Code's own documented plugin-loading path (--plugin-dir) from an isolated scratch directory outside this checkout.",
+      "met": true
+    },
+    {
+      "criterion": "That session is given a prompt guaranteed to cause a real Bash tool call, and lwb_hook.py's ledger (LWB_LEDGER_PATH pointed at a controlled file) gains a PreToolUse/Bash entry as a direct result.",
+      "met": true
+    },
+    {
+      "criterion": "The Agent matcher is also exercised (a prompt causing a real subagent/Task-tool dispatch), since hooks.json registers Agent and Bash as two independent PreToolUse entries that could fail independently -- not just the Bash matcher.",
+      "met": true
+    },
+    {
+      "criterion": "The nested session's own transcript (--output-format json) is captured as corroborating evidence alongside the ledger file.",
+      "met": true
+    },
+    {
+      "criterion": "A concrete, falsifiable verdict is recorded with exact reproduction commands, environment (OS, Python, Claude Code version), and explicit statement of what is NOT proven (OS/version coverage, permission mode, policy content) -- see docs/maintainers/hook-fires-verification-2026-09-24.md.",
+      "met": true
+    },
+    {
+      "criterion": "The \"never observed\" claims in HANDOFF.md and docs/requirements/build-plan.md's item 1.8 row are updated to point at this evidence, without overclaiming beyond what was tested.",
+      "met": true
+    },
+    {
+      "criterion": "python -m pytest tests/ -q remains green after this deliverable's changes.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- not measured from a session transcript in this run; the two nested Claude Code sessions launched as evidence each report their own usage in their own --output-format json transcripts (not this outer session's usage), and those numbers are not this record's tokens either -- they measure the SUBJECT under test, not the work of writing this record."
+  },
+  "mutations": [
+    "docs/maintainers/hook-fires-verification-2026-09-24.md: new -- the reproduction, environment, evidence, and explicit scope limits for item 1.8",
+    "docs/requirements/build-plan.md: item 1.8's row updated from \"never once observed\" to CONFIRMED, pointing at the new doc, with the same OS/version caveat repeated inline",
+    "HANDOFF.md: item 5's \"the hook has still never been seen to fire\" sentence updated to point at the new doc; the file's own literal home-directory checkout path was found and removed from an earlier draft of the new doc by this branch's own python -m pytest tests/ -q run (tests/test_lwb_check_env_leak.py), then fixed in a follow-up commit -- see that commit's message",
+    "proof/lwb-confirm-hook-fires.json: this record"
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string UNCHECKED-pending-independent-review, per this repo's convention (e.g. proof/39.json), rather than an invented or borrowed reviewer identity.",
+    "NO PR NUMBER IS DECLARED YET. Per the task this record was written under, I was told not to open a PR myself -- the parent session does that. proof/README.md's PR-authority rule requires a record ADDED by a PR to self-declare that PR's own number; whoever opens the PR for this branch must add a \"pr\" field here equal to that PR's number before it can clear lwb-proof-pr / check_new_proof_records_declare_pr.",
+    "THE LIVE CLAUDE CODE SESSIONS THEMSELVES (the actual evidence for item 1.8) are not re-run as commands[] entries in this record -- each costs real Anthropic API usage, is not byte-for-byte reproducible (fresh session_id, timestamps, model routing), and running them again here would not change what already happened. Their exact commands, full transcripts' relevant fields, and the ledger files they produced are captured verbatim in docs/maintainers/hook-fires-verification-2026-09-24.md; the two `cat .../ledger-*.jsonl` commands[] entries above reproduce the ledger evidence that record quotes, byte for byte, with sha256 digests of their own.",
+    "OS/VERSION COVERAGE: every command above, and both live Claude Code sessions, ran on one Linux container (Ubuntu 24.04.4 LTS, Python 3.11.15, Claude Code 2.1.282) only. Windows and macOS were not exercised for the live-session evidence; scripts/lwb_check_hook_launch.py (launch-mechanics only, not a live session) is the only piece of this that CI runs cross-platform.",
+    "PERMISSION MODE: only --permission-mode dontAsk (with a --settings allow-list for Bash/Task) was exercised end-to-end. --dangerously-skip-permissions and --permission-mode bypassPermissions were tried first and refused outright by the CLI in this root-privileged container (\"cannot be used with root/sudo privileges\"), so they were never observed either firing or not firing the hook. Other permission modes were not tried.",
+    "POLICY CONTENT: the bundled default policy's only rule, lwb_version, always allows and only ever warns -- this record and the new doc establish that the hook FIRES and is OBSERVED, not that deny-mode policy behavior works correctly inside a live session (that is a separate, untested question).",
+    "lwb-env-leak was not run with a real LWB_PRIVATE_NEEDLES value locally -- that variable is a CI-only secret, unset in this environment, so a local run reports UNCONFIGURED rather than a real pass. The one leak this branch's own commits actually introduced (a literal home-directory path in an early draft of the new doc) was instead caught by tests/test_lwb_check_env_leak.py inside `python -m pytest tests/ -q` itself, and fixed in a follow-up commit; see that commit's message for the exact failure and fix.",
+    "lwb_check_proof.py (schema validation of this very record) was not run as a commands[] entry, per proof/README.md's own rule that a record cannot contain proof of its own existence -- it should be run separately, after this record is written, by whoever reviews or lands this PR.",
+    "HANDOFF.md's generated block (main SHA, proof-state counts) is regenerated in a separate, later commit on this branch via `python scripts/lwb_handoff.py --write`, per this deliverable's own instructions that it must be the LAST commit -- the state-claims command above (run before that regeneration) reflects the pre-regeneration state and is not re-run after it."
+  ]
+}
