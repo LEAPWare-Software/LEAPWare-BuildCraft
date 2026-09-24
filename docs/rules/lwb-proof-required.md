@@ -173,8 +173,7 @@ other confirmed bypass in this section is unaffected. It closes exactly
 one documented gap: `deny` no longer silently downgrades itself to
 "report only" the moment it cannot read git.
 
-### Confirmed bypasses that remain, from independent review of PR #26 (and
-still open after 1.2)
+### Confirmed bypasses that remain (independent review of PR #26; still open after 1.2)
 
 - **Detached HEAD, no PR number, in EVERY mode including `deny` — left
   out of scope for build-plan item 1.2, by deliberate decision.**
@@ -244,10 +243,25 @@ Still not detected, and not fixed:
 ## Known gap: Codex
 
 `adapters/codex/hook_io.py` does not collect repo facts, so `Event.repo` is
-None on every Codex event and **this rule is inert on Codex today**. That
-is a deliberate fail-quiet, not an oversight, but it does mean the
-protocol is currently enforced on one host only. Teaching the Codex adapter
-to populate `RepoFacts` is all that is required; the rule needs no change.
+None on every Codex event. **In `warn` (the shipped default) this rule is
+still inert on Codex today** -- a deliberate fail-quiet, not an oversight,
+consistent with every other adapter that has not been taught to collect
+repo facts. It does mean the protocol is currently enforced on one host
+only.
+
+**As of build-plan item 1.2, this is no longer true in `deny`.** A policy
+that arms `lwb_proof_required` to `deny` now denies EVERY genuine publish
+on Codex, unconditionally, because `event.repo is None` on every Codex
+event and `deny` fails closed on that. This is the correct consequence of
+1.2's own framing, not a bug: a `deny` policy that cannot verify anything
+on a host must not silently permit there either, and Codex today is
+exactly a host `deny` cannot verify anything on. It is a strong argument
+for NOT arming `deny` in any policy a Codex session might also run under,
+until the Codex adapter is taught to populate `RepoFacts` (still all that
+is required; the rule itself needs no further change). `core/policy/default.json`
+continues to ship `warn`, so this does not change today's shipped
+behavior -- it changes what a policy AUTHOR gets if they arm `deny`
+themselves.
 
 ## Under-match, deliberately
 
