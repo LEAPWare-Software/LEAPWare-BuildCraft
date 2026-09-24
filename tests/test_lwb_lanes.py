@@ -1110,3 +1110,84 @@ def test_the_vendor_exception_does_not_leak_into_authored_lane_paths():
     # A path merely CONTAINING the word vendor elsewhere is not exempt.
     assert lwb_lanes.classify_path("plugins/codex/lwb/bin/vendor_helper.py") == "codex"
     assert lwb_lanes.classify_path("plugins/codex/vendor/x.py") == "codex"
+
+
+
+# ---------------------------------------------------------------------------
+# independent_reviews must not let a record that does not COUNT (because
+# _review_ok rejected it -- stale, wrong verdict, bad identity, whatever)
+# also VETO an otherwise-sufficient set of valid records. _review_ok's own
+# contract, and its own direct tests above, are unchanged: a record either
+# counts toward REQUIRED_INDEPENDENT_REVIEWS or it does not, and that
+# decision is unaffected. What changes is that a record which does NOT
+# count must not be able to fail the whole gate when enough OTHER, valid
+# records already exist in the same reviews/<pr>/ directory.
+# ---------------------------------------------------------------------------
+
+
+def test_independent_reviews_passes_with_one_stale_and_one_fresh_valid_record(tmp_path):
+    """The exact bug this fixes: a leftover stale record from an earlier
+    review round must not veto the gate once a fresh, valid AGREE record
+    already satisfies REQUIRED_INDEPENDENT_REVIEWS on its own."""
+    _write_review(
+        tmp_path, "stale-reviewer.json",
+        reviewer_id="old-reviewer", reviewed_commit="0123456",
+    )
+    _write_review(
+        tmp_path, "fresh-reviewer.json",
+        reviewer_id="fresh-reviewer", reviewed_commit=HEAD_SHA,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is True, errors
+    assert errors == []
+    # The stale record's reason is not silently dropped -- it is surfaced
+    # as a notice, since it did not count but enough other records did.
+    assert any("STALE" in n for n in notices), notices
+
+
+def test_independent_reviews_still_fails_on_a_lone_stale_record(tmp_path):
+    """No valid record exists at all -- a single stale record must still
+    fail the gate, and its STALE reason must still be visible in `errors`
+    (not silently swallowed now that it no longer vetoes a sufficient set,
+    since here the set is NOT sufficient)."""
+    _write_review(
+        tmp_path, "stale-reviewer.json",
+        reviewer_id="old-reviewer", reviewed_commit="0123456",
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False
+    assert any("STALE" in e for e in errors), errors
+    assert any("0 independent review" in e for e in errors), errors
+
+
+def test_independent_reviews_ordinary_single_valid_record_still_passes(tmp_path):
+    """REQUIRED_INDEPENDENT_REVIEWS = 1, one fresh valid record, no stale
+    records at all -- the ordinary case this fix must leave unaffected."""
+    _write_review(tmp_path, "claude-cto.json", reviewer_id="the-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is True, errors
+    assert errors == []
+    assert notices == []

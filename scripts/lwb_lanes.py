@@ -718,17 +718,50 @@ def independent_reviews(
     errors: list[str],
     notices: Optional[list[str]] = None,
 ) -> bool:
-    """True when this PR carries REQUIRED_INDEPENDENT_REVIEWS distinct reviewers."""
+    """True when this PR carries REQUIRED_INDEPENDENT_REVIEWS distinct reviewers.
+
+    A per-record failure and an overall gate failure are two different
+    properties, and this function used to conflate them. `_review_ok`
+    returning `None` for a given record (STALE, wrong verdict, a bad
+    identity, whatever the reason) must mean "this record does not COUNT
+    toward the requirement" -- that property is unchanged and is still
+    entirely `_review_ok`'s call, untouched here. It must NOT also mean
+    "the whole gate fails": a PR's `reviews/<pr>/` directory accumulates
+    records across review rounds, and a record from an earlier round going
+    STALE the moment new commits land is routine, expected churn, not a
+    sign anything is wrong.
+
+    The old code passed the SAME `errors` list into every `_review_ok`
+    call, so one leftover stale record from an earlier round permanently
+    vetoed the gate even after a brand-new, fresh, valid AGREE record
+    already satisfied REQUIRED_INDEPENDENT_REVIEWS on its own -- found by
+    independent review and reproduced live against this repo's own open
+    PRs, not merely theorised: a PR whose reviewable head moved (e.g.
+    after a merge-conflict resolution) picked up fresh AGREE records from
+    independent reviewers, but `lwb-lanes` kept failing hard on the
+    now-superseded records from the round before, without ever mentioning
+    that enough valid reviews already existed alongside them.
+
+    The fix: collect each record's own errors into a LOCAL list, never the
+    caller's `errors`, and only escalate that local list into `errors` --
+    the one `main()` checks to fail the build -- if the final count of
+    distinct valid reviewer identities is still short of
+    REQUIRED_INDEPENDENT_REVIEWS. A record that does not count still never
+    counts toward satisfying the requirement; it just stops being able to
+    veto a set of records that, on their own, are already sufficient.
+    """
     review_dir = REPO_ROOT / "reviews" / str(pr_number)
     records = sorted(review_dir.glob("*.json")) if review_dir.is_dir() else []
 
     reviewer_ids = set()
+    per_record_errors: list[str] = []
     for record in records:
-        reviewer_id = _review_ok(record, head_sha, pr_number, errors, notices)
+        reviewer_id = _review_ok(record, head_sha, pr_number, per_record_errors, notices)
         if reviewer_id is not None:
             reviewer_ids.add(reviewer_id)
 
     if len(reviewer_ids) < REQUIRED_INDEPENDENT_REVIEWS:
+        errors.extend(per_record_errors)
         errors.append(
             f"{commit_sha[:12]}: touches a shared path and has "
             f"{len(reviewer_ids)} independent review(s) in reviews/{pr_number}/, "
@@ -737,6 +770,18 @@ def independent_reviews(
             "commit_author_id)"
         )
         return False
+
+    # Enough valid records already exist on their own. A record that did
+    # NOT count is still surfaced -- as a notice, not an error -- so a
+    # stale or otherwise-invalid record sitting in the directory remains
+    # visible to a human reading CI output; it is just no longer fatal to
+    # the build once sufficient valid records exist alongside it.
+    if notices is not None:
+        for e in per_record_errors:
+            notices.append(
+                f"not counted toward the {len(reviewer_ids)} valid review(s) above, "
+                f"but enough already exist: {e}"
+            )
     return True
 
 
