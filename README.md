@@ -14,7 +14,7 @@ Shipped as two plugins sharing one policy engine:
 
 | Host | Package | What it does |
 |---|---|---|
-| Claude Code | `plugins/claude/lwb/` | Registers a `PreToolUse` hook. The hook's deny path is implemented and tested, but the only rule shipped today is `lwb_version`, a deliberate no-op -- so nothing is enforced for a user yet. See "The walking skeleton" below. |
+| Claude Code | `plugins/claude/lwb/` | Registers a `PreToolUse` hook. Four rules ship today -- `lwb_version` (a deliberate no-op), `lwb_proof_required`, `lwb_proof_coverage` and `lwb_proof_integrity` -- all at `warn`, none armed to `deny` yet. See "The walking skeleton" below and [`docs/rules/`](docs/rules/). |
 | Codex CLI | `plugins/codex/lwb/` | Registers a `PreToolUse` hook, same engine as Claude Code. **Deferred under D11**: present in the tree and tested, not developed further until the owner undefers it. See [docs/install-codex.md](docs/install-codex.md). |
 
 Runtime dependency policy: **Python 3.10+ standard library only.** No
@@ -25,17 +25,31 @@ License: [Apache-2.0](LICENSE).
 
 ## The walking skeleton
 
-One rule ships today, `lwb_version` (see
-[docs/rules/lwb-version.md](docs/rules/lwb-version.md)): a safe no-op that
-fires on every event, reports this build's `lwb_core.__version__`, and
-never denies — even a policy file that (incorrectly) configures it to
-`deny` still allows. It exists to prove the whole pipeline end to end —
-event in, pure decision, decision out — without shipping any real
-enforcement yet: BuildCraft's actual SDLC gate rules (stage checks, role
-lanes, and the enforcement behind them — see
+`lwb_version` (see [docs/rules/lwb-version.md](docs/rules/lwb-version.md))
+is the walking-skeleton rule: a safe no-op that fires on every event,
+reports this build's `lwb_core.__version__`, and never denies — even a
+policy file that (incorrectly) configures it to `deny` still allows. It
+exists to prove the whole pipeline end to end — event in, pure decision,
+decision out — before any real enforcement was built on top of it.
+
+Three rules now enforce something for real, all at `warn`:
+
+- [`lwb_proof_required`](docs/rules/lwb-proof-required.md) — a `git
+  push`/`gh pr create`/`gh pr merge` needs a matching `proof/*.json`
+  record.
+- [`lwb_proof_coverage`](docs/rules/lwb-proof-coverage.md) — a
+  best-effort, local check that landed deliverables reachable from HEAD
+  have not skipped that record entirely.
+- [`lwb_proof_integrity`](docs/rules/lwb-proof-integrity.md) — a
+  structural, execution-free check that the matched record does not
+  certify itself or admit a failed command.
+
+BuildCraft's remaining SDLC gate rules (stage checks, role lanes, and the
+enforcement behind them — see
 [docs/requirements/owner-directives.md](docs/requirements/owner-directives.md)
 for this project's own requirements-gathering placeholder) are designed
-and built in a later session.
+and built in later phases; see
+[docs/requirements/build-plan.md](docs/requirements/build-plan.md).
 
 ## How it fits together
 
