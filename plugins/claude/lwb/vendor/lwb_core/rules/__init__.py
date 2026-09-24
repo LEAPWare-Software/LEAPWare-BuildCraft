@@ -16,14 +16,26 @@ this registry is load-bearing rather than decorative.
 
 from __future__ import annotations
 
-from . import lwb_proof_required, lwb_version
+from . import lwb_proof_coverage, lwb_proof_integrity, lwb_proof_required, lwb_version
 
 # Order matters only in that the engine stops at the first DENY. The no-op
 # `lwb_version` is kept first so its version report is recorded in the
-# ledger even on an event a later rule denies.
+# ledger even on an event a later rule denies. `lwb_proof_coverage` and
+# `lwb_proof_integrity` both import shared publish-detection helpers from
+# `lwb_proof_required` (see each module's own docstring), so they are
+# listed right after it -- proximity here is documentation, not a runtime
+# dependency the engine enforces.
 RULES = [
     lwb_version,
     lwb_proof_required,
+    lwb_proof_coverage,
+    lwb_proof_integrity,
 ]
 
-__all__ = ["RULES", "lwb_proof_required", "lwb_version"]
+__all__ = [
+    "RULES",
+    "lwb_proof_coverage",
+    "lwb_proof_integrity",
+    "lwb_proof_required",
+    "lwb_version",
+]
