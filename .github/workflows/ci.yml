@@ -194,6 +194,7 @@ jobs:
           python scripts/lwb_check_commit_identity.py
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
+          --pr-number ${{ github.event.pull_request.number }}
 
       - name: lwb-lanes (per-commit lane discipline + shared-path review gate)
         if: always() && github.event_name == 'pull_request'
