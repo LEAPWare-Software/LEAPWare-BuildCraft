@@ -27,10 +27,12 @@ that no WORTHY AND VETTED tool already does it before building anything.
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
 3. **IN FLIGHT (track A): Phase 1 item 1.1.** Ships
-   `lwb_proof_coverage` + `lwb_proof_integrity` as rules, wired into
-   `RULES`/`core/policy/default.json` at `warn`; `RepoFacts` extended.
-   Tests green, vendor rebuilt, PR pending -- see its own proof record
-   for the number. Cloud loop also has #40, #44-48 open (unrelated).
+   `lwb_proof_coverage` + `lwb_proof_integrity` as rules at `warn`.
+   Tests green, vendor rebuilt. #49 re-cut (branch
+   `lwb-recut-49-bad-reviewer-identity`): reviewer B's commit was
+   authored `Claude <noreply@anthropic.com>`, unlisted -- permanent
+   `lwb-commit-identity` failure, same shape as #38's bad commit (#39).
+   Not this PR's bug. New PR TBD. Cloud has #40, #44-48 open too.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 2 rules on `main` today (4
    once 1.1 lands), 0 armed to deny, 2 of 8 skills working.
 5. **DEFECT PATTERN:** "I could not check" must never share a
@@ -41,16 +43,16 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 12:32 UTC
+Generated: 2026-09-24 13:07 UTC
 main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
 CLI: claude
-Session: track-a-proof-coverage-integrity-1.1
+Session: track-a-recut-49-bad-identity
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-21/21 proven
+22/22 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
