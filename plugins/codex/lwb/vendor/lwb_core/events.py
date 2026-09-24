@@ -67,12 +67,44 @@ class RepoFacts:
         stays silent rather than risk a false deny built on facts it does
         not actually have when this is set.
     facts_incomplete_reason: human-readable detail for the above, or None.
+    landed_unproven: identifiers of commits reachable from HEAD (walking
+        first-parent) whose subject looks like a squash-merge (a
+        trailing `(#N)`, GitHub's own convention) and whose PR number N
+        has no matching entry in `proof_ids`, after applying
+        `proof/exempt.json`'s carve-out -- see
+        `rules/lwb_proof_coverage.py`. Each entry is a human-readable
+        `"<sha prefix> (#<N>)"` string, ready to report. This is a
+        BEST-EFFORT, BOUNDED, LOCAL scan (see
+        `adapters/claude/repo_facts.collect_landed_unproven`): it can
+        only read commits still present as loose objects, stops at a
+        packed one, and is capped at a fixed depth. An empty tuple means
+        "found none within what was walkable" -- NEVER a claim that all
+        of history was checked. A rule must not treat this as
+        exhaustive coverage.
+    matched_proof_self_certified: for the proof record whose id equals
+        the checked-out branch name (the one identifier available
+        without parsing the triggering command -- see
+        `rules/lwb_proof_required.py`'s fuller PR-number/branch-token
+        matching, not duplicated here), True when that record's own
+        JSON declares a non-empty `checked_by` equal to a non-empty
+        `author` -- a record certifying itself. None when there is no
+        such record, or its content could not be read or parsed as a
+        JSON object; a rule must treat None as no-opinion, the same
+        discipline `repo is None` gets.
+    matched_proof_has_failed_command: for the same matched record, True
+        when any of its `commands[]` entries records an `exit` that
+        differs from its own `expect_exit` -- a command the record
+        itself admits did not pass. None under the same conditions as
+        `matched_proof_self_certified`.
     """
 
     branch: Optional[str] = None
     proof_ids: Tuple[str, ...] = ()
     facts_incomplete: bool = False
     facts_incomplete_reason: Optional[str] = None
+    landed_unproven: Tuple[str, ...] = ()
+    matched_proof_self_certified: Optional[bool] = None
+    matched_proof_has_failed_command: Optional[bool] = None
 
 
 @dataclass(frozen=True)
