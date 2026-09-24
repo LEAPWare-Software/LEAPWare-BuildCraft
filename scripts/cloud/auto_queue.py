@@ -71,15 +71,23 @@ def _run(args: List[str]) -> Tuple[int, str, str]:
 
 def _api(path: str) -> Optional[Any]:
     """REST GET via gh. Returns None on any failure -- callers must treat
-    None as "could not check", never as "checked and found nothing"."""
+    None as "could not check", never as "checked and found nothing".
+
+    NOTICE diagnostics go to stderr, never stdout. `emit_find_prs`'s only
+    stdout line is `prs=...`, which the workflow appends straight into
+    `$GITHUB_OUTPUT`; a NOTICE line on stdout would land in that file too,
+    and one with no `=` in it makes the Actions runner treat the file as
+    malformed and fail the step outright -- the opposite of the intended
+    fail-open, retry-later behaviour.
+    """
     code, out, err = _run(["gh", "api", path])
     if code != 0:
-        print(f"NOTICE: gh api {path} exited {code}: {err.strip()[:200]}")
+        print(f"NOTICE: gh api {path} exited {code}: {err.strip()[:200]}", file=sys.stderr)
         return None
     try:
         return json.loads(out)
     except json.JSONDecodeError:
-        print(f"NOTICE: gh api {path} returned non-JSON")
+        print(f"NOTICE: gh api {path} returned non-JSON", file=sys.stderr)
         return None
 
 
@@ -136,7 +144,7 @@ def _all_required_checks_green(sha: str, required: List[str]) -> Tuple[bool, str
     return True, f"all {len(required)} required checks green"
 
 
-def resolve_pr_numbers(event: Dict[str, Any]) -> Optional[List[int]]:
+def resolve_pr_numbers(event: Dict[str, Any], event_name: str) -> Optional[List[int]]:
     """Work out which pull requests the triggering event concerns.
 
     Three event shapes, all handled here rather than in YAML so this is
@@ -150,13 +158,25 @@ def resolve_pr_numbers(event: Dict[str, Any]) -> Optional[List[int]]:
       commit has an open PR. Resolve from the head sha instead via
       `commits/{sha}/pulls`, keeping only PRs that are open and target
       `main`.
-    * anything else (the `schedule` sweep) -- no event data names a PR at
-      all, so every open PR targeting `main` is swept.
+    * `schedule` -- no event data names a PR at all, so every open PR
+      targeting `main` is swept.
+
+    `event_name` is `GITHUB_EVENT_NAME` as Actions sets it for every event
+    type. It is what gates the sweep branch, NOT merely "the event dict has
+    neither an `inputs.pr_number` nor a `workflow_run` key": an unreadable
+    or missing event payload for a `workflow_dispatch` or `workflow_run`
+    trigger produces exactly that same empty-looking shape, and treating it
+    as "must be the schedule sweep" would silently escalate a targeted run
+    into a repo-wide sweep with no diagnostic a human would see. So any
+    event whose payload doesn't match one of the two named shapes above,
+    AND whose `event_name` is not literally `"schedule"`, is unresolved --
+    returns `None`, the same as any other lookup failure.
 
     Returns `None` when a lookup could not be completed (an unreadable API
-    call), which callers must treat as "could not determine" and NOT as
-    "no PRs concerned" -- the next scheduled sweep or workflow_run gets
-    another chance rather than this run silently doing nothing forever.
+    call, or an event this function could not place), which callers must
+    treat as "could not determine" and NOT as "no PRs concerned" -- the
+    next scheduled sweep or workflow_run gets another chance rather than
+    this run silently doing nothing forever.
     """
     inputs = event.get("inputs") or {}
     manual = inputs.get("pr_number")
@@ -180,41 +200,58 @@ def resolve_pr_numbers(event: Dict[str, Any]) -> Optional[List[int]]:
             if p.get("state") == "open" and (p.get("base") or {}).get("ref") == "main"
         ]
 
-    # schedule, or any event carrying neither shape above: sweep every open
-    # PR targeting main. This is the retry and the self-heal -- it covers a
-    # workflow_run that never lands, a run that GitHub skips, and a check
-    # that completed before this fix shipped.
-    pulls = _api(f"repos/{REPO}/pulls?state=open&base=main&per_page=100")
-    if pulls is None:
-        return None
-    return [p["number"] for p in pulls]
+    if event_name == "schedule":
+        # No event data names a PR at all on a schedule tick, by design --
+        # sweep every open PR targeting main. This is the retry and the
+        # self-heal: it covers a workflow_run that never lands, a run that
+        # GitHub skips, and a check that completed before this fix shipped.
+        pulls = _api(f"repos/{REPO}/pulls?state=open&base=main&per_page=100")
+        if pulls is None:
+            return None
+        return [p["number"] for p in pulls]
+
+    # Any other event name (workflow_dispatch, workflow_run, ...) whose
+    # payload didn't match the shapes above could not be resolved. Never
+    # widen an unreadable/unexpected payload on a targeted trigger into
+    # "sweep everything" -- that is the schedule trigger's job alone.
+    return None
 
 
 def emit_find_prs() -> int:
     """CLI entry for the workflow's "Find the pull requests" step.
 
-    Reads the Actions event payload from `GITHUB_EVENT_PATH`, resolves PR
-    numbers via `resolve_pr_numbers`, and prints `prs=<comma-joined>` in
-    `GITHUB_OUTPUT` format -- the same shape the old inline heredoc step
-    emitted, so every downstream step is untouched.
+    Reads the Actions event payload from `GITHUB_EVENT_PATH` and the
+    triggering event name from `GITHUB_EVENT_NAME` (Actions sets both for
+    every run), resolves PR numbers via `resolve_pr_numbers`, and prints
+    `prs=<comma-joined>` in `GITHUB_OUTPUT` format -- the same shape the
+    old inline heredoc step emitted, so every downstream step is untouched.
+
+    This is the ONLY function that may print to stdout: the workflow
+    appends this step's stdout straight into `$GITHUB_OUTPUT`
+    (`>> "$GITHUB_OUTPUT"`), so a stray line there -- especially one with
+    no `=` in it -- is not just noise, it makes the Actions runner treat
+    the file as malformed and fail the step outright. Every diagnostic
+    NOTICE below therefore goes to stderr; only the final `prs=...` line
+    goes to stdout.
 
     A lookup failure prints `prs=` (empty) rather than failing the job:
     this workflow retries every 15 minutes and on the next workflow_run, so
     a transient API failure here should not need a human.
     """
     event_path = os.environ.get("GITHUB_EVENT_PATH")
+    event_name = os.environ.get("GITHUB_EVENT_NAME", "")
     event: Dict[str, Any] = {}
     if event_path:
         try:
             with open(event_path, encoding="utf-8") as f:
                 event = json.load(f)
         except (OSError, json.JSONDecodeError) as exc:
-            print(f"NOTICE: could not read GITHUB_EVENT_PATH: {exc}")
+            print(f"NOTICE: could not read GITHUB_EVENT_PATH: {exc}", file=sys.stderr)
             event = {}
 
-    numbers = resolve_pr_numbers(event)
+    numbers = resolve_pr_numbers(event, event_name)
     if numbers is None:
-        print("NOTICE: could not resolve pull requests for this event")
+        print("NOTICE: could not resolve pull requests for this event", file=sys.stderr)
         print("prs=")
         return 0
     print("prs=" + ",".join(str(n) for n in numbers))
