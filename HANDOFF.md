@@ -32,27 +32,29 @@ that no WORTHY AND VETTED tool already does it before building anything.
    `lwb-recut-49-bad-reviewer-identity`): reviewer B's commit was
    authored `Claude <noreply@anthropic.com>`, unlisted -- permanent
    `lwb-commit-identity` failure, same shape as #38's bad commit (#39).
-   Not this PR's bug. New PR TBD. Cloud has #40, #44-48 open too.
-4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 2 rules on `main` today (4
-   once 1.1 lands), 0 armed to deny, 2 of 8 skills working.
-5. **DEFECT PATTERN:** "I could not check" must never share a
+   Not this PR's bug. New PR TBD.
+4. **1.6:** #52 re-cut as **#53** (bad identity was `bcee47f`, not
+   reviewer B's correctly-authored `3056493`). #52 left open.
+5. **WHAT BLOCKS 1.0.0.** 0/13 stages, 2 rules on `main`, 0 armed to
+   deny, 2/8 skills working.
+6. **DEFECT PATTERN:** "I could not check" must never share a
    representation with "I checked and found nothing". Live in Codex's
    lane. The hook has still never been seen to fire from `hooks.json`.
-6. Every deliverable: proof record, pushed, CI green, announced
+7. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 13:07 UTC
-main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
+Generated: 2026-09-24 17:12 UTC
+main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
 CLI: claude
-Session: track-a-recut-49-bad-identity
+Session: recut-52-bad-identity
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-22/22 proven
+23/23 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
