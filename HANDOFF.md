@@ -41,7 +41,7 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 12:32 UTC
+Generated: 2026-09-24 12:38 UTC
 main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
 CLI: claude
 Session: track-a-proof-coverage-integrity-1.1
@@ -50,7 +50,7 @@ Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-21/21 proven
+22/22 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
