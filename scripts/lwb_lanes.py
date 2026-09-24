@@ -786,6 +786,28 @@ def _review_ok(
     return str(reviewer_id)
 
 
+def _is_stale_only_rejection(record_errors: list[str]) -> bool:
+    """True when a single `_review_ok` call's own error list is nothing
+    but the STALE rejection.
+
+    `_review_ok` is untouched by this file's stale-veto fix (see
+    `independent_reviews` below) and has no structured "reason" field --
+    it reports a failure as a plain string appended to the list it is
+    given. STALE is the one rejection reason this fix treats as routine
+    churn (see `independent_reviews`), and `_review_ok` always reports it
+    as exactly one string containing the literal marker "STALE" (its only
+    use anywhere in this module outside prose comments -- see the STALE
+    branch of `_review_ok`), and never combines it with any other
+    rejection in the same call (each of `_review_ok`'s failure branches
+    returns immediately after its own single `errors.append`). Checking
+    for that marker, rather than changing `_review_ok` to return a
+    structured reason, keeps `_review_ok`'s signature, behavior and
+    existing direct unit tests completely untouched -- the constraint
+    this whole file's review-freshness fix was built under.
+    """
+    return len(record_errors) == 1 and "STALE" in record_errors[0]
+
+
 def independent_reviews(
     pr_number: int,
     commit_sha: str,
@@ -817,26 +839,57 @@ def independent_reviews(
     now-superseded records from the round before, without ever mentioning
     that enough valid reviews already existed alongside them.
 
-    The fix: collect each record's own errors into a LOCAL list, never the
-    caller's `errors`, and only escalate that local list into `errors` --
-    the one `main()` checks to fail the build -- if the final count of
-    distinct valid reviewer identities is still short of
-    REQUIRED_INDEPENDENT_REVIEWS. A record that does not count still never
-    counts toward satisfying the requirement; it just stops being able to
-    veto a set of records that, on their own, are already sufficient.
+    NARROWED, found by a second round of independent review of the first
+    version of this fix: that first version collected EVERY rejection
+    reason -- not just STALE -- into the same downgradable local list, so
+    once enough valid AGREE records existed, a genuine DISAGREE sitting
+    right next to them, a self-review segment collision, a malformed
+    record, or a wrong PR number were ALL silently downgraded to a mere
+    notice too. Only staleness is routine churn from ordinary review
+    rounds superseding each other; dissent and identity problems are not,
+    and must never be outvoted by an unrelated valid record. So each
+    record's errors are now judged on their own: a record whose rejection
+    is STALE and STALE alone (see `_is_stale_only_rejection`) goes into a
+    separate, still-downgradable bucket; every other rejection reason is
+    appended straight to the caller's `errors` UNCONDITIONALLY, exactly as
+    before this whole fix existed, and also forces this function's own
+    return value to False -- a directory holding a live objection or a
+    bad record is never honestly "independent review satisfied", however
+    many other valid records sit beside it.
+
+    The fix for the STALE case itself is unchanged: collect it into a
+    LOCAL list, never the caller's `errors` directly, and only escalate
+    it into `errors` -- the one `main()` checks to fail the build -- if
+    the final count of distinct valid reviewer identities is still short
+    of REQUIRED_INDEPENDENT_REVIEWS. A record that does not count still
+    never counts toward satisfying the requirement; a STALE one just
+    stops being able to veto a set of records that, on their own, are
+    already sufficient.
     """
     review_dir = REPO_ROOT / "reviews" / str(pr_number)
     records = sorted(review_dir.glob("*.json")) if review_dir.is_dir() else []
 
     reviewer_ids = set()
-    per_record_errors: list[str] = []
+    stale_errors: list[str] = []
+    hard_error_found = False
     for record in records:
-        reviewer_id = _review_ok(record, head_sha, pr_number, per_record_errors, notices)
+        record_errors: list[str] = []
+        reviewer_id = _review_ok(record, head_sha, pr_number, record_errors, notices)
         if reviewer_id is not None:
             reviewer_ids.add(reviewer_id)
+            continue
+        if _is_stale_only_rejection(record_errors):
+            stale_errors.extend(record_errors)
+        else:
+            # DISAGREE, a bad/self-review identity, a malformed record, a
+            # wrong PR number, a missing dispatched-boolean, ... -- not
+            # routine churn. Always fails the gate, whatever else is true
+            # of this directory.
+            errors.extend(record_errors)
+            hard_error_found = True
 
     if len(reviewer_ids) < REQUIRED_INDEPENDENT_REVIEWS:
-        errors.extend(per_record_errors)
+        errors.extend(stale_errors)
         errors.append(
             f"{commit_sha[:12]}: touches a shared path and has "
             f"{len(reviewer_ids)} independent review(s) in reviews/{pr_number}/, "
@@ -846,17 +899,27 @@ def independent_reviews(
         )
         return False
 
-    # Enough valid records already exist on their own. A record that did
-    # NOT count is still surfaced -- as a notice, not an error -- so a
-    # stale or otherwise-invalid record sitting in the directory remains
-    # visible to a human reading CI output; it is just no longer fatal to
-    # the build once sufficient valid records exist alongside it.
+    # Enough valid records already exist on their own. A STALE record is
+    # surfaced -- as a notice, not an error -- so it remains visible to a
+    # human reading CI output; it is just no longer fatal to the build
+    # once sufficient valid records exist alongside it. This runs whether
+    # or not a hard error was ALSO found elsewhere in the directory --
+    # the STALE record's own disposition does not depend on what some
+    # other, unrelated record in the same directory did.
     if notices is not None:
-        for e in per_record_errors:
+        for e in stale_errors:
             notices.append(
                 f"not counted toward the {len(reviewer_ids)} valid review(s) above, "
                 f"but enough already exist: {e}"
             )
+
+    if hard_error_found:
+        # At least one OTHER record in this same directory failed for a
+        # reason that is not routine churn. Its message is already in
+        # `errors` (added above, unconditionally) so the build still
+        # fails; this function reports False too, for the same reason.
+        return False
+
     return True
 
 
@@ -916,12 +979,34 @@ def check_lanes(
             continue  # the owner's own commits are unrestricted
 
         files = commit_files(sha)
+        # A merge commit's `files` (see commit_files' own docstring) is its
+        # FIRST-PARENT diff -- what this merge brought in, from the
+        # mainline's point of view. That is the right input for deciding
+        # whether the merge touched a shared path (so a review is still
+        # required for whatever it brought in), but it is the WRONG input
+        # for lane-OWNERSHIP checking: those files were not necessarily
+        # authored by whoever performed the merge, they were carried in
+        # from wherever the merged-in side came from, and each of THOSE
+        # commits was already lane-checked individually when it landed.
+        # Before the merge fix, a merge commit's `files` was always `[]`
+        # (plain diff-tree has nothing to say about a multi-parent commit),
+        # so this loop was accidentally never reached for a merge at all --
+        # found by independent review as a latent consequence of that fix:
+        # once merges report real files, a merge that happens to carry in a
+        # file from a DIFFERENT lane (e.g. catching a feature branch up
+        # with a shared-path or other-lane change that already landed on
+        # the base branch) would be flagged as if the merging agent had
+        # personally written a file outside their own lane, in one commit
+        # they only merged. A merge is therefore exempt from the
+        # per-file OWNERSHIP check below, but not from the shared-path /
+        # review-freshness determination that follows it.
+        is_merge = len(_commit_parents(sha)) >= 2
         touches_shared = False
         for f in files:
             cls = classify_path(f)
             if cls == "shared":
                 touches_shared = True
-            elif cls != agent:
+            elif not is_merge and cls != agent:
                 errors.append(
                     f"{sha[:12]} (LWB-Agent: {agent}): touches '{f}', outside the "
                     f"{agent} lane and not a shared path"
