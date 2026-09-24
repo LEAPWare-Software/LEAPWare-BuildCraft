@@ -37,22 +37,23 @@ that no WORTHY AND VETTED tool already does it before building anything.
    once 1.1 lands), 0 armed to deny, 2 of 8 skills working.
 5. **DEFECT PATTERN:** "I could not check" must never share a
    representation with "I checked and found nothing". Live in Codex's
-   lane. The hook has still never been seen to fire from `hooks.json`.
+   lane. 1.8 CONFIRMED 2026-09-24, Linux only --
+   `docs/maintainers/hook-fires-verification-2026-09-24.md`.
 6. Every deliverable: proof record, pushed, CI green, announced
    `LWB - Alert: <id> DONE ...`.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 13:07 UTC
-main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
-CLI: claude
-Session: track-a-recut-49-bad-identity
+Generated: 2026-09-24 20:33 UTC
+main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
+CLI: unknown
+Session: unknown
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-22/22 proven
+23/23 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
