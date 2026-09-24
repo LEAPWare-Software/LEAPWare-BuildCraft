@@ -1,0 +1,202 @@
+{
+  "deliverable": "lwb-no-unauthorised-destructive-action-1.6",
+  "pr": 52,
+  "author": "claude-code-track-a-session_01H2pQdziijj12otKaWk7XVU",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "ad92d5eae7403a42ba1ac933ec079240206b7173",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 21%]",
+        "........................................................................ [ 32%]",
+        "........................................................................ [ 43%]",
+        "........................................................................ [ 54%]",
+        "........................................................................ [ 65%]",
+        "........................................................................ [ 76%]",
+        "........................................................................ [ 87%]",
+        "........................................................................ [ 98%]",
+        ".............                                                            [100%]",
+        "661 passed in 22.53s"
+      ],
+      "sha256": "ef61664c5bb60c955243d51f9a79fd87c3dbf6120a3544dabc3ef5e3848552e3",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_state_claims.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-24 16:31 UTC",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "4e7933ae84190108418a7f3b6bcbf33c6ab56eb1e8867b271ef0f1d1ef8aeae8",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2954 bytes)"
+      ],
+      "sha256": "473964f41c71bb0997d2028238c6e8f4416091827cfcef05b984d77ac27a9c0a",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (22 record(s))"
+      ],
+      "sha256": "bba9b28c8981416ced186c309ec37561ab51ce48fa1456970df1a5bd74d1af27",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    }
+  ],
+  "mutations": [
+    "core/lwb_core/rules/lwb_no_unauthorised_destructive_action.py: new rule -- gates the four destructive-action categories docs/handoff-protocol.md's hard rules name (settings change, force-push, history rewrite, delete-remote-ref), carving merging out unconditionally per D19 and resolving 'authorised' via an explicit consuming-repo policy allowlist (options.allow.<category>, plus a delete_ref-specific options.verified_landed_branches).",
+    "core/lwb_core/rules/__init__.py: registers the new rule in RULES, after the proof-family rules.",
+    "core/policy/default.json: adds lwb_no_unauthorised_destructive_action at mode 'warn' (not armed to deny).",
+    "docs/rules/lwb-no-unauthorised-destructive-action.md: new policy-author-facing rule doc, mirroring docs/rules/lwb-proof-required.md's format.",
+    "tests/core/test_lwb_no_unauthorised_destructive_action.py: new pure-unit test file covering the four categories, the merge carve-out, the verified_landed_branches carve-out, the general allowlist mechanism, repo-facts silence, and mode honouring.",
+    "tests/core/test_engine_mutation.py: adds registry mutation-proof tests for the new rule, mirroring the existing lwb_proof_coverage/lwb_proof_integrity pattern.",
+    "plugins/claude/lwb/vendor/ and plugins/codex/lwb/vendor/: rebuilt via scripts/lwb_build.py to carry the new rule and updated default policy."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "A new deny-capable rule lwb_no_unauthorised_destructive_action exists at core/lwb_core/rules/lwb_no_unauthorised_destructive_action.py, rule_id set, registered in core/lwb_core/rules/__init__.py's RULES list, and is a pure (Event, RuleConfig) -> Optional[Finding] function with no I/O, matching lwb_proof_required.py's shape.",
+      "met": true
+    },
+    {
+      "criterion": "The rule reuses docs/handoff-protocol.md's existing four-item destructive-action list (settings change, force-push, history rewrite, delete-remote-ref) as-is and does not invent a fifth category -- the exact mistake decisions.md's required-work item 10 note warns against repeating.",
+      "met": true
+    },
+    {
+      "criterion": "'Authorised' is defined by generalizing the concept (not the list) to 'the consuming repo's own policy explicitly allowlists it', via RuleConfig.options, mirroring how every other core/lwb_core rule already resolves configuration -- not a value this rule invents or infers.",
+      "met": true
+    },
+    {
+      "criterion": "Merging (git merge / gh pr merge) is carved out unconditionally, mirroring D19's 'merging is ordinary work', and is covered by a dedicated test that holds even with no policy configured and under deny mode.",
+      "met": true
+    },
+    {
+      "criterion": "The verified-landed-branch-deletion carve-out from docs/handoff-protocol.md's hard rules is addressed honestly: automatic ancestry verification is NOT implemented (recorded as genuinely unresolved, with the reason, in the rule's docstring, the rule doc, and the PR body); the narrower, defensible interpretation shipped is a policy-declared options.verified_landed_branches list, covered by its own test distinguishing it from the general allowlist mechanism.",
+      "met": true
+    },
+    {
+      "criterion": "The rule honours config.mode (can deny) per D9, but ships at 'warn' in core/policy/default.json and in both vendored plugin copies -- not armed to deny, matching lwb_proof_required's own ship-quiet-arm-later discipline. A test locks this for every shipped policy file, mirroring test_lwb_proof_required.py's equivalent lock.",
+      "met": true
+    },
+    {
+      "criterion": "docs/rules/lwb-no-unauthorised-destructive-action.md exists, mirroring docs/rules/lwb-proof-required.md's format (what it checks, modes, silence conditions, tests).",
+      "met": true
+    },
+    {
+      "criterion": "Tests under tests/core/ cover: each of the four categories denied/warned when unauthorised; the merge carve-out; the verified-landed-branch-deletion carve-out; an explicit policy allowlist authorising an otherwise-destructive action; event.repo is None staying silent; event.repo.facts_incomplete staying silent; and mode honouring (warn/deny/off) -- plus registry mutation-proof tests in test_engine_mutation.py showing removal from RULES removes the finding.",
+      "met": true
+    },
+    {
+      "criterion": "python scripts/lwb_build.py was run after the core/ change, and python scripts/lwb_build.py --check passes, so the vendored plugin copies the shipped hook actually imports are not stale.",
+      "met": true
+    },
+    {
+      "criterion": "python -m pytest tests/ -q is fully green (661 passed), and scripts/lwb_check_prefix.py, scripts/lwb_check_no_instruction_dep.py and scripts/lwb_check_state_claims.py all pass locally. This PR does not touch .github/, so tests/test_workflows_parse.py was not required separately (it is already included, green, in the full suite run).",
+      "met": true
+    },
+    {
+      "criterion": "Before building, the standing adopt-before-build condition was considered and recorded in the PR body: this is a narrow, bespoke policy gate tied to this repo's own (Event, Policy) -> Decision hook architecture, which neither GitHub branch protection/rulesets (act only on pushes GitHub itself receives, cannot see an in-flight Bash command before it runs) nor a generic git-hook framework (has no concept of this plugin's Policy/RuleConfig or allow/warn/deny modes) substitute for.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  },
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. 'checked_by' is deliberately the literal string 'pending-independent-reviewer-routine' rather than a reviewer identity, per D20 -- a separate reviewer routine on its own clock reviews this PR; I did not dispatch or fabricate one myself.",
+    "AUTOMATIC VERIFIED-LANDED-BRANCH-DELETION DETECTION IS NOT IMPLEMENTED. The rule cannot mechanically confirm a branch's tip is an ancestor of what was squash-merged (history-ancestry work outside core/lwb_core's I/O-free purity budget); a policy names such branches explicitly via options.verified_landed_branches instead. Recorded as a genuine, deliberate gap, not a silently narrowed claim -- see the rule's docstring and the PR body.",
+    "PARSING BLIND SPOTS ARE ACCEPTED, NOT CLOSED, matching lwb_proof_required's own posture: git -C <path> push -f, env-prefixed pushes, a destructive GitHub API call whose path is not one of the recognized settings shapes (e.g. a ref deleted via gh api -X DELETE repos/.../git/refs/...), and history-rewrite recognition scoped to five named subcommands rather than every way history can change. All named in the rule's docstring and the rule doc.",
+    "THE COMMANDS RAN ON LINUX ONLY (this container). CI runs the same gates on ubuntu, macos and windows across Python 3.10 and 3.12; I did not run the other five legs.",
+    "THIS RULE IS SHIPPED AT WARN, NOT DENY. Arming it to deny is an explicitly later, separate build-plan item and is not attempted here.",
+    "THE STANDING ADOPT-BEFORE-BUILD SURVEY IS A CONSIDERED JUDGEMENT, NOT A FORMAL TRIAL under D13/D18 -- this deliverable is a narrow gate tied to this repo's own hook architecture, so no scoped trial of an external tool was run; the reasoning is recorded in the PR body rather than in a trial record."
+  ]
+}
