@@ -69,11 +69,22 @@ fail-open.
 
 ## The bundled default
 
-`core/policy/default.json` ships `lwb_version` in `warn` mode — a safe
-no-op that reports the plugin version and never blocks a dispatch, even
-if misconfigured to `deny` (see `core/lwb_core/rules/lwb_version.py`).
-BuildCraft's real stage/role/gate rules are designed and built in a later
-session, on top of the same fail-open scaffolding. See
+`core/policy/default.json` ships four rules, every one of them in `warn`
+mode:
+
+- `lwb_version` — a safe no-op that reports the plugin version and never
+  blocks a dispatch, even if misconfigured to `deny` (see
+  `core/lwb_core/rules/lwb_version.py`).
+- `lwb_proof_required`, `lwb_proof_coverage`, `lwb_proof_integrity` — the
+  proof-of-completion family (`docs/rules/lwb-proof-required.md`,
+  `docs/rules/lwb-proof-coverage.md`, `docs/rules/lwb-proof-integrity.md`).
+  None is armed to `deny` in the shipped default: this repository's own
+  discipline is to land a new gate report-only first and arm it in a
+  separate, later change once there is ledger evidence about what it
+  actually fires on.
+
+BuildCraft's remaining stage/role/gate rules are designed and built in
+later phases, on top of the same fail-open scaffolding. See
 `examples/policies/example-routing.json` for a larger, generic illustration
 of a multi-rule policy shape (not a real deployed policy — see that file's
 own header comment).

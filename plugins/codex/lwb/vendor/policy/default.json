@@ -8,6 +8,14 @@
     "lwb_proof_required": {
       "mode": "warn",
       "options": {}
+    },
+    "lwb_proof_coverage": {
+      "mode": "warn",
+      "options": {}
+    },
+    "lwb_proof_integrity": {
+      "mode": "warn",
+      "options": {}
     }
   }
 }
