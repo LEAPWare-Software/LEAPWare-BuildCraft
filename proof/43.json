@@ -126,7 +126,7 @@
       "met": true
     },
     {
-      "criterion": "THE SECOND LIMITATION IS RECORDED. A pull request whose commits touch only reviews/ and proof/ is not covered by the review gate: classify_path calls those paths shared so a review is demanded, but resolve_reviewable_head skips record-only commits, so the head a record must attest to is the base commit the PR does not modify. Reviewer B proved it by replacing the document's entire contents with nonsense and watching lwb-lanes still pass. The document says this PR is itself an instance and tells the reader to read the review record rather than trust the green check.",
+      "criterion": "THE SECOND LIMITATION IS RECORDED, BY ITS GENERAL SHAPE. A pull request whose commits touch only reviews/ and proof/ is not covered by the review gate: classify_path calls those paths shared so a review is demanded, but resolve_reviewable_head skips record-only commits, so the head a record must attest to can be the base commit the PR does not modify. Reviewer B proved it by replacing the document's entire contents with nonsense and watching lwb-lanes still pass. An earlier version of the document additionally claimed 'this pull request is itself an instance' of that hazard -- true when written on the #32-era branch, where the reviewable head was the base, but false once this PR started landing real content commits on top (re-deriving resolve_reviewable_head from this branch's tip resolves to a commit that modifies HANDOFF.md, not the base and not record-only). A later independent reviewer caught the staleness; the document now states the hazard by its durable general shape instead of claiming this specific PR is a live example of it.",
       "met": true
     }
   ],
