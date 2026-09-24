@@ -98,9 +98,25 @@ is what stops a review record invalidating itself. In the degenerate
 all-records pull request it defines the reviewed content out of
 existence.
 
-**This pull request is itself an instance.** A green `lwb-lanes` here is
-not evidence that anything in this file was reviewed. The review record
-that demonstrated the hole (`reviews/32/`) does not exist in this tree,
+**The hazard is general; it does not require this PR to be an example of
+it, and by the time you read this it may not be.** Content under
+`reviews/` and `proof/` is never what `resolve_reviewable_head` pins
+freshness to -- it walks back from the head skipping record-only commits
+and stops at the first one that touches anything else. So a pull request
+whose *reviewable head* lands on a record-only commit (the limit case:
+one whose entire history back to its base is record-only, so the walk
+never finds anything else and falls back to the base) is not proven
+reviewed by a green `lwb-lanes`, regardless of what other commits that
+PR's branch happens to carry. On this branch, `git log -S` on the earlier
+version of this sentence shows it was true when first written, on the
+#32-era branch where the reviewable head really was the base; it stopped
+being true here once real content commits started landing on top, and
+re-deriving it today (`resolve_reviewable_head` from this branch's tip)
+resolves to `7da6f47` -- a commit that modifies `HANDOFF.md`, not a
+record-only commit and not the base. So this PR is not currently a live
+instance: its green `lwb-lanes` does attest to review of `7da6f47`'s
+content. The review record that demonstrated the hole (`reviews/32/`)
+does not exist in this tree,
 on `main`, or anywhere reachable from a fresh clone: PR #32 was closed
 unmerged, and the re-cut that carried this document forward (PR #41)
 deliberately left #32's reviewer-record commits behind. It still exists
