@@ -1,0 +1,280 @@
+{
+  "deliverable": "ship-lwb-proof-coverage-and-lwb-proof-integrity-1.1",
+  "author": "claude-code-track-a-session_012CYfXUsJMrpqknbwzPFLGC",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "560b68aab9255d9a9edf3bb65deeb9b334dc845f",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 12%]",
+        "........................................................................ [ 24%]",
+        "........................................................................ [ 36%]",
+        "........................................................................ [ 48%]",
+        "........................................................................ [ 61%]",
+        "........................................................................ [ 73%]",
+        "........................................................................ [ 85%]",
+        "........................................................................ [ 97%]",
+        ".............                                                            [100%]",
+        "589 passed in 21.71s"
+      ],
+      "sha256": "a44b6692d252a870eb0885095b6106092589753ab38c9bcf94d7c54e504a471a",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_validate_claude_plugin.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "Claude plugin validation passed"
+      ],
+      "sha256": "619ada789ca468110703bf240cbe66ae005fcda31587c5b2854057af0facf306",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_validate_codex_plugin.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "Codex plugin validation passed"
+      ],
+      "sha256": "fc1fae45a0bf8b84d7e98a6c52c4c66a909177983709aa16659b60b518eb837f",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_hook_launch.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-portable check passed"
+      ],
+      "sha256": "b48fc74400ced6df61ac28ff5edec0a81eb23026b48768bb20d1e52c93f08d7d",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_foreign_repo.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "TOTAL: 8 of 8 cases exercised against a scratch repo OUTSIDE this checkout -- 3 expected a proof-required warning, 5 expected silence, all matched",
+        "    the command hooks.json registers for Bash was launched as a subprocess for every case, with CLAUDE_PLUGIN_ROOT set and cwd in the scratch repo -- not imported in-process, and not a hardcoded path",
+        "lwb-foreign-repo check passed"
+      ],
+      "sha256": "0515596848f9ccfc93555ee827b8310dfb9b54e60e17e86f227aacb582815174",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2838 bytes)"
+      ],
+      "sha256": "138d748c26f94cb90df70a81b2325c3e84f3d0e94565fbc5a7ebb3c2fab03d15",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (21 record(s))"
+      ],
+      "sha256": "11c384419b8c98fd8fde3ad60e731b833c28bd65063870560a712e2ecee50ab0",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_state_claims.py",
+        "--repo",
+        "."
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:44: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-24 12:32 UTC",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "a5a49041ece1fb4d66d19b3a682dd456327fbc7e871fb3d75d699239b8a4293e",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    }
+  ],
+  "mutations": [
+    "HANDOFF.md",
+    "README.md",
+    "adapters/claude/repo_facts.py",
+    "core/lwb_core/events.py",
+    "core/lwb_core/rules/__init__.py",
+    "core/lwb_core/rules/lwb_proof_coverage.py",
+    "core/lwb_core/rules/lwb_proof_integrity.py",
+    "core/policy/default.json",
+    "docs/policy.md",
+    "docs/rules/lwb-proof-coverage.md",
+    "docs/rules/lwb-proof-integrity.md",
+    "plugins/claude/lwb/vendor/adapters/claude/repo_facts.py",
+    "plugins/claude/lwb/vendor/lwb_core/events.py",
+    "plugins/claude/lwb/vendor/lwb_core/rules/__init__.py",
+    "plugins/claude/lwb/vendor/lwb_core/rules/lwb_proof_coverage.py",
+    "plugins/claude/lwb/vendor/lwb_core/rules/lwb_proof_integrity.py",
+    "plugins/claude/lwb/vendor/policy/default.json",
+    "plugins/codex/lwb/vendor/lwb_core/events.py",
+    "plugins/codex/lwb/vendor/lwb_core/rules/__init__.py",
+    "plugins/codex/lwb/vendor/lwb_core/rules/lwb_proof_coverage.py",
+    "plugins/codex/lwb/vendor/lwb_core/rules/lwb_proof_integrity.py",
+    "plugins/codex/lwb/vendor/policy/default.json",
+    "tests/adapters/test_claude_repo_facts_landed_unproven.py",
+    "tests/adapters/test_claude_repo_facts_matched_proof.py",
+    "tests/core/test_engine_mutation.py",
+    "tests/core/test_lwb_proof_coverage.py",
+    "tests/core/test_lwb_proof_integrity.py"
+  ],
+  "unproven": [
+    "lwb-env-leak was not run locally: LWB_PRIVATE_NEEDLES is a CI-only secret, unset in this environment, so a local run would report UNCONFIGURED rather than a real pass. This PR touches no reviews/ or proof/ content files that would be the usual source of a leak. CI's real run with the secret configured is the only authoritative check.",
+    "lwb-proof-reexecute (--reexecute) was not run locally against this record: it is report-only in CI and, per this PR's own scope, proof_integrity as a shipped rule deliberately does not attempt re-execution either (see the module docstring and docs/rules/lwb-proof-integrity.md) -- item 1.4 is a separate, later piece of work.",
+    "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only. lwb_check_hook_launch.py and lwb_check_foreign_repo.py specifically exist to catch cross-platform launch differences that this container cannot exercise.",
+    "collect_landed_unproven's loose-object walk was exercised in tests/adapters/test_claude_repo_facts_landed_unproven.py against small, purpose-built repos (up to ~45 commits) and manually against a real foreign scratch repo with a genuine squash-merge-shaped subject (see the PR description) -- it was not run against a very large, long-lived, heavily-packed real-world repository, so its actual hit rate on real history beyond this repo's own is unmeasured.",
+    "No independent reviewer has checked this PR yet -- checked_by below is a placeholder pending that review, per this repo's proof-record convention (see e.g. proof/45.json, proof/46.json on other open PRs)."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "lwb_proof_coverage and lwb_proof_integrity ship as rule modules under core/lwb_core/rules/, each pure (Event, RuleConfig) -> Optional[Finding], reasoning only from event.repo",
+      "met": true
+    },
+    {
+      "criterion": "Both wired into core/lwb_core/rules/__init__.py's RULES list and core/policy/default.json at mode \"warn\" -- neither armed to \"deny\"",
+      "met": true
+    },
+    {
+      "criterion": "RepoFacts extended with typed, documented, immutable fields (landed_unproven: tuple; matched_proof_self_certified / matched_proof_has_failed_command: Optional[bool]) populated by adapters/claude/repo_facts.py without shelling out to git",
+      "met": true
+    },
+    {
+      "criterion": "A missed check degrades to silence (empty tuple / None), never a false positive; an unexpected failure in either new collector cannot take down the branch/proof_ids facts lwb_proof_required depends on",
+      "met": true
+    },
+    {
+      "criterion": "Policy-author-facing docs added: docs/rules/lwb-proof-coverage.md, docs/rules/lwb-proof-integrity.md, matching the existing docs/rules/ format",
+      "met": true
+    },
+    {
+      "criterion": "Unit tests for both new rules, adapter tests for both new collectors against real on-disk git/proof layouts, and tests/core/test_engine_mutation.py extended to prove both rules are registry-load-bearing the same way lwb_version already is",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green",
+      "met": true
+    },
+    {
+      "criterion": "scripts/lwb_build.py re-run after the core/adapters change; scripts/lwb_build.py --check confirms both plugins' vendor/ trees match",
+      "met": true
+    },
+    {
+      "criterion": "A standing-condition survey was performed (existing tools for this exact mechanism) and recorded in the PR description, not merely asserted",
+      "met": true
+    },
+    {
+      "criterion": "Neither rule attempts real re-execution or full git-log-backed history walking inside the hook -- both stay within the hook-vs-runner boundary D17 sets, and say so honestly in their own findings/docs when their scope is narrower than CI's equivalent check",
+      "met": true
+    },
+    {
+      "criterion": "No plugins/codex/ or adapters/codex/ hand-edit; codex's vendor/ tree only moved because scripts/lwb_build.py mechanically re-vendors core/lwb_core for both plugins, which the task's own mandatory step requires",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
