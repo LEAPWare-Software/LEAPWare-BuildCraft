@@ -1,0 +1,211 @@
+{
+  "deliverable": "lane-collision-and-cross-pr-record-only-exemption-fix",
+  "pr": 45,
+  "author": "conductor-track-a-claude-sonnet5-session01BQh4cF-2026-09-24",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "8e65ae552fbbab0c58feff928f605d096615f018",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 26%]",
+        "........................................................................ [ 40%]",
+        "........................................................................ [ 53%]",
+        "........................................................................ [ 67%]",
+        "........................................................................ [ 80%]",
+        "........................................................................ [ 94%]",
+        "..............................                                           [100%]",
+        "534 passed in 25.19s"
+      ],
+      "sha256": "69e77dc17aeac737aaeb67df8364d92bb6f215d6fe8db1cf95da419717edcd2b",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...                                                                      [100%]",
+        "3 passed in 0.08s"
+      ],
+      "sha256": "db7f09414dbfd608dbdbc9dc30246e56e6598dc0e7fbf509c46c3bdd43c83e32",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+        "--head",
+        "8e65ae552fbbab0c58feff928f605d096615f018",
+        "--pr-number",
+        "45"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+      "resolved_head": "8e65ae552fbbab0c58feff928f605d096615f018"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+        "--head",
+        "8e65ae552fbbab0c58feff928f605d096615f018",
+        "--pr-number",
+        "45"
+      ],
+      "exit": 1,
+      "expect_exit": 1,
+      "tail": [
+        "FAIL: 8e65ae552fbb: touches a shared path and has 0 independent review(s) in reviews/45/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)",
+        "FAIL: 08680379add1: touches a shared path and has 0 independent review(s) in reviews/45/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)",
+        "FAIL: 98d2fa9e2323: touches a shared path and has 0 independent review(s) in reviews/45/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)",
+        "FAIL: 2bab2820a1d5: touches a shared path and has 0 independent review(s) in reviews/45/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)"
+      ],
+      "sha256": "b63061de4f4df7cc7aef8a45bde98afe20fb4c9491909ba9f50d3022a828330d",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+      "resolved_head": "8e65ae552fbbab0c58feff928f605d096615f018"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2961 bytes)"
+      ],
+      "sha256": "ab8f5e3be55b7ccb642be8c14e54c200edacc355a15f468491bc96399cddeb83",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (21 record(s))"
+      ],
+      "sha256": "11c384419b8c98fd8fde3ad60e731b833c28bd65063870560a712e2ecee50ab0",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "mutations": [
+    ".github/workflows/ci.yml",
+    "scripts/lwb_check_commit_identity.py",
+    "scripts/lwb_lanes.py",
+    "tests/test_lwb_check_commit_identity.py",
+    "tests/test_lwb_lanes.py"
+  ],
+  "unproven": [
+    "lwb-env-leak was not run locally: LWB_PRIVATE_NEEDLES is a CI-only secret, unset in this environment, so a local run would report UNCONFIGURED rather than a real pass. This PR's content commits touch no reviews/ or proof/ files (the earlier source of a leak on #40), but CI's real run with the secret configured is the only authoritative check.",
+    "lwb-lanes currently fails (recorded above, expect_exit=1) with '0 independent review(s) in reviews/45/, needs 1' for each content commit -- expected and unresolved as of this record: this PR has not yet received its independent review. This record does not, and cannot, prove that gate green; a separate reviewer routine's AGREE record is what will.",
+    "lwb_build.py --check / plugin validators were not run: this PR touches neither core/, adapters/, nor plugins/, so no vendor rebuild is implicated, but they were not exercised either way.",
+    "Windows/macOS CI legs were not run locally; everything above ran on Linux/CPython in this container only."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "Every content commit authored exactly LEAPWare <leapware@outlook.com> with a literal LWB-Agent: claude trailer (B1)",
+      "met": true
+    },
+    {
+      "criterion": "scripts/lwb_lanes.py edited surgically against main's real file -- no existing comment/docstring line deleted or reworded incidentally (B2)",
+      "met": true
+    },
+    {
+      "criterion": "_is_record_only_commit scoped to reviews/<pr_number>/ and exactly proof/<pr_number>.json, threaded through resolve_reviewable_head, check_lanes, and a new lwb_check_commit_identity.py --pr-number flag wired into ci.yml (B3)",
+      "met": true
+    },
+    {
+      "criterion": "Regression tests added covering the product-name stoplist (including case-insensitivity), the record-only skip in _authors, and the per-PR scoping from B3 in both lwb_lanes.py and lwb_check_commit_identity.py (B5)",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green",
+      "met": true
+    },
+    {
+      "criterion": ".github/workflows/ci.yml stays parseable after the --pr-number addition (tests/test_workflows_parse.py)",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
