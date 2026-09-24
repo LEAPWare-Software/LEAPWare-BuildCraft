@@ -17,8 +17,8 @@ detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 that no WORTHY AND VETTED tool already does it before building anything.
 
 1. **DONE: #7-#27, #31, #39.** Decisions: `docs/requirements/decisions.md`
-   -- READ FIRST, do not re-decide. Branch tips and PR state are not
-   written here; re-derive per `docs/handoff-protocol.md`.
+   -- READ FIRST. `main`'s #34 has no proof/34.json (unexempted) --
+   gap open. Re-derive PR state per `docs/handoff-protocol.md`.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
    every 2h; a separate reviewer routine writes the gating record
    hourly. D27's rule: separate cron entries, no trigger path
