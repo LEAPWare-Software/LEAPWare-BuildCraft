@@ -25,16 +25,13 @@ that no WORTHY AND VETTED tool already does it before building anything.
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT: #43** (re-cuts #32, the #27 provenance correction;
-   #32 itself was PERMANENTLY BLOCKED -- unclearable DISAGREE records,
-   a stale HANDOFF.md, a leaked private domain, force-push denied --
-   and superseded). #43's reviewable head `bc6874c` carried an
-   independent AGREE; merging `main` (now including #39) into #43 to
-   clear a HANDOFF.md conflict lands a real content commit after that
-   head, so the AGREE is now STALE and a fresh independent review is
-   needed before #43 can merge. #29 (runbook, conflicts w/ main) also
-   open. Re-derive current PR/review state per
-   `docs/handoff-protocol.md`, not from this list.
+3. **IN FLIGHT: #43** (re-cuts #32, the #27 correction; #32 was
+   PERMANENTLY BLOCKED -- unclearable DISAGREE, stale HANDOFF.md, a
+   leaked domain, force-push denied -- and superseded). Reviewable
+   head `bc6874c` had an independent AGREE; this merge lands a real
+   commit after it, so that AGREE is now STALE -- needs a fresh
+   review. #29 (runbook, conflicts w/ main) also open. Re-derive
+   PR/review state per `docs/handoff-protocol.md`.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 2 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
@@ -46,8 +43,8 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-19 21:07 UTC
-main SHA: bfe850796969980545811e1ffa551b9143965faf
+Generated: 2026-09-24 05:42 UTC
+main SHA: e5f29bfaccec90199f983b778c1d7689b8c24d33
 CLI: claude
 Session: session_01EkvcWAEAV2sJYoN51CPrTF
 
@@ -55,7 +52,7 @@ Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-21/21 proven
+22/22 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
