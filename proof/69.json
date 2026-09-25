@@ -1,0 +1,225 @@
+{
+  "deliverable": "lwb-proof-pr-bot-exemption",
+  "pr": 69,
+  "author": "claude-code-conductor-track-a-session_0155DxqgPJdW2MmcumiGKwrm",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "64a8d1ea4f83a6f04358e0da03adcb24b3b018b6",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 46%]",
+        "........................................................................ [ 58%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 81%]",
+        "........................................................................ [ 93%]",
+        ".......................................                                  [100%]",
+        "615 passed in 26.53s"
+      ],
+      "sha256": "f2b012885db131252d8aeeb9918ad1c62b37bb8d1755e52d7da27eef749e1892",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/test_lwb_check_proof.py",
+        "-q",
+        "-k",
+        "bot"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "....                                                                     [100%]",
+        "4 passed, 34 deselected in 0.13s"
+      ],
+      "sha256": "ea083c1dca06cbeb049d57e95f8258a1b7c66aca39268e1e2922c1778992c0a3",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...                                                                      [100%]",
+        "3 passed in 0.06s"
+      ],
+      "sha256": "c2d64d41edcb4d9a0b7a81fcc964ceb8d2b7d73d7d92491bb17f24d0bbaea6d3",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (23 record(s))"
+      ],
+      "sha256": "d8377194e81f4eed5b36c0a14154c6ecb36d9602075e71d7325b831ca8b93401",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "64a8d1ea4f83a6f04358e0da03adcb24b3b018b6"
+    }
+  ],
+  "mutations": [
+    "scripts/lwb_check_proof.py: adds BOT_LOGIN_RE / is_bot_pr_author(login), and threads an optional pr_author + notices through check_pr_has_record() and a new --pr-author CLI flag through main() -- a bot PR author is exempted from the pre-merge self-record requirement, reported via a notice, never silently.",
+    ".github/workflows/ci.yml: the lwb-proof-pr step now passes --pr-author \"${{ github.event.pull_request.user.login }}\".",
+    "tests/test_lwb_check_proof.py: exemption-path test (empty errors + notice naming the PR and login), two regression tests (human author / no author still fails), and three direct unit tests of is_bot_pr_author's match/no-match cases.",
+    "proof/69.json: this record.",
+    "HANDOFF.md: generated deliverable-proof-state block regenerated via scripts/lwb_handoff.py --write in the same commit as this record, per docs/maintainers/proof-of-completion-plan.md's record/head circularity note -- proof file written before the regen."
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string pending-independent-reviewer-routine rather than a reviewer identity -- per D20/D27 and this repo's CLAUDE.md, that record is the separate clock-dispatched reviewer routine's job, and this session must not write or dispatch one itself.",
+    "The commands above ran on Linux only, in this container. CI's other matrix legs (macOS, Windows, the second Python version) were not run here.",
+    "lwb-env-leak / lwb-env-leak-history were not run locally: LWB_PRIVATE_NEEDLES is a CI-only repository secret, unset in this environment -- a local run would report UNCONFIGURED rather than a real pass. This PR adds no needle-shaped strings and touches no proof/ or reviews/ content beyond this record; CI's real run with the secret configured is the only authoritative check.",
+    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number 69 was not run to check this PR's own lane gate: this PR touches only shared paths (scripts/, .github/, tests/) and no independent review record exists under reviews/69/ yet, which is the expected, correct state before the reviewer routine runs -- not a defect in this record.",
+    "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
+    "The fix was implemented by a subagent dispatched by this conductor session, per the routine's own rule that the conductor coordinates and does not write product code directly (CLAUDE.md / the routine's step 7). The diff was reviewed line-by-line and every command above was re-run independently by the conductor session before this record was written, rather than trusting the subagent's own report of success.",
+    "Whether the real Dependabot PRs #60 and #61 actually go green once this lands on main was not measured by this record -- ci.yml only takes effect on runs that check it out, so #60/#61 (both currently `behind` main) will need a rebase onto a main that includes this fix before their lwb-proof-pr step can be re-observed; that observation is separate follow-up, not claimed here."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "is_bot_pr_author(login) matches any GitHub login ending in the literal suffix '[bot]' (case-insensitive) -- dependabot[bot], renovate[bot], github-actions[bot] -- and does not match None, an empty string, or a login that merely contains 'bot' without that exact suffix (e.g. 'robot-wrangler')",
+      "met": true
+    },
+    {
+      "criterion": "check_pr_has_record() accepts an optional pr_author and notices param; when pr_author is a recognized bot, the function returns no errors and appends exactly one NOTICE naming the PR number and the login to notices, rather than passing silently",
+      "met": true
+    },
+    {
+      "criterion": "A non-bot pr_author, or no pr_author given at all, leaves check_pr_has_record()'s existing behavior completely unchanged (regression-tested)",
+      "met": true
+    },
+    {
+      "criterion": "main()'s argparse gains --pr-author, paired with --pr, and threads it (plus notices) into check_pr_has_record() -- no other call site or check in the file is touched",
+      "met": true
+    },
+    {
+      "criterion": "ci.yml's lwb-proof-pr step passes --pr-author \"${{ github.event.pull_request.user.login }}\" so the exemption is actually live in CI, not just in the library function",
+      "met": true
+    },
+    {
+      "criterion": "tests/test_lwb_check_proof.py covers the exemption path, both regression cases, and is_bot_pr_author's match/no-match cases as separate named tests, following the file's existing REPO_ROOT/PROOF_DIR monkeypatch convention",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green, and tests/test_workflows_parse.py green after touching ci.yml (this repo's own trap: an unparseable workflow produces no CI run at all, not a red one)",
+      "met": true
+    },
+    {
+      "criterion": "This deliverable touches no core/ or adapters/ path, so scripts/lwb_build.py --check needs no vendor rebuild -- confirmed by running it, not assumed",
+      "met": true
+    },
+    {
+      "criterion": "No reviews/ record written or dispatched by this session -- that is the separate clock-dispatched routine's job per D20/D27",
+      "met": true
+    },
+    {
+      "criterion": "Implementation work delegated to a subagent per this routine's own coordinate-don't-write rule, with the conductor independently re-verifying (diff read, full suite re-run, workflow parse, vendor check) rather than trusting the subagent's self-report",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
