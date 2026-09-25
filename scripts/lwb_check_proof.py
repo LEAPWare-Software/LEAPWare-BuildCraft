@@ -580,7 +580,34 @@ def check_coverage(rev_range: str) -> list[str]:
     return errors
 
 
-def check_pr_has_record(pr_number: int) -> list[str]:
+# GitHub's own convention for a bot/App account's login: it always ends in
+# `[bot]` (dependabot[bot], renovate[bot], github-actions[bot], the app-name
+# form of any GitHub App). This is a DIFFERENT signal from
+# `lwb_lanes.py::BOT_AUTHOR_PATTERNS`, which matches the git commit AUTHOR
+# EMAIL of each commit in a range. Here there is no commit to inspect yet --
+# `check_pr_has_record` runs pre-merge, keyed on the PR's own number, and the
+# only bot signal available at that moment is the PR's GITHUB LOGIN
+# (`github.event.pull_request.user.login`), which CI already has and this
+# module did not previously accept. Anchored at the end (`$`) so a login that
+# merely CONTAINS "bot" (e.g. a human-chosen `robot-wrangler`) never matches
+# -- only GitHub's own bracketed suffix does.
+BOT_LOGIN_RE = re.compile(r"\[bot\]$", re.IGNORECASE)
+
+
+def is_bot_pr_author(login) -> bool:
+    """True when `login` (a GitHub PR author login, not a commit email) is a
+    recognized bot/App account by GitHub's own `[bot]` suffix convention.
+
+    Covers `dependabot[bot]` explicitly by the same suffix rule as any other
+    bot login (`renovate[bot]`, `github-actions[bot]`, ...) -- there is
+    nothing dependabot-specific to special-case. `None`, `""`, and a login
+    that merely contains "bot" without the bracketed suffix (e.g. a human
+    account named `robot-wrangler`) all return False.
+    """
+    return isinstance(login, str) and bool(BOT_LOGIN_RE.search(login))
+
+
+def check_pr_has_record(pr_number: int, pr_author=None, notices: "list[str] | None" = None) -> list[str]:
     """Pre-merge half of directive 7: this PR must carry its own proof record.
 
     `check_coverage` keys on the `(#N)` squash-merge subject, and GitHub
@@ -594,7 +621,33 @@ def check_pr_has_record(pr_number: int) -> list[str]:
     So there are two halves, keyed on the two things that actually exist at
     the two moments: the PR NUMBER before the merge (blocking), and the
     COMMIT after it (detective, on push to main).
+
+    `pr_author` (the PR's GitHub login, optional) carries the same exemption
+    `lwb_lanes.py`'s module docstring already states for the lane gate ("Bot
+    commits are skipped too ... a bot ... cannot write a `reviews/` record,
+    so without this every Dependabot PR would fail ... and teach us to merge
+    past a red gate"): a Dependabot (or any `[bot]`-suffixed) PR can never
+    write a `proof/*.json` record naming its own PR number either -- it has
+    no owner directive 7 workflow to run -- so requiring one here is the same
+    permanent, unfixable failure the lane gate was already exempted from.
+    That reasoning was written for the lane gate only and was never carried
+    across to this proof-record gate; this is the missing half. Unlike the
+    lane exemption (silent, by design -- see `is_bot_commit`), this one is
+    reported: a bot exemption of the PROOF requirement is load-bearing enough
+    that it must never look identical to "checked and found a record", so a
+    notice is appended to `notices` (if given) naming the PR and the login.
+    Bots remain bound by every other check in this file.
     """
+    if is_bot_pr_author(pr_author):
+        if notices is not None:
+            notices.append(
+                f"pr-authority: PR #{pr_number} author {pr_author!r} is a recognized bot "
+                "account -- exempted from carrying its own proof/*.json record, same "
+                "rationale as lwb_lanes.py's BOT_AUTHOR_PATTERNS lane exemption (a bot "
+                "cannot write one). Bots remain bound by every other check."
+            )
+        return []
+
     errors: list[str] = []
     if not PROOF_DIR.is_dir():
         records = []
@@ -1273,6 +1326,20 @@ def main() -> int:
         default=None,
         help="pre-merge: require a proof record naming this PR number",
     )
+    # Paired with --pr: the PR's GitHub login (github.event.pull_request.
+    # user.login in CI), not a git commit author email -- a different
+    # signal from lwb_lanes.py's commit-email-based bot check. When this
+    # names a recognized bot account (is_bot_pr_author), check_pr_has_record
+    # exempts that PR from carrying its own proof/*.json record (a bot can
+    # never write one) and reports the exemption via a notice rather than
+    # silently. Omitted or a non-bot login: no change in behaviour.
+    parser.add_argument(
+        "--pr-author",
+        dest="pr_author",
+        default=None,
+        help="PR author's GitHub login; a recognized bot (e.g. dependabot[bot]) is "
+        "exempted from the --pr proof-record requirement, reported via a notice",
+    )
     # Paired with --pr: the base/head to diff for
     # check_new_proof_records_declare_pr's "new or changed in this PR"
     # check. Same base/head reasoning as lwb_check_commit_identity.py and
@@ -1333,7 +1400,7 @@ def main() -> int:
         errors.extend(check_coverage(args.rev_range))
     notices: list[str] = []
     if args.pr_number:
-        errors.extend(check_pr_has_record(args.pr_number))
+        errors.extend(check_pr_has_record(args.pr_number, pr_author=args.pr_author, notices=notices))
         pr_check_kwargs = {}
         if args.base and args.head:
             pr_check_kwargs["rev_range"] = f"{args.base}..{args.head}"

@@ -121,11 +121,21 @@ jobs:
         # check_new_proof_records_declare_pr, which requires every
         # proof/*.json file new or changed in this range to self-declare
         # this PR's own number.
+        #
+        # --pr-author: the PR's GitHub login, available on pull_request
+        # events. A bot account (dependabot[bot], renovate[bot], ...) can
+        # never write a proof/*.json record naming its own PR -- same
+        # rationale as lwb_lanes.py's commit-email-based bot exemption for
+        # the lane gate, carried across to this gate. Wiring it here (rather
+        # than leaving --pr-author unset) is what closes the gap: Dependabot
+        # PRs #60/#61 have been red on this step since they opened, for
+        # exactly this reason.
         run: >-
           python scripts/lwb_check_proof.py
           --pr ${{ github.event.pull_request.number }}
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
+          --pr-author "${{ github.event.pull_request.user.login }}"
 
       - name: "lwb-proof-reexecute (report-only: re-run verifiable commands, compare digests)"
         if: always()

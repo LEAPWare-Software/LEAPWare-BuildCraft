@@ -115,6 +115,57 @@ def test_ci_workflow_still_declares_the_jobs_the_ruleset_requires():
         )
 
 
+def _lwb_proof_pr_step(data: dict) -> dict:
+    steps = data["jobs"]["test"]["steps"]
+    matches = [
+        s for s in steps if str(s.get("name", "")).startswith("lwb-proof-pr")
+    ]
+    assert len(matches) == 1, (
+        "expected exactly one 'test' job step whose name starts with "
+        f"'lwb-proof-pr', found {len(matches)}"
+    )
+    return matches[0]
+
+
+def test_lwb_proof_pr_step_passes_pr_author():
+    """Regression for a gap two independent reviewers flagged: the
+    `lwb-proof-pr` step's `run:` command must keep passing `--pr-author`, or
+    the bot-PR exemption in scripts/lwb_check_proof.py silently stops being
+    wired up in CI while the rest of the suite stays green.
+
+    THE VACUITY TRAP. A naive `"--pr-author" in <raw file text>` check would
+    still pass even with the flag deleted from the actual `run:` block,
+    because the string `--pr-author` also appears in this step's own
+    explanatory comment a few lines above `run:`. So this test parses the
+    workflow with PyYAML and asserts on the parsed step's own `run` string
+    specifically, never on the whole raw file.
+    """
+    yaml = _require_yaml()
+    ci = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    data = yaml.safe_load(ci.read_text(encoding="utf-8"))
+
+    step = _lwb_proof_pr_step(data)
+    run = step.get("run", "")
+    assert "--pr-author" in run, (
+        "the lwb-proof-pr step's 'run:' command no longer passes --pr-author -- "
+        f"this silently disables the bot-PR exemption. run was:\n{run!r}"
+    )
+
+    # Prove this assertion is not vacuous the same way the trap could be:
+    # a copy of the real run string with --pr-author stripped out (as the
+    # regression would leave it) must fail the same assertion.
+    mutated_run = "\n".join(
+        line for line in run.splitlines() if "--pr-author" not in line
+    )
+    assert "--pr-author" not in mutated_run
+    try:
+        assert "--pr-author" in mutated_run
+    except AssertionError:
+        pass
+    else:  # pragma: no cover -- would mean the probe itself is broken
+        pytest.fail("mutation probe did not fail as expected -- test is vacuous")
+
+
 def test_step_names_with_a_colon_are_quoted():
     """The specific mistake that caused this, caught at its own shape.
 
