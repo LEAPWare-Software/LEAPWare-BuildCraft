@@ -1,0 +1,183 @@
+{
+  "deliverable": "recut-65-bad-commit-identity",
+  "pr": 66,
+  "author": "claude-code-sonnet5-session_018tmHaUa9DYFzZiTiWBZirr",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "be216e879bd7fcbd2d69e37912637ba242ae6f98",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        ".................................                                        [100%]",
+        "609 passed in 21.77s"
+      ],
+      "sha256": "67a3863196c006edb66f82dfdd4800be5c79d922a401b9656010ef20734fba02",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (23 record(s))"
+      ],
+      "sha256": "d8377194e81f4eed5b36c0a14154c6ecb36d9602075e71d7325b831ca8b93401",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "lwb-recut-65-bad-commit-identity"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "be216e879bd7fcbd2d69e37912637ba242ae6f98"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_lanes.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "lwb-recut-65-bad-commit-identity",
+        "--pr-number",
+        "66"
+      ],
+      "exit": 1,
+      "expect_exit": 1,
+      "tail": [
+        "FAIL: be216e879bd7: touches a shared path and has 0 independent review(s) in reviews/66/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)",
+        "FAIL: 698ee6ac4b72: touches a shared path and has 0 independent review(s) in reviews/66/, needs 1 (each a record with verdict AGREE and a reviewer_id differing from commit_author_id)"
+      ],
+      "sha256": "78e8f9982c783323ba23cf501a05187394a5102ac018538796b30d2d5bff1340",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "be216e879bd7fcbd2d69e37912637ba242ae6f98"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2945 bytes)"
+      ],
+      "sha256": "b99b13284833966e25fdc6fc9e5956ccc9fdc8ffaa09b48b8473fb0acc246a98",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_state_claims.py",
+        "--repo",
+        "."
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-25 10:29 UTC",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "cf89e86df97dfdfedb1e2bc8f9171cfce220e421246a05567b50e773a79f3042",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    }
+  ],
+  "mutations": [
+    "docs/maintainers/item-1.7-reviewer-plurality-2026-09-25.md",
+    "HANDOFF.md"
+  ],
+  "unproven": [
+    "No independent reviewer has checked this PR yet -- checked_by above is a placeholder pending that review, per this repo's proof-record convention (see e.g. proof/lwb-ship-proof-coverage-integrity.json).",
+    "lwb-lanes' own finding (0 independent review(s) in reviews/66/) is expected and not fixed by this record -- it is the same 'not yours to fix' condition #65's own diagnosis named; this record does not claim it as resolved.",
+    "This record does not re-verify build-plan item 1.7's own underlying claims (the reviewer-Routine schedule, the sampled reviews/*.json records, or the ShellUX cross-repo secondary) beyond confirming the evidence doc it adds is byte-identical to what was read from origin/lwb-item-1.7-reviewer-plurality and re-read in full before being copied here -- see that doc's own \"What could not be verified\" section for item 1.7's residual gaps.",
+    "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
+    "lwb-env-leak was not run locally: LWB_PRIVATE_NEEDLES is a CI-only secret, unset in this environment, so a local run would report UNCONFIGURED rather than a real pass. This PR touches no reviews/ or proof/ content files that would be the usual source of a leak."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "The commit landing the evidence doc is authored and committed as LEAPWare <leapware@outlook.com>, not the container-default Claude <noreply@anthropic.com> that broke #65 (lwb-commit-identity)",
+      "met": true
+    },
+    {
+      "criterion": "docs/maintainers/item-1.7-reviewer-plurality-2026-09-25.md is re-read in full from origin/lwb-item-1.7-reviewer-plurality and confirmed still accurate before being committed here, content unchanged",
+      "met": true
+    },
+    {
+      "criterion": "This PR's own description does not claim inclusion of anything not actually committed at the time it is opened -- the proof record and any HANDOFF.md change are described as follow-up commits, not as already included, closing the lwb-proof-pr defect #65 had",
+      "met": true
+    },
+    {
+      "criterion": "commit-msg hook (scripts/githooks/commit-msg) actually fires for these commits, not silently skipped -- core.hooksPath was confirmed set to scripts/githooks before committing",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q), lwb_check_proof.py, and lwb_check_commit_identity.py all pass locally before push",
+      "met": true
+    },
+    {
+      "criterion": "lwb_lanes.py run locally against the real PR number shows only the expected, not-mine-to-fix '0 independent review(s)' finding, nothing else",
+      "met": true
+    },
+    {
+      "criterion": "proof/<id>.json is built via scripts/lwb_record.py, never hand-edited, and declares \"pr\": 66 in the commit that adds it, per proof/README.md's PR-authority rule",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
