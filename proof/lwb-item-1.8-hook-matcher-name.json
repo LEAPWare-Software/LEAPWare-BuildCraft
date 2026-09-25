@@ -1,0 +1,164 @@
+{
+  "deliverable": "lwb-item-1.8-hook-matcher-name",
+  "author": "claude-code-conductor-track-a-session_01YD5hpzfpL5it8uZroanCLn",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "e4a14ceeb47d7d0d5f4114beae89c89ef87b8353",
+  "commands": [
+    {
+      "argv": [
+        "/root/.local/bin/pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        "..............................sss                                        [100%]",
+        "606 passed, 3 skipped in 29.14s"
+      ],
+      "sha256": "f574886fda3646aa671a19f36b0b25da4a063ca42e81881df8d1a7366e48c7dd",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "/root/.local/bin/pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "sss                                                                      [100%]",
+        "3 skipped in 0.01s"
+      ],
+      "sha256": "f93af03063f5ed70c0106507190b617cd9b8fe5104e1bd308f47e80c062d7bf2",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "e4a14ceeb47d7d0d5f4114beae89c89ef87b8353"
+    }
+  ],
+  "mutations": [
+    "docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md: new dated maintainers note quoting finding 6 verbatim, quoting the official Anthropic doc rename note verbatim with URL, and stating what is narrowed vs what stays open.",
+    "docs/maintainers/proof-of-completion-plan.md: appended an annotation under finding 6 (~line 443) pointing at the new note and stating the naming risk is resolved with citation, while explicitly stating the firing-observation question stays open. The original finding text is unchanged, per this file's own convention of appending corrections rather than rewriting.",
+    "proof/lwb-item-1.8-hook-matcher-name.json: this record."
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string pending-independent-reviewer-routine, not a reviewer identity -- per D20/D27 and this repo's CLAUDE.md, writing or dispatching that record is a separate clock-dispatched reviewer routine's job, and this session must not do either.",
+    "The doc citation (Anthropic's sub-agents.md rename note) was checked via two independent lookups in this session (a research subagent's fetch and a separate direct fetch of the same URL) and both returned the same text -- but this record does not re-fetch the URL itself as a command, so the citation's exact current text is not re-verified by anything in commands[] above; it is asserted from what was read earlier in this session.",
+    "The empirical hook-firing question -- does plugins/claude/lwb/hooks/hooks.json actually fire inside a real running Claude Code session -- remains genuinely open and is explicitly NOT claimed resolved by this record or by the note it adds. No probe was run in this session. That is Build Plan Phase 6's job.",
+    "reviews/ has no record for this PR yet, which is the expected, correct state before the separate reviewer routine runs -- not a defect in this record. lwb_lanes.py was not run against this branch for that reason.",
+    "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
+    "This environment's python3 has no pytest module installed (python3 -m pytest fails with No module named pytest); the pytest binary at /root/.local/bin/pytest was used directly instead, an equivalent invocation, recorded honestly as the argv actually run rather than the python3 -m pytest form the task instructions suggested.",
+    "tests/test_workflows_parse.py's 3 tests were SKIPPED, not passed: PyYAML is not installed in this local environment, and the tests themselves say this check is mandatory in CI. That is an honest environment fact, not a claim that workflow parsing was verified locally.",
+    "lwb-env-leak / lwb-env-leak-history were not run locally: LWB_PRIVATE_NEEDLES is a CI-only repository secret, unset here. This deliverable adds no needle-shaped strings and touches only docs/ and proof/; CI's real run with the secret configured is the only authoritative check.",
+    "The commands above ran on Linux only, in this container. CI's other matrix legs (macOS, Windows, the second Python version) were not run here."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "A new dated maintainers note exists at docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md that quotes finding 6's stated risk verbatim and quotes the official Anthropic doc's exact Task-renamed-to-Agent note verbatim, with the doc URL cited",
+      "met": true
+    },
+    {
+      "criterion": "The note explicitly states it was checked via two independent lookups against the same URL, and states clearly what is narrowed (the dead-matcher-name risk) versus what remains open (empirical hook-firing observation, reserved for Build Plan Phase 6)",
+      "met": true
+    },
+    {
+      "criterion": "The note contains no claim that item 1.8 is closed, and no claim that the hook has been observed to fire",
+      "met": true
+    },
+    {
+      "criterion": "docs/maintainers/proof-of-completion-plan.md's finding 6 is annotated with a pointer to the new note, not silently rewritten -- the original finding text is unchanged and the annotation is clearly appended",
+      "met": true
+    },
+    {
+      "criterion": "No core/, adapters/, plugins/*/lwb/vendor/, or plugins/claude/lwb/hooks/hooks.json path is touched by this deliverable",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green with no test changes needed, since this is docs-only",
+      "met": true
+    },
+    {
+      "criterion": "Commit author/committer identity (LEAPWare <leapware@outlook.com>) passes scripts/lwb_check_commit_identity.py --base origin/main --head HEAD",
+      "met": true
+    },
+    {
+      "criterion": "The commit message carries the LWB-Agent: claude trailer required by scripts/githooks/commit-msg",
+      "met": true
+    },
+    {
+      "criterion": "No reviews/ record written or dispatched by this session -- that is the separate clock-dispatched routine's job per D20/D27",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
