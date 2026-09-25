@@ -1,0 +1,153 @@
+{
+  "deliverable": "correction-record-for-27-false-dispatch-claim",
+  "pr": 46,
+  "author": "coordinator-opus5-f8da3f9e-2026-09-19",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "ba983cf686ea65cc9c0fe9b7fb4190daefe43ced",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 14%]",
+        "........................................................................ [ 28%]",
+        "........................................................................ [ 42%]",
+        "........................................................................ [ 56%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 84%]",
+        "........................................................................ [ 98%]",
+        "........                                                                 [100%]",
+        "512 passed in 49.44s"
+      ],
+      "sha256": "9fa931d809fca0bc82c66a879233a0e128675ef97d67939fd76cd7140bc784f9",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_state_claims.py",
+        "--repo",
+        "."
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:43: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-19 11:34 UTC",
+        "HANDOFF.md:44: INFO (git-verified): recorded main SHA 9b374b52a56e04e6b443f9aa9d86fa51a0d8a47c is live main's first parent 9b374b52a56e04e6b443f9aa9d86fa51a0d8a47c (live main is now f9b4deadbb441f0c1046a0d73b0434424f1cf13c) -- verified by git",
+        "HANDOFF.md:49: INFO (git-verified): #27 listed as open but gh reports MERGED -- its merge commit f9b4deadbb441f0c1046a0d73b0434424f1cf13c is live main itself (f9b4deadbb441f0c1046a0d73b0434424f1cf13c); this is the expected post-merge state, not a stale listing",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "b46eda93c8c6fdfd55b63fdecbeb803b0b12230927b1826d512a86bd45d0c2a9",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (19 record(s))"
+      ],
+      "sha256": "76e3444b5a681d370182c71251c2f1b8e9b98effebcce0d52366a56262e42190",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "THE FACT IS ESTABLISHED FROM EVIDENCE IN THE REPOSITORY, not from memory. reviews/27/cloud-reviewer.json carries reviewer_was_dispatched_by_author: false and a reviewer_id containing the session token 01GaiKSWBCRLtcVa5fPYz4nQ. That run was created at 13:59:25Z. The routine's cron is `23 * * * *`. 13:59 is not a cron time; the run was fired by hand by the session that authored #27's commits. Independent reviewer B corroborated the timeline from GitHub REST: reviewer A's comment landed 14:09:46Z and #27 merged 14:18:29Z, which fits a 13:59 start and does not fit a 13:23 or 14:23 one.",
+      "met": true
+    },
+    {
+      "criterion": "THE LANDED RECORD IS NOT AMENDED. #27 is merged. Rewriting a landed review record to say something other than what the reviewer wrote would be a worse act than the error being corrected, so the record stands and the correction sits beside it.",
+      "met": true
+    },
+    {
+      "criterion": "THE DOCUMENT'S OWN FALSE CLAIM IS CORRECTED. Its first version asserted that a record declaring dispatched=true 'will not satisfy the gate'. Reviewer B measured the opposite: such a record PASSES lwb-lanes with exit 0 and a NOTICE. Confirmed by reading scripts/lwb_lanes.py lines 694-711, where the dispatched branch appends a notice and the function returns the reviewer id rather than None, and by reviews/schema.json's own description. The document now states that honest reporting would NOT have blocked #27 -- which is worse than what it first claimed, and true.",
+      "met": true
+    },
+    {
+      "criterion": "THE SECOND LIMITATION IS RECORDED, BY ITS GENERAL SHAPE. A pull request whose commits touch only reviews/ and proof/ is not covered by the review gate: classify_path calls those paths shared so a review is demanded, but resolve_reviewable_head skips record-only commits, so the head a record must attest to can be the base commit the PR does not modify. Reviewer B proved it by replacing the document's entire contents with nonsense and watching lwb-lanes still pass. An earlier version of the document additionally claimed 'this pull request is itself an instance' of that hazard -- true when written on the #32-era branch, where the reviewable head was the base, but false once this PR started landing real content commits on top (re-deriving resolve_reviewable_head from this branch's tip resolves to a commit that modifies HANDOFF.md, not the base and not record-only). A later independent reviewer caught the staleness; the document now states the hazard by its durable general shape instead of claiming this specific PR is a live example of it.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- no per-PR token accounting was taken. Recorded unknown rather than copied from another record, because a borrowed number is a manufactured one."
+  },
+  "mutations": [
+    "reviews/27/dispatch-correction.md: the correction, and the correction to the correction"
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED. checked_by is the literal string UNCHECKED-pending-independent-review, not a reviewer identity.",
+    "THE GATE CANNOT VERIFY THE CENTRAL CLAIM. Nothing in scripts/lwb_lanes.py can distinguish a cron-dispatched run from a hand-fired one; both arrive as a commit on a branch. The evidence for this correction is a run-creation timestamp visible to the session that fired it, corroborated by a reviewer from GitHub's own clock -- not anything the repository can check for itself. The mitigation is procedural, not mechanical, and the document says so.",
+    "THE STRUCTURAL HOLE IS NOT FIXED. A reviews/-only or proof/-only pull request still bypasses the review gate with respect to its own content. Fixing it means changing scripts/lwb_lanes.py, which is a shared path needing its own review, and doing it inside this PR would mean the fix landed through the very hole it closes.",
+    "WINDOWS ONLY for the six commands; CI runs six legs across three operating systems."
+  ]
+}
