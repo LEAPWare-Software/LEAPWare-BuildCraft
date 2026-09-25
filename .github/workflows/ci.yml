@@ -163,6 +163,40 @@ jobs:
         timeout-minutes: 15
         run: python scripts/lwb_check_proof.py --reexecute
 
+      - name: "lwb-acceptance-criteria (report-only: D24 -- issue must predate first commit)"
+        # REPORT-ONLY, matching lwb-proof-reexecute's shape exactly
+        # (continue-on-error: true, if: always()): this is a NEW gate and
+        # this repo's own discipline lands a new gate quiet before arming
+        # it -- see core/lwb_core/rules/lwb_proof_required.py's docstring,
+        # "Ship quiet, collect evidence from the ledger, then arm". Scoped
+        # to pull_request, like lwb-proof-pr above, because it needs
+        # github.event.pull_request.number for --pr and
+        # base.sha/head.sha for the same reason lwb-proof-pr and
+        # lwb-commit-identity need them: a pull_request checkout's HEAD is
+        # the synthetic refs/pull/N/merge commit, not a real commit on the
+        # PR branch, so the real head sha must be passed explicitly.
+        #
+        # No GH_TOKEN is set here, matching lwb-check-state-claims and
+        # lwb-proof-pr/lwb-proof-reexecute above EXACTLY -- none of them
+        # sets one either, so `gh` runs unauthenticated in this job today
+        # (see docs/maintainers/proof-of-completion-plan.md: "CI stayed
+        # green only because the runner's gh is unauthenticated"). This
+        # step therefore very likely reports UNVERIFIABLE on every real PR
+        # run until that separate, pre-existing gap is closed -- named
+        # here rather than silently worked around by adding a token this
+        # PR was not asked to add.
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: >-
+          python scripts/lwb_check_acceptance_criteria.py
+          --pr ${{ github.event.pull_request.number }}
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}
+          --branch "$PR_HEAD_REF"
+
       - name: lwb-proof-coverage (every landed deliverable HAS a record)
         # Post-merge, on main: `before..sha` contains the squash commit that
         # GitHub has now actually written, `(#N)` subject and all.

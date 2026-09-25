@@ -1,0 +1,305 @@
+{
+  "deliverable": "acceptance-criteria-anchor-1.5",
+  "pr": 68,
+  "author": "claude-code-session_01NVQQFzEvEo9SJS2hemiphw",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "2b83009efa8d24121b6834c4bd7ee823f7746ac8",
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 22%]",
+        "........................................................................ [ 34%]",
+        "........................................................................ [ 45%]",
+        "........................................................................ [ 56%]",
+        "........................................................................ [ 68%]",
+        "........................................................................ [ 79%]",
+        "........................................................................ [ 90%]",
+        ".........................................................                [100%]",
+        "633 passed in 29.59s"
+      ],
+      "sha256": "9c7c7af66719bddc7fda7994ce25b1f5c821307e29de6186a7f6b92eaa685fa0",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 22%]",
+        "........................................................................ [ 33%]",
+        "........................................................................ [ 45%]",
+        "........................................................................ [ 56%]",
+        "........................................................................ [ 67%]",
+        "........................................................................ [ 79%]",
+        "........................................................................ [ 90%]",
+        "............................................................             [100%]",
+        "636 passed in 31.78s"
+      ],
+      "sha256": "732c4aa502a156b3ece5c65a48b465f3b8b16d4e1cad5be209598a6cbea8dc11",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2960 bytes)"
+      ],
+      "sha256": "475224736a586a6814e73907bfa221659ef2dc494ae04fb493a3051c036f2df9",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (23 record(s))"
+      ],
+      "sha256": "d8377194e81f4eed5b36c0a14154c6ecb36d9602075e71d7325b831ca8b93401",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_state_claims.py",
+        "--repo",
+        "."
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-24 18:20 UTC",
+        "HANDOFF.md:47: INFO (git-verified): recorded main SHA 6afc545646faa9b241ffe60ee4c612f50e4437f8 is live main's first parent 6afc545646faa9b241ffe60ee4c612f50e4437f8 (live main is now 0d1be714ac028d9b2204bf997d49296c32378ff1) -- verified by git",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "51c87ea2379cb87b6588c045e9ef3395e908e82b8433ec43005343ac691e3c8b",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "2b83009efa8d24121b6834c4bd7ee823f7746ac8"
+    },
+    {
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...                                                                      [100%]",
+        "3 passed in 0.06s"
+      ],
+      "sha256": "c2d64d41edcb4d9a0b7a81fcc964ceb8d2b7d73d7d92491bb17f24d0bbaea6d3",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
+        "scripts/lwb_check_acceptance_criteria.py",
+        "--help"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "  --pr PR_NUMBER        the PR number whose body is searched for a closing-",
+        "                        keyword issue reference",
+        "  --branch BRANCH       branch name for",
+        "                        docs/requirements/acceptance_exempt.json 'branch'",
+        "                        matching (default: $GITHUB_HEAD_REF, else the local",
+        "                        repo's current branch)",
+        "  --repo-path REPO_PATH",
+        "                        local git repository root (default: current directory)",
+        "  --gh-repo GH_REPO     owner/repo slug for gh api calls (default: LEAPWare-",
+        "                        Software/LEAPWare-BuildCraft)"
+      ],
+      "sha256": "14774b4b09d683a12cf918a0772a170fb5b400c57d17d6c7f1c17938ac7a1da0",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "mutations": [
+    ".github/workflows/ci.yml",
+    "HANDOFF.md",
+    "docs/requirements/acceptance_exempt.json",
+    "proof/68.json",
+    "scripts/lwb_check_acceptance_criteria.py",
+    "tests/test_lwb_check_acceptance_criteria.py"
+  ],
+  "unproven": [
+    "lwb-env-leak was not run locally: LWB_PRIVATE_NEEDLES is a CI-only secret, unset in this environment, so a local run would report UNCONFIGURED rather than a real pass. This PR touches no proof/ or reviews/ content beyond this record and adds no needle-shaped strings; CI's real run with the secret configured is the only authoritative check.",
+    "lwb-lanes (scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number 68) currently FAILS locally: this PR touches only shared paths, and no independent review record exists under reviews/68/ yet. Per this repo's CLAUDE.md and D20/D27, that record is the job of a separate clock-dispatched reviewer routine, not this session -- this session must not write or dispatch anything under reviews/. This is the expected, correct state before that routine runs, not a defect.",
+    "The new lwb-acceptance-criteria CI step was NOT run against a real GitHub Actions runner as part of this record -- only locally, against this repo's live PRs/issues via gh (which worked in this session's sandboxed environment) and against real tmp_path git repos in the unit tests. Whether `gh` behaves identically on a real GitHub-hosted runner with no GH_TOKEN configured (see the module docstring's 'known CI limitation' section) is unmeasured by this record.",
+    "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
+    "checked_by is a placeholder pending independent review, per this repo's proof-record convention for an unreviewed PR (see e.g. proof/lwb-ship-proof-coverage-integrity.json).",
+    "The mutation probes described in this PR's description (flipping the timestamp comparison operator; disabling the exemption match) were run interactively in this session and reverted before this record was written -- they are not themselves one of the commands[] entries above, since committing a script in a deliberately-broken state, even briefly, is not something this record captures as proof; the PR description states their exact before/after test counts instead.",
+    "This record originally marked `pytest tests/test_workflows_parse.py -q` verifiable: true, on the assumption that a 3-test run's output was stable enough. It is not: pytest's own summary line embeds a wall-clock duration (\"3 passed in 0.06s\"), the exact defect docs/maintainers/proof-of-completion-plan.md already names for the full `pytest tests/ -q` entry above. CI's own --reexecute step (report-only, so this did not fail the build) caught the mismatch on the real runner and this is corrected here -- classification only, per proof/README.md's rule for the one legitimate kind of post-hoc edit to a record: the captured argv/exit/tail/sha256 are left byte-for-byte as originally captured; only verifiable/verifiable_reason changed.",
+    "F4 correction (reviews/68/cloud-reviewer.json): the first `pytest tests/ -q` entry above (633 passed) was captured at commit 2b83009e, this record's original `commit` field, and is left byte-for-byte untouched per proof/README.md's rule that an existing record may only be corrected in its CLASSIFICATION, never its captured evidence. Three commits landed on this PR branch after that capture (8a577b0, f65fd7f6, and this fix commit), adding tests and fixing F1/F2/F3/F5; the true count moved. Rather than rewrite the original entry's tail/sha256 -- which proof/README.md and this record's own prior correction (the test_workflows_parse.py verifiable-flag fix above) both treat as illegitimate -- a second, freshly-captured `pytest tests/ -q` entry was generated through scripts/lwb_record.py (never hand-typed) and appended immediately after the original, showing the corrected, current count: 636 passed. This second entry is the authoritative count for this PR's completion claim; the PR body and this file's description of the count are updated to match it. A first attempt at re-running this command hit tests/test_lwb_lanes.py's pre-existing, already-tracked flake (test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff, root-caused and tracked by open PR #63 -- see reviews/68/cloud-reviewer-b.json's F3) and was discarded as noise, not recorded, since it is not a property of this PR's own code; the entry above is a clean re-run."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "scripts/lwb_check_acceptance_criteria.py resolves the deliverable's first commit as the earliest entry of `git log --first-parent <base>..<head> --reverse`, with the module docstring explaining why --first-parent is correct for a base..head range (reusing resolve_reviewable_head's own reasoning, not rediscovering it)",
+      "met": true
+    },
+    {
+      "criterion": "Finds the PR's linked issue via `gh api repos/{owner}/{repo}/pulls/{pr}` (REST only) and GitHub's standard closing-keyword regex, case-insensitive, first match wins",
+      "met": true
+    },
+    {
+      "criterion": "Compares the linked issue's created_at (gh api .../issues/{n}) against the first commit's AUTHOR date: issue at-or-before first commit is PASS, issue after the first commit is FAIL naming both timestamps and the gap; no linked issue is FAIL as NO_ISSUE_REFERENCE unless exempted",
+      "met": true
+    },
+    {
+      "criterion": "docs/requirements/acceptance_exempt.json exists, ships with zero entries, and a PR/branch listed there with a non-empty reason reports EXEMPT (not FAIL) regardless of issue linkage; a malformed entry (both pr/branch null, missing/empty reason) is rejected loudly as CONFIG_ERROR, never silently ignored",
+      "met": true
+    },
+    {
+      "criterion": "gh unavailable/unauthenticated/any non-zero exit is UNVERIFIABLE, distinctly, never a silent PASS",
+      "met": true
+    },
+    {
+      "criterion": "An unresolvable --base, or an empty base..head range (including base==head), is a DISTINCT outcome (NO_RANGE), never silently PASS or FAIL",
+      "met": true
+    },
+    {
+      "criterion": "Clean --help; module docstring quotes D24's own two named design gaps and explains how each is closed; main() returns one of six named ACCEPTANCE_EXIT_* codes, never a plain boolean",
+      "met": true
+    },
+    {
+      "criterion": "One new CI step, lwb-acceptance-criteria, added to ci.yml with continue-on-error: true and if: always() -- report-only, not required, not armed to block",
+      "met": true
+    },
+    {
+      "criterion": "tests/test_lwb_check_acceptance_criteria.py covers, as separate named tests: issue-before-first-commit PASS, issue-after-first-commit FAIL (both timestamps named), no-issue-reference FAIL, PR-exempt EXEMPT even with no issue, branch-exempt EXEMPT, a merge-forward-from-base scenario that does NOT change the resolved first commit, gh-unavailable UNVERIFIABLE, empty-range and unresolvable-base as distinct NO_RANGE outcomes, and two malformed-exempt-entry cases rejected loudly",
+      "met": true
+    },
+    {
+      "criterion": "A mutation probe on the PASS/FAIL comparison and on the exemption check each turns exactly the expected subset of tests red and no others, confirming the suite is not vacuous",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green, and tests/test_workflows_parse.py green after touching ci.yml",
+      "met": true
+    },
+    {
+      "criterion": "This deliverable touches no core/ or adapters/ path, so scripts/lwb_build.py --check needs no vendor rebuild -- confirmed by running it, not assumed",
+      "met": true
+    },
+    {
+      "criterion": "No reviews/ record written or dispatched by this session -- that is the separate clock-dispatched routine's job per D20/D27",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
