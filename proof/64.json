@@ -1,0 +1,199 @@
+{
+  "deliverable": "auto-queue-identity-fix-recut48",
+  "pr": 64,
+  "author": "claude-code-sonnet5-session-011oiJssxoZ2Wwn9F9g22dAw-2026-09-25",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "6385feb9eb4d54b9ec62ec3e4e65cb0246f48de1",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 22%]",
+        "........................................................................ [ 34%]",
+        "........................................................................ [ 45%]",
+        "........................................................................ [ 57%]",
+        "........................................................................ [ 68%]",
+        "........................................................................ [ 80%]",
+        "........................................................................ [ 91%]",
+        "....................................................                     [100%]",
+        "628 passed in 22.81s"
+      ],
+      "sha256": "66bad4cf787e705dbfb0649226e0fae8e4d76c770ff7b0780fd79f1eb0f93f37",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........                                                                 [100%]",
+        "8 passed in 0.10s"
+      ],
+      "sha256": "4389b56885d24ad3c0212124adcac5049cd8550cd047de2185842dbf63b1bd56",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_hosted_runners.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-hosted-runners check passed"
+      ],
+      "sha256": "478ba8f94ab7a99f2aba42d1d15c7858c7fc81e42593314ec2a9ff67b979b261",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "22e75ff3a5c34cfd1ae0dde3e22018c8f235aa1c"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "PR #48's real content (the auto-queue check_suite -> workflow_run/schedule trigger fix and the B1 loop-abort-on-first-failure fix, plus their tests) ported onto a fresh branch off current main (0d1be714ac028d9b2204bf997d49296c32378ff1), verified byte-identical against origin/lwb-recut-47-autoqueue-loop-fix for .github/workflows/auto-queue.yml, scripts/cloud/auto_queue.py, tests/test_auto_queue.py and tests/test_workflows_parse.py, excluding reviews/48/, proof/48.json and that branch's HANDOFF.md.",
+      "met": true
+    },
+    {
+      "criterion": "Zero pre-existing review records carried onto the new branch's reviews/64/ (directory does not exist at all on this branch), so the lwb-lanes stale-record veto (the second mechanical defect blocking #48, per the reviewer's 2026-09-25T05:00:00Z comment) cannot trigger the way it did on #48, #47, #46 and #40->#45 before it -- there is nothing stale to veto.",
+      "met": true
+    },
+    {
+      "criterion": "Every commit on this branch carries the correct git identity, LEAPWare <leapware@outlook.com> (name exactly 'LEAPWare', no '-HQ' suffix) -- the first mechanical defect blocking #48, where the branch's head commit was authored as 'LEAPWare-HQ <leapware@outlook.com>' by an independent reviewer session and could not be corrected in place because force-push is denied on this machine. Verified by `git log --format='%an <%ae>' origin/main..HEAD` showing exactly that identity for every commit, and by `python scripts/lwb_check_commit_identity.py --base origin/main --head HEAD` passing cleanly.",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green: 628 passed, no reduction in test count and no skips introduced by this re-cut.",
+      "met": true
+    },
+    {
+      "criterion": "tests/test_workflows_parse.py -q green on its own (8 passed) and .github/workflows/auto-queue.yml remains valid YAML.",
+      "met": true
+    },
+    {
+      "criterion": "core/ and adapters/ are untouched by this re-cut (git diff --stat origin/main..HEAD -- core/ adapters/ is empty), so scripts/lwb_build.py --check is run as a sanity check rather than because a vendor rebuild is implicated, and it passes for both plugins/claude/lwb/vendor and plugins/codex/lwb/vendor.",
+      "met": true
+    },
+    {
+      "criterion": "No commit on this branch touches reviews/ or proof/ from any prior PR in the #44->#47->#48 chain; the only proof/ file present is this record itself, added fresh.",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md's generated block regenerated via scripts/lwb_handoff.py --write as the LAST change on the branch, in the same commit as this proof record, so the stale-count/ordering trap documented in docs/handoff-protocol.md (which has bitten nearly every PR in this chain) is not repeated here.",
+      "met": true
+    }
+  ],
+  "mutations": [
+    ".github/workflows/auto-queue.yml",
+    "scripts/cloud/auto_queue.py",
+    "tests/test_auto_queue.py",
+    "tests/test_workflows_parse.py",
+    "proof/64.json",
+    "HANDOFF.md"
+  ],
+  "unproven": [
+    "This record is self-authored and not yet independently checked; checked_by is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity.",
+    "lwb-env-leak was not run locally: LWB_PRIVATE_NEEDLES is a CI-only secret, unset in this environment, so a local run would report UNCONFIGURED rather than a real pass.",
+    "lwb-lanes is expected to report '0 independent review(s) in reviews/64/, needs 1' until the separate reviewer routine dispatches a fresh review -- this record does not, and cannot, prove that gate green; creating a review record is explicitly not this session's job (and reviews/ is off-limits to this session by task instruction).",
+    "Windows/macOS CI legs were not run locally; everything above ran on Linux/CPython in this container only.",
+    "This record's PR number (64) is a best guess made from the highest existing PR (#63) before this PR was opened, following the precedent set by #45/#46/#47/#48's own proof records. If the real PR number differs once opened, a follow-up commit renames this file and re-declares its 'pr' field under the same correct commit identity, and this sentence is corrected then.",
+    "This branch carries no changes to scripts/lwb_lanes.py, tests/test_lwb_lanes.py or scripts/githooks/commit-msg even though a raw diff against the old lwb-recut-47-autoqueue-loop-fix branch shows those files differing -- that difference is because origin/main has since merged PR #56 (0d1be714, 'Re-cut #55: fix bad commit identity, close the root cause with a hook'), which already fixed the lwb-lanes stale-record veto and added the commit-msg hook on main directly. Carrying the old branch's now-superseded copies of those files forward would have REGRESSED main's already-landed fix, so only the four files that are this deliverable's actual content (auto-queue.yml, auto_queue.py, test_auto_queue.py, test_workflows_parse.py) were ported; this was verified by diffing origin/main..origin/lwb-recut-47-autoqueue-loop-fix per-file before porting anything.",
+    "The commit-identity check's resolved_head above is the content commit (auto-queue port only), not this final commit that also adds this proof record and the HANDOFF.md regeneration -- a second run after this commit exists (before pushing) re-verifies the full range and its result is what step 9 of the task instructions checks before push.",
+    "The reviewer's secondary, optional suggestion from the earlier #47 review (treating 'already queued' as NOT READY rather than an error inside enqueue()) remains deliberately not implemented, unchanged from #48 -- out of scope for this identity/lanes re-cut.",
+    "The auto-queue fix's consequence for a real GitHub Actions runner was not observed on a live runner in this session; it is proven here by parse-level regression test only, same as every prior re-cut in this chain.",
+    "The 'commit' field above (6385feb9eb4d54b9ec62ec3e4e65cb0246f48de1) is this record's own commit ONE amend-round prior to its true final sha -- editing this field necessarily changes the commit's hash, so a proof record can never state its own final commit sha with byte-for-byte self-consistency (the same structural limitation implied by proof/56.json's 'commit' field, which is not reachable in this repo's history for the identical reason: it names that PR's own pre-squash tip). The actual final commit on this branch is one amend past the sha recorded here; `git log --format='%H %an <%ae>' origin/main..HEAD` is the authoritative source for the true tip, not this field."
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
