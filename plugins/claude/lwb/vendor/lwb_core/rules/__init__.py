@@ -16,7 +16,13 @@ this registry is load-bearing rather than decorative.
 
 from __future__ import annotations
 
-from . import lwb_proof_coverage, lwb_proof_integrity, lwb_proof_required, lwb_version
+from . import (
+    lwb_no_unauthorised_destructive_action,
+    lwb_proof_coverage,
+    lwb_proof_integrity,
+    lwb_proof_required,
+    lwb_version,
+)
 
 # Order matters only in that the engine stops at the first DENY. The no-op
 # `lwb_version` is kept first so its version report is recorded in the
@@ -24,16 +30,21 @@ from . import lwb_proof_coverage, lwb_proof_integrity, lwb_proof_required, lwb_v
 # `lwb_proof_integrity` both import shared publish-detection helpers from
 # `lwb_proof_required` (see each module's own docstring), so they are
 # listed right after it -- proximity here is documentation, not a runtime
-# dependency the engine enforces.
+# dependency the engine enforces. `lwb_no_unauthorised_destructive_action`
+# also imports shared quote/heredoc/segment-splitting helpers from
+# `lwb_proof_required` (see its own docstring), so it is listed right after
+# the proof-family rules for the same reason -- proximity as documentation.
 RULES = [
     lwb_version,
     lwb_proof_required,
     lwb_proof_coverage,
     lwb_proof_integrity,
+    lwb_no_unauthorised_destructive_action,
 ]
 
 __all__ = [
     "RULES",
+    "lwb_no_unauthorised_destructive_action",
     "lwb_proof_coverage",
     "lwb_proof_integrity",
     "lwb_proof_required",

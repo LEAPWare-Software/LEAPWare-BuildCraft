@@ -1,0 +1,139 @@
+{
+    "deliverable": "lwb-lanes-resolve-reviewable-head-first-parent-port-onto-53",
+    "pr": 53,
+    "author": "conductor-track-a-session_018EQTARPxaim19t3Rw5dvVJ-2026-09-25",
+    "checked_by": "pending-independent-reviewer-routine",
+    "commit": "5b078910e95f21cd1c78808c0f5736e567a11e44",
+    "commands": [
+        {
+            "argv": [
+                "python3",
+                "-m",
+                "pytest",
+                "tests/",
+                "-q"
+            ],
+            "exit": 0,
+            "expect_exit": 0,
+            "tail": [
+                "........................................................................ [ 21%]",
+                "........................................................................ [ 31%]",
+                "........................................................................ [ 42%]",
+                "........................................................................ [ 53%]",
+                "........................................................................ [ 63%]",
+                "........................................................................ [ 74%]",
+                "........................................................................ [ 84%]",
+                "........................................................................ [ 95%]",
+                "..............................                                           [100%]",
+                "678 passed in 25.73s"
+            ],
+            "sha256": "954462e06d65bfdc379e88c7e93694c2426fa5c5720492e8dbacc1bfb5b0cca2",
+            "sanitiser_version": "1",
+            "verifiable": false,
+            "verifiable_reason": "nondeterministic-output"
+        },
+        {
+            "argv": [
+                "python3",
+                "scripts/lwb_check_prefix.py"
+            ],
+            "exit": 0,
+            "expect_exit": 0,
+            "tail": [
+                "lwb-prefix check passed"
+            ],
+            "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+            "sanitiser_version": "1",
+            "verifiable": true
+        },
+        {
+            "argv": [
+                "python3",
+                "scripts/lwb_check_no_instruction_dep.py"
+            ],
+            "exit": 0,
+            "expect_exit": 0,
+            "tail": [
+                "lwb-no-instruction-dep check passed"
+            ],
+            "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+            "sanitiser_version": "1",
+            "verifiable": true
+        },
+        {
+            "argv": [
+                "python3",
+                "scripts/lwb_build.py",
+                "--check"
+            ],
+            "exit": 0,
+            "expect_exit": 0,
+            "tail": [
+                "OK: <repo>/plugins/claude/lwb/vendor matches source",
+                "OK: <repo>/plugins/codex/lwb/vendor matches source"
+            ],
+            "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+            "sanitiser_version": "1",
+            "verifiable": true
+        },
+        {
+            "argv": [
+                "python3",
+                "scripts/lwb_check_proof.py"
+            ],
+            "exit": 0,
+            "expect_exit": 0,
+            "tail": [
+                "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+                "lwb-proof check passed (24 record(s))"
+            ],
+            "sha256": "fa769397adf913e1918a23fbb848641137d9397ac9965930ab10777193aa4c92",
+            "sanitiser_version": "1",
+            "verifiable": false,
+            "verifiable_reason": "nondeterministic-output"
+        }
+    ],
+    "mutations": [
+        "scripts/lwb_lanes.py: ported PR #63's one-line resolve_reviewable_head fix (add --first-parent to the `git log --format=%H` call) byte-for-byte, so this PR's own CI is not left blocked by a pre-existing, unrelated bug while #63 is still pending its own independent review. See commit 5b078910e95f21cd1c78808c0f5736e567a11e44 for the full rationale."
+    ],
+    "acceptance_criteria": [
+        {
+            "criterion": "This PR's own diff (proof/53.json) never touched scripts/lwb_lanes.py or tests/test_lwb_lanes.py; its `test` CI job was red on every platform solely because tests/test_lwb_lanes.py::test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff is flaky against unfixed main -- a pre-existing bug in resolve_reviewable_head(), unrelated to this PR's own deliverable, observed failing on windows-latest and passing on ubuntu/macos.",
+            "met": true
+        },
+        {
+            "criterion": "The fix ported here is byte-for-byte the same one-line change (`git log` -> `git log --first-parent`) PR #63 (branch lwb-fix-resolve-reviewable-head-first-parent, commit a0a0991b824c0c8be156a8f85ce8e05859f0f541) already carries and verified red-before/green-after in a 10x loop -- not a second, independently-derived fix for the same bug.",
+            "met": true
+        },
+        {
+            "criterion": "PR #63's own new pinned regression test for this bug is deliberately NOT duplicated onto this PR -- it belongs with the fix's own coverage on #63, and copying it here would widen this PR beyond what getting its CI green needs.",
+            "met": true
+        },
+        {
+            "criterion": "python -m pytest tests/ -q is green (678 passed) after the port; scripts/lwb_check_prefix.py, scripts/lwb_check_no_instruction_dep.py and scripts/lwb_build.py --check all pass locally too.",
+            "met": true
+        },
+        {
+            "criterion": "This port does not touch, correct, or reassign proof/53.json, which continues to prove PR #53's original deliverable (lwb_no_unauthorised_destructive_action) exactly as it always did.",
+            "met": true
+        }
+    ],
+    "tokens": {
+        "total_input": "unknown",
+        "cached_input": "unknown",
+        "uncached_input": "unknown",
+        "output": "unknown",
+        "retries": "unknown",
+        "setup_overhead": "unknown",
+        "tool_overhead": "unknown",
+        "wall_time_seconds": "unknown",
+        "source": "unknown: not measured from a session transcript in this run"
+    },
+    "unproven": [
+        "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. 'checked_by' is deliberately the literal string 'pending-independent-reviewer-routine' rather than a reviewer identity, per D20 -- a separate reviewer routine on its own clock reviews this PR; I did not dispatch or fabricate one myself.",
+        "THE WINDOWS-SPECIFIC FAILURE THIS PORT FIXES WAS NOT REPRODUCED IN THIS RECORD. It depends on wall-clock commit-date ordering and was reported flaky even on windows-latest CI, not deterministic on this Linux container. This port is trusted because PR #63 already verified the identical one-line fix red-before/green-after by hand and in a 10x loop against a deterministic, pinned reproduction -- not because this record re-derived or re-verified that reproduction independently.",
+        "THIS PORT DELIBERATELY TOUCHES A SHARED PATH (scripts/lwb_lanes.py) AGAIN AFTER PR #53 ALREADY HAD A VALID INDEPENDENT REVIEW. It does not update or relabel reviews/53/ or the existing AGREE records -- scripts/lwb_lanes.py's own resolve_reviewable_head correctly treats them as stale for this new head and will require a fresh independent review before this PR's lwb-lanes check can pass again. That is the intended, un-bypassed consequence of adding real content to a shared path, not an oversight.",
+        "THE COMMANDS ABOVE RAN ON LINUX ONLY (this container). CI runs the same gates on ubuntu, macos and windows across Python 3.10 and 3.12; the other five legs were not run here.",
+        "WHETHER PR #63 ITSELF STILL NEEDS FURTHER WORK BEFORE IT CAN LAND IS OUT OF SCOPE FOR THIS RECORD. This record proves only that the one-line fix it already carries, ported here unchanged, fixes PR #53's CI without regressing PR #53's own test suite."
+    ]
+}
