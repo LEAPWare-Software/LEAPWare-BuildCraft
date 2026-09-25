@@ -25,12 +25,12 @@ that no WORTHY AND VETTED tool already does it before building anything.
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT:** #51 (Phase 1 item 1.2 -- `lwb_proof_required`'s
-   `deny` now fails closed when it cannot read git; 2 independent AGREE
-   reviews in reviews/51/, CI green, merging main to clear a conflict
-   with #50). Item 1.1 landed as #50 (4 rules on `main` now). Also
-   green and awaiting Auto-queue: #45, #46, #48. Dead re-cuts, don't
-   touch: #40, #44, #47, #49 -- each superseded, red CI by design.
+3. **IN FLIGHT:** #51 (item 1.2, `deny` fails closed on unreadable
+   git). #56 landed (lwb_lanes stale-veto + merge-first-parent fix +
+   identity hook) -- it changes `resolve_reviewable_head`, so merging
+   main into #51 stales its AGREE records; a fresh review is expected
+   next, not a defect. Re-derive dead/live PR state per
+   `docs/handoff-protocol.md`; it drifts fast here.
 4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 4 rules shipped,
    0 armed to deny, 2 of 8 skills working. **A consuming repo installs
    `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
@@ -42,8 +42,8 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 17:46 UTC
-main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
+Generated: 2026-09-25 03:13 UTC
+main SHA: 0d1be714ac028d9b2204bf997d49296c32378ff1
 CLI: claude
 Session: 01oyCUXLqcRyXy8deLZYtH
 
@@ -51,7 +51,7 @@ Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-23/23 proven
+24/24 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
