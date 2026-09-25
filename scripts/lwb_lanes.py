@@ -433,6 +433,19 @@ def resolve_reviewable_head(rev_range: str, pr_number: int) -> Optional[str]:
     record-only-shaped commit filed under a DIFFERENT PR's `reviews/` or
     `proof/` path is never mistaken for this PR's own record-keeping.
 
+    The walk is `--first-parent` only, matching how `commit_files` reads a
+    merge (against its first parent, see that function's docstring) --
+    plain `git log` from a merge also enumerates every commit reachable
+    through the OTHER parent (a merged-in side branch), which is never
+    part of this branch's own reviewable sequence and must not be
+    considered here. Found as a real bug, not just a style
+    inconsistency: with commits made close enough together that `git
+    log`'s default (commit-date) ordering isn't guaranteed stable across
+    platforms, the walk could land on a side branch's own commit instead
+    of this branch's next real ancestor -- reproduced as a genuine
+    Windows-only test failure, not a flake, because `--first-parent`
+    makes the walk deterministic regardless of commit timestamps.
+
     Returns None if the head cannot be resolved at all, so callers fail
     loudly instead of silently skipping the freshness check.
     """
@@ -441,7 +454,7 @@ def resolve_reviewable_head(rev_range: str, pr_number: int) -> Optional[str]:
         return None
 
     result = subprocess.run(
-        ["git", "log", "--format=%H", head_sha],
+        ["git", "log", "--first-parent", "--format=%H", head_sha],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
