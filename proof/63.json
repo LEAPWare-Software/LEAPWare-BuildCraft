@@ -1,0 +1,183 @@
+{
+  "deliverable": "lwb-lanes-resolve-reviewable-head-first-parent",
+  "pr": 63,
+  "author": "claude-code-sonnet5-session-01H2pQdziijj12otKaWk7XVU-2026-09-25",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "a0a0991b824c0c8be156a8f85ce8e05859f0f541",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        "..................................                                       [100%]",
+        "610 passed in 19.83s"
+      ],
+      "sha256": "fc5044ff2e6031515daa74610a1b9ef3fb7e8ac717c7b1dc7d8b077a0f21f2a0",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/test_lwb_lanes.py",
+        "-q",
+        "-k",
+        "test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff or test_reviewable_head_walks_first_parent_only_not_a_later_dated_side_commit"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "..                                                                       [100%]",
+        "2 passed, 79 deselected in 0.73s"
+      ],
+      "sha256": "0c1501eb07aa460ff27500738a92c8b1ea0846614ab85b520851ee767a3d1292",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "a0a0991b824c0c8be156a8f85ce8e05859f0f541"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "resolve_reviewable_head()'s internal `git log` walk is restricted to first-parent (mainline) history, matching its own docstring's stated intent. Proven by the diff: the only change to scripts/lwb_lanes.py is adding '--first-parent' to that one subprocess.run argv.",
+      "met": true
+    },
+    {
+      "criterion": "The bug is real and observable against this repo's ACTUAL current code (not assumed from the task description): reproduced live in a scratch repo (seed -> substantive -> branch 'side' with one commit touching unrelated.txt -> `git merge --no-ff -s ours side`), where resolve_reviewable_head('HEAD') on the pre-fix code returned the side branch's own commit sha instead of 'substantive'.",
+      "met": true
+    },
+    {
+      "criterion": "A new, deterministic regression test (test_reviewable_head_walks_first_parent_only_not_a_later_dated_side_commit) reproduces this without depending on real-clock timing, by pinning GIT_AUTHOR_DATE/GIT_COMMITTER_DATE so the side commit is dated after the merge. Verified red before the fix (10/10 failures across a loop, after temporarily reverting just the --first-parent addition) and green after (10/10 passes), confirming the test is not timing-lucky.",
+      "met": true
+    },
+    {
+      "criterion": "The pre-existing test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff (added by #56) is unaffected by this fix and still passes -- run 15x in a loop with the fix applied, all green. It was also confirmed to pass 20/20 WITHOUT the fix on this machine (real-clock timestamps, commits made milliseconds apart), consistent with the task's own description of it as timing/platform-dependent rather than deterministically red on every platform -- which is exactly why the new deterministic test above was added rather than relying on that one alone.",
+      "met": true
+    },
+    {
+      "criterion": "commit_files()'s own first-parent diffing of merge commits (added by #56) is unmodified and still correctly complements this fix rather than conflicting with it -- confirmed by the diff touching nothing in commit_files() or _is_record_only_commit(), and by the full test suite (including all of #56's merge-handling tests) passing unmodified.",
+      "met": true
+    },
+    {
+      "criterion": "commits_in_range() (a different `git log --format=%H` call, for enumerating every commit in a base..head range for per-commit identity/lane checks) is deliberately left untouched -- not confident --first-parent is correct there too, given it may be meant to include commits merged in from a side branch. Noted as an open question in the PR body rather than guessed at, per instruction.",
+      "met": true
+    },
+    {
+      "criterion": "python -m pytest tests/ -q passes in full (610 passed: 609 pre-existing at origin/main's tip plus this PR's one new test). scripts/lwb_build.py --check, scripts/lwb_check_prefix.py, scripts/lwb_check_no_instruction_dep.py and scripts/lwb_check_commit_identity.py --base origin/main --head HEAD all pass at this commit.",
+      "met": true
+    },
+    {
+      "criterion": "Every commit on this branch carries the correct git identity (LEAPWare <leapware@outlook.com>) and the required 'LWB-Agent: claude' trailer -- verified by `git log --format='%H %an <%ae>'` over this branch's own commit and by scripts/lwb_check_commit_identity.py passing clean.",
+      "met": true
+    },
+    {
+      "criterion": "This PR does not touch PR #53 or its branch (lwb-recut-52-bad-reviewer-identity), plugins/codex/, adapters/codex/, or tests/**/codex/ -- confirmed by the diff touching only scripts/lwb_lanes.py and tests/test_lwb_lanes.py.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- this record was written mid-session without access to this session's own transcript file path/session id needed to compute message.usage totals per proof/schema.json's documented method; recorded as unknown rather than estimated, per proof/README.md."
+  },
+  "mutations": [
+    "scripts/lwb_lanes.py: resolve_reviewable_head()'s internal `git log` call gains '--first-parent', restricting its walk to mainline history only. No other line in this file changed.",
+    "tests/test_lwb_lanes.py: _commit() test helper gains an optional `date=` keyword (pins GIT_AUTHOR_DATE/GIT_COMMITTER_DATE via env=), and a new _merge_dated() helper (a dated, optionally-strategized --no-ff merge) is added alongside the pre-existing _merge_no_ff(). One new test, test_reviewable_head_walks_first_parent_only_not_a_later_dated_side_commit, uses both to reproduce the walk-order bug deterministically.",
+    "proof/63.json: this record.",
+    "HANDOFF.md: generated deliverable-proof-state block to be regenerated via scripts/lwb_handoff.py --write in the same commit as this record, per docs/maintainers/proof-of-completion-plan.md's record/head circularity note -- proof file written before the regen."
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity -- inventing or borrowing one would be exactly the dishonesty this system exists to catch. I have not created and will not create a review record for this PR myself, and have not dispatched a reviewer.",
+    "THE COMMANDS RAN ON LINUX ONLY (this container). CI's other legs (macOS, Windows, other Python versions) were not run here.",
+    "python scripts/lwb_check_proof.py --reexecute WAS NOT RUN as part of producing this record.",
+    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number 63 was NOT run to check this PR's own lane gate -- there is no review record for PR #63 yet (none should exist from me), so it is expected to fail on independent-review-count grounds alone; that is not this record's job to fix.",
+    "The specific CI-failure narrative in the task prompt (a named test failing twice on windows-latest CI for PR #53) could not be independently corroborated from inside this repo -- no CI logs for PR #53 were read as part of this work, per instruction not to touch PR #53. The bug itself was instead independently re-derived and reproduced from first principles by reading scripts/lwb_lanes.py directly and building a scratch-repo repro, which is what this record's commands and mutations actually prove."
+  ]
+}
