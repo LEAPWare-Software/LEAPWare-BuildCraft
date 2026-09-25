@@ -9,34 +9,33 @@ next step. Session start, re-derive commands, hard rules and traps live in
 In order. Do not start step *n+1* before step *n* is done and proven.
 
 **THE PLAN IS `docs/requirements/build-plan.md`** -- seven phases,
-owner-approved 2026-09-19. Read it before starting anything. Session
-detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
+owner-approved 2026-09-19. Session detail:
+`docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 `docs/maintainers/proof-of-completion-plan.md`.
 
 **THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
 that no WORTHY AND VETTED tool already does it before building anything.
 
-1. **DONE: #7-#39.** Decisions: `docs/requirements/decisions.md` --
-   READ FIRST, do not re-decide. `main`'s tip is #39 (e5f29bf), GREEN
-   (`gh api .../check-runs`, 2026-09-24). Re-derive per
-   `docs/handoff-protocol.md`.
+1. **DONE: #7-#56** (see generated block below for `main`'s live SHA
+   -- do not trust a number here, re-derive). Decisions:
+   `docs/requirements/decisions.md` -- READ FIRST, do not re-decide.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
    every 2h; a separate reviewer routine writes the gating record
    hourly. D27's rule: separate cron entries, no trigger path
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT (track A): Phase 1 item 1.1.** Ships
-   `lwb_proof_coverage` + `lwb_proof_integrity` as rules at `warn`.
-   Tests green, vendor rebuilt. #49 re-cut (branch
-   `lwb-recut-49-bad-reviewer-identity`): reviewer B's commit was
-   authored `Claude <noreply@anthropic.com>`, unlisted -- permanent
-   `lwb-commit-identity` failure, same shape as #38's bad commit (#39).
-   Not this PR's bug. New PR TBD.
+3. **1.1 SHIPPED** (`lwb_proof_coverage` + `lwb_proof_integrity` at
+   `warn`, via #50, after #49 was re-cut for a bad-identity commit).
+   Track A also has many open PRs for 1.2/1.4/1.6/1.7/1.8 and lane
+   fixes -- `gh pr list --state open` before starting new work.
 4. **1.6:** #52 re-cut as **#53** (bad identity was `bcee47f`, not
-   reviewer B's correctly-authored `3056493`). #52 left open.
-5. **WHAT BLOCKS 1.0.0.** 0/13 stages, 2 rules on `main`, 0 armed to
-   deny, 2/8 skills working.
+   reviewer B's correctly-authored `3056493`). #52 left open. #53's
+   `test` job was red repo-wide from an unrelated pre-existing bug
+   (`resolve_reviewable_head` needs `--first-parent`, fixed on open
+   #63) -- ported onto #53; now waits on a fresh independent review.
+5. **BLOCKS 1.0.0:** 0/13 stages, 0 rules armed to deny, 2/8 skills
+   working.
 6. **DEFECT PATTERN:** "I could not check" must never share a
    representation with "I checked and found nothing". Live in Codex's
    lane. The hook has still never been seen to fire from `hooks.json`.
@@ -45,16 +44,16 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-25 03:01 UTC
+Generated: 2026-09-25 04:23 UTC
 main SHA: 0d1be714ac028d9b2204bf997d49296c32378ff1
 CLI: claude
-Session: recut-52-merge-main
+Session: session_018EQTARPxaim19t3Rw5dvVJ
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-24/24 proven
+25/25 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->
