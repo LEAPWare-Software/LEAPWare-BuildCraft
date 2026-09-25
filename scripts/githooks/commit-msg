@@ -1,11 +1,34 @@
 #!/bin/sh
-# Reject a commit message with no `LWB-Agent:` trailer.
+# Reject a commit message with no `LWB-Agent:` trailer, and reject a
+# commit whose author identity is not LEAPWare or an allow-listed bot.
 #
-# scripts/lwb_lanes.py already enforces this in CI, but only after the
-# commit exists and has been pushed -- and the only repair at that point is
-# a history rewrite, which this machine's permission settings deny
-# outright. That cost a branch rebuild on PR #14. This hook moves the check
-# to the moment the commit is written, where fixing it is free.
+# scripts/lwb_lanes.py already enforces the trailer in CI, but only after
+# the commit exists and has been pushed -- and the only repair at that
+# point is a history rewrite, which this machine's permission settings
+# deny outright. That cost a branch rebuild on PR #14.
+#
+# The identity check added here exists for the SAME reason, proven again
+# and again on 2026-09-24: scripts/lwb_check_commit_identity.py enforces
+# `ALLOWED_HUMAN = ("LEAPWare", "leapware@outlook.com")` in CI, and a
+# commit authored under any other name/email fails that check permanently
+# once pushed -- force-push denied, same as the trailer case. This defect
+# class caused several unrecoverable re-cuts in one day on PR #55 alone
+# (and its predecessors #54, #53, #52, #50, #39), from at least three
+# different concurrently-running sessions that each got git identity wrong
+# in a different way -- a stray `git config --global user.name`, an
+# account-login-shaped name instead of the exact required one, the
+# generic `Claude <noreply@anthropic.com>` default. Every one of those was
+# free to fix at commit time and cost a whole branch re-cut once pushed.
+# This hook moves the check to the moment the commit is written, mirroring
+# the trailer check already living here, for the identical reason: fixing
+# it here is free, fixing it after a push is not.
+#
+# Put in commit-msg rather than pre-commit because the author identity is
+# already fully resolved by the time commit-msg runs (`git var
+# GIT_AUTHOR_IDENT` reads it) even though the commit object does not exist
+# yet -- so a bad identity is still caught before anything is written, in
+# the same hook and the same run that already inspects the message, rather
+# than adding a second hook file to maintain in parallel with this one.
 #
 # Lives under scripts/ rather than .githooks/ on purpose: scripts/ is a
 # shared path, and a repo-wide gate belongs to no single CLI's lane.
@@ -17,14 +40,18 @@
 # `human` is deliberately NOT accepted here: lwb_lanes.py reads this
 # trailer to decide which lane a commit belongs to, and CI rejects a
 # `human` trailer on an agent-authored commit.
+#
+# The identity allowlist below is a hand-mirror of
+# scripts/lwb_check_commit_identity.py's ALLOWED_HUMAN, BOT_NAME and
+# BOT_EMAIL -- kept in sync by hand since this is a POSIX shell hook and
+# that script is Python; if that script's allowlist ever changes, this
+# one must change with it, or the hook diverges from the gate it exists to
+# preempt.
 
 msg_file="$1"
 
-if grep -qE '^LWB-Agent: (claude|codex)$' "$msg_file"; then
-	exit 0
-fi
-
-cat >&2 <<'EOF'
+if ! grep -qE '^LWB-Agent: (claude|codex)$' "$msg_file"; then
+	cat >&2 <<'EOF'
 commit-msg: missing `LWB-Agent:` trailer.
 
 Every commit needs a trailer line, exactly:
@@ -37,4 +64,47 @@ then the only repair is a history rewrite.
 
 Add the trailer and commit again.
 EOF
-exit 1
+	exit 1
+fi
+
+ident=$(git var GIT_AUTHOR_IDENT) || exit 1
+author_name=$(printf '%s\n' "$ident" | sed -n 's/^\(.*\) <[^>]*>.*/\1/p')
+author_email=$(printf '%s\n' "$ident" | sed -n 's/.*<\([^>]*\)>.*/\1/p')
+
+allowed_human_name="LEAPWare"
+allowed_human_email="leapware@outlook.com"
+
+is_allowed=0
+if [ "$author_name" = "$allowed_human_name" ] && [ "$author_email" = "$allowed_human_email" ]; then
+	is_allowed=1
+elif printf '%s\n' "$author_name" | grep -qE '^[[:alnum:]_.-]+\[bot\]$' \
+	&& printf '%s\n' "$author_email" | grep -qE '^([0-9]+\+)?[[:alnum:]_.-]+\[bot\]@users\.noreply\.github\.com$'; then
+	is_allowed=1
+fi
+
+if [ "$is_allowed" -ne 1 ]; then
+	cat >&2 <<EOF
+commit-msg: commit author is not an allowed identity.
+
+    author: ${author_name} <${author_email}>
+    required: ${allowed_human_name} <${allowed_human_email}>
+    (or a GitHub-managed bot, e.g. dependabot[bot] <NNNN+dependabot[bot]@users.noreply.github.com>)
+
+scripts/lwb_check_commit_identity.py enforces this exact allowlist in CI,
+AFTER the commit is pushed -- and by then the only repair is a history
+rewrite, which this machine's permission settings deny outright. This
+exact defect has cost several unrecoverable branch re-cuts in one day
+(PR #55 and its predecessors). Fix it now, before it is unrecoverable:
+
+    git config user.name "${allowed_human_name}"
+    git config user.email "${allowed_human_email}"
+
+(repo-local, no --global -- check \`git config user.name\` /
+\`git config user.email\` actually report what you expect before
+committing again; an ambient global config can silently override what you
+think is set). Then commit again.
+EOF
+	exit 1
+fi
+
+exit 0
