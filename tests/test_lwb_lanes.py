@@ -1267,3 +1267,572 @@ def test_the_vendor_exception_does_not_leak_into_authored_lane_paths():
     # A path merely CONTAINING the word vendor elsewhere is not exempt.
     assert lwb_lanes.classify_path("plugins/codex/lwb/bin/vendor_helper.py") == "codex"
     assert lwb_lanes.classify_path("plugins/codex/vendor/x.py") == "codex"
+
+
+
+# ---------------------------------------------------------------------------
+# independent_reviews must not let a record that does not COUNT (because
+# _review_ok rejected it -- stale, wrong verdict, bad identity, whatever)
+# also VETO an otherwise-sufficient set of valid records. _review_ok's own
+# contract, and its own direct tests above, are unchanged: a record either
+# counts toward REQUIRED_INDEPENDENT_REVIEWS or it does not, and that
+# decision is unaffected. What changes is that a record which does NOT
+# count must not be able to fail the whole gate when enough OTHER, valid
+# records already exist in the same reviews/<pr>/ directory.
+# ---------------------------------------------------------------------------
+
+
+def test_independent_reviews_passes_with_one_stale_and_one_fresh_valid_record(tmp_path):
+    """The exact bug this fixes: a leftover stale record from an earlier
+    review round must not veto the gate once a fresh, valid AGREE record
+    already satisfies REQUIRED_INDEPENDENT_REVIEWS on its own."""
+    _write_review(
+        tmp_path, "stale-reviewer.json",
+        reviewer_id="old-reviewer", reviewed_commit="0123456",
+    )
+    _write_review(
+        tmp_path, "fresh-reviewer.json",
+        reviewer_id="fresh-reviewer", reviewed_commit=HEAD_SHA,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is True, errors
+    assert errors == []
+    # The stale record's reason is not silently dropped -- it is surfaced
+    # as a notice, since it did not count but enough other records did.
+    assert any("STALE" in n for n in notices), notices
+
+
+def test_independent_reviews_still_fails_on_a_lone_stale_record(tmp_path):
+    """No valid record exists at all -- a single stale record must still
+    fail the gate, and its STALE reason must still be visible in `errors`
+    (not silently swallowed now that it no longer vetoes a sufficient set,
+    since here the set is NOT sufficient)."""
+    _write_review(
+        tmp_path, "stale-reviewer.json",
+        reviewer_id="old-reviewer", reviewed_commit="0123456",
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False
+    assert any("STALE" in e for e in errors), errors
+    assert any("0 independent review" in e for e in errors), errors
+
+
+def test_independent_reviews_ordinary_single_valid_record_still_passes(tmp_path):
+    """REQUIRED_INDEPENDENT_REVIEWS = 1, one fresh valid record, no stale
+    records at all -- the ordinary case this fix must leave unaffected."""
+    _write_review(tmp_path, "claude-cto.json", reviewer_id="the-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is True, errors
+    assert errors == []
+    assert notices == []
+
+
+
+# ---------------------------------------------------------------------------
+# commit_files / _is_record_only_commit and MERGE commits.
+#
+# Plain `git diff-tree` (no -m/-c/--cc) prints NOTHING for a multi-parent
+# (merge) commit -- confirmed live against this repo's own history, not
+# just in these fixtures. `commit_files` used to run exactly that call
+# unconditionally, so every merge commit looked like it changed zero
+# files, and `_is_record_only_commit`'s own vacuous-`all()` guard then
+# (correctly, given that wrong input) treated a review-record-only merge
+# as a real content change -- stopping resolve_reviewable_head's walk at
+# the merge and staling the very records it had just brought in. These
+# tests exercise the fix: a merge's file list must come from its diff
+# against its FIRST PARENT specifically.
+# ---------------------------------------------------------------------------
+
+
+def _branch_name(repo) -> str:
+    return _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+
+
+def _merge_no_ff(repo, onto_branch: str, other_ref: str, message: str) -> str:
+    subprocess.run(["git", "checkout", "-q", onto_branch], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "merge", "--no-ff", "-q", "-m", message, other_ref],
+        cwd=repo,
+        check=True,
+    )
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_commit_files_uses_first_parent_diff_for_a_merge_commit(tmp_path):
+    """The live defect, reproduced in a throwaway repo: a merge whose
+    first-parent diff touches only reviews/ must report exactly those
+    files, not the empty list plain diff-tree gives a merge."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+
+    merge_sha = _merge_no_ff(repo, main_branch, "side", "merge review record")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        files = lwb_lanes.commit_files(merge_sha)
+        parents = lwb_lanes._commit_parents(merge_sha)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert files == ["reviews/9/verifier.json"]
+    assert len(parents) == 2
+    assert parents[0] == substantive
+
+
+def test_reviewable_head_skips_a_merge_that_only_brought_in_review_records(tmp_path):
+    """The consequence that actually matters: resolve_reviewable_head must
+    walk PAST a merge commit whose only content, relative to its first
+    parent, is under reviews/ or proof/ -- exactly like it already skips
+    an ordinary record-only commit."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+
+    _merge_no_ff(repo, main_branch, "side", "merge review record")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == substantive
+
+
+def test_reviewable_head_does_not_skip_a_merge_carrying_real_content_too(tmp_path):
+    """The case that must NOT regress: a merge must never be able to
+    smuggle real content past the review requirement just by also
+    carrying a reviews/ file alongside it. A merge whose first-parent
+    diff touches BOTH a review record AND a real file is not record-only,
+    and resolve_reviewable_head must return the merge itself, not walk
+    past it."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+    _commit(repo, "core/other.py", "more code\n", "real content on the side branch too")
+
+    merge_sha = _merge_no_ff(repo, main_branch, "side", "merge side branch")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        files = lwb_lanes.commit_files(merge_sha)
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert set(files) == {"reviews/9/verifier.json", "core/other.py"}
+    assert got == merge_sha
+
+
+def test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff(tmp_path):
+    """A merge whose first-parent diff is EMPTY (its tree is byte-identical
+    to its first parent's -- e.g. an `-s ours` no-op merge) is not the
+    same ambiguous case an ordinary empty commit is. `commit_files`
+    diffing a merge against its first parent specifically makes an empty
+    result here a PROVEN claim that nothing changed, so this is treated as
+    record-only (skippable) -- the opposite of the ordinary-commit guard,
+    and deliberately so: refusing to skip it would reproduce the exact
+    staling bug this mechanism exists to prevent, by stopping the walk at
+    a merge that changed nothing."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    main_branch = _branch_name(repo)
+    substantive = _commit(repo, "core/thing.py", "code\n", "substantive change")
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    _commit(repo, "unrelated.txt", "on the side branch only\n", "side content")
+
+    subprocess.run(["git", "checkout", "-q", main_branch], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "merge", "--no-ff", "-q", "-s", "ours", "-m", "ours merge, keep main's tree", "side"],
+        cwd=repo,
+        check=True,
+    )
+    merge_sha = _git(repo, "rev-parse", "HEAD")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        files = lwb_lanes.commit_files(merge_sha)
+        record_only = lwb_lanes._is_record_only_commit(merge_sha, 9)
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert files == []
+    assert record_only is True
+    assert got == substantive
+
+
+def test_is_record_only_commit_still_false_for_an_ordinary_empty_commit(tmp_path):
+    """Unchanged from before: a genuinely empty ORDINARY (non-merge) commit
+    stays NOT record-only -- the ambiguity this guard exists for is a
+    property of a single-parent commit having nothing to say about itself,
+    not something the merge fix should touch."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-q", "-m", "deliberately empty"],
+        cwd=repo,
+        check=True,
+    )
+    empty_sha = _git(repo, "rev-parse", "HEAD")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        assert lwb_lanes.commit_files(empty_sha) == []
+        assert len(lwb_lanes._commit_parents(empty_sha)) == 1
+        record_only = lwb_lanes._is_record_only_commit(empty_sha, 9)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert record_only is False
+
+
+def test_commit_parents_root_commit_has_none_and_ordinary_commit_has_one(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    root = _commit(repo, "seed.txt", "seed\n", "seed")
+    child = _commit(repo, "core/thing.py", "code\n", "child")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        assert lwb_lanes._commit_parents(root) == []
+        assert lwb_lanes._commit_parents(child) == [root]
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+
+
+# ---------------------------------------------------------------------------
+# Finding A (second round of independent review): the stale-veto fix must
+# not over-widen into silencing a genuine DISAGREE, a self-review
+# collision, or any other non-STALE rejection just because a different,
+# valid AGREE record also exists. Only STALE is routine churn.
+# ---------------------------------------------------------------------------
+
+
+def test_independent_reviews_disagree_still_fails_even_with_a_sufficient_fresh_agree(tmp_path):
+    """The case that must NOT regress: a DISAGREE record sitting right next
+    to a fresh, valid AGREE from a DIFFERENT reviewer must not be silently
+    outvoted. REQUIRED_INDEPENDENT_REVIEWS=1 is already satisfied by the
+    AGREE alone, but the gate must still fail on the live objection."""
+    _write_review(tmp_path, "disagree-reviewer.json", reviewer_id="disagreeing-reviewer", verdict="DISAGREE")
+    _write_review(tmp_path, "agree-reviewer.json", reviewer_id="agreeing-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False
+    assert any("DISAGREE" in e for e in errors), errors
+
+
+def test_independent_reviews_self_review_collision_still_fails_with_a_sufficient_fresh_agree(tmp_path):
+    """Same principle, a different non-STALE rejection reason: a
+    reviewer_id == commit_author_id record must keep failing the gate
+    even when a different, valid AGREE record also exists."""
+    _write_review(tmp_path, "self-review.json", reviewer_id="same-id", commit_author_id="same-id")
+    _write_review(tmp_path, "agree-reviewer.json", reviewer_id="agreeing-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False
+    assert any("equals" in e for e in errors), errors
+
+
+def test_independent_reviews_stale_is_downgraded_but_disagree_is_not_in_the_same_directory(tmp_path):
+    """A directory holding all three at once: a STALE record (routine
+    churn, downgradable), a DISAGREE record (a live objection, never
+    downgradable), and a fresh valid AGREE (sufficient on its own for
+    REQUIRED_INDEPENDENT_REVIEWS=1). The gate must still fail overall
+    (because of the DISAGREE), with the STALE reason demoted to a notice
+    and the DISAGREE reason kept in errors."""
+    _write_review(
+        tmp_path, "stale-reviewer.json",
+        reviewer_id="stale-reviewer", reviewed_commit="0123456",
+    )
+    _write_review(tmp_path, "disagree-reviewer.json", reviewer_id="disagreeing-reviewer", verdict="DISAGREE")
+    _write_review(tmp_path, "agree-reviewer.json", reviewer_id="agreeing-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False
+    assert any("DISAGREE" in e for e in errors), errors
+    assert not any("STALE" in e for e in errors), errors
+    assert any("STALE" in n for n in notices), notices
+
+
+# ---------------------------------------------------------------------------
+# PR #56 finding F1 (reviews/56/cloud-reviewer-b.json): the STALE-vs-other
+# classification used to be `_is_stale_only_rejection`, a bare substring
+# search ("STALE" in record_errors[0]) over `_review_ok`'s formatted error
+# TEXT. Every one of those messages is built as f"{rel}: ...", and `rel` is
+# the review record's OWN FILENAME -- reviews/README.md says explicitly that
+# any filename is accepted, so the record's author fully controls it. A
+# record with a genuine DISAGREE verdict, or a genuine self-review identity
+# collision, filed at a path that merely CONTAINS the substring "STALE" (with
+# nothing to do with actual staleness) produced an error message containing
+# "STALE" purely because of the filename, and the old check misclassified it
+# as routine staleness -- silently demoting a live DISAGREE (or a detected
+# self-review) to a mere notice instead of failing the gate. This is exactly
+# the "a DISAGREE is silently outvoted" bug an earlier review round already
+# found and this code was supposed to have fixed.
+#
+# The fix replaces the substring search with a structured `rejection_kind`
+# tag that `_review_ok` sets itself, at the exact branch that rejects a
+# record, never inferred afterward from message text. These tests go through
+# `independent_reviews` (the real entry point that decides pass/fail), not
+# `_review_ok` in isolation, because the exploit is specifically about what
+# `independent_reviews` does with the classification.
+# ---------------------------------------------------------------------------
+
+
+def test_independent_reviews_disagree_at_a_stale_named_path_still_fails(tmp_path):
+    """The exact reproduction from finding F1: a genuine DISAGREE record
+    filed at a path/filename containing the literal substring "STALE",
+    alongside a separate fresh, valid AGREE record from a different
+    reviewer. REQUIRED_INDEPENDENT_REVIEWS=1 is already satisfied by the
+    AGREE alone, but the DISAGREE must not be silently demoted just
+    because its filename happens to contain "STALE" -- the gate must
+    still fail."""
+    _write_review(
+        tmp_path, "whatever-STALE-whatever.json",
+        reviewer_id="disagreeing-reviewer", verdict="DISAGREE",
+    )
+    _write_review(tmp_path, "agree-reviewer.json", reviewer_id="agreeing-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False, errors
+    assert any("DISAGREE" in e for e in errors), errors
+    # It must not have been swallowed into a notice either -- a live
+    # objection is never "not counted toward ... but enough already
+    # exist", however its filename happens to read.
+    assert not any("DISAGREE" in n for n in notices), notices
+
+
+def test_independent_reviews_self_review_collision_at_a_stale_named_path_still_fails(tmp_path):
+    """Same exploit, the other non-stale rejection reason: a
+    reviewer_id == commit_author_id self-review collision filed at a
+    "STALE"-containing path must keep failing the gate even alongside a
+    sufficient fresh AGREE record."""
+    _write_review(
+        tmp_path, "collide-STALE-collide.json",
+        reviewer_id="same-id", commit_author_id="same-id",
+    )
+    _write_review(tmp_path, "agree-reviewer.json", reviewer_id="agreeing-reviewer")
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is False, errors
+    assert any("equals" in e for e in errors), errors
+    assert not any("equals" in n for n in notices), notices
+
+
+def test_independent_reviews_genuinely_stale_at_a_stale_named_path_is_still_downgraded(tmp_path):
+    """Confirms the fix does not over-narrow: a record that IS genuinely
+    stale (reviewed_commit does not match the reviewable head), filed at a
+    path that also happens to contain "STALE", must still be correctly
+    downgraded to a notice once a sufficient fresh AGREE exists elsewhere
+    -- the filename must not matter either way, for staleness any more
+    than for a non-stale rejection."""
+    _write_review(
+        tmp_path, "old-STALE-reviewer.json",
+        reviewer_id="old-reviewer", reviewed_commit="0123456",
+    )
+    _write_review(
+        tmp_path, "fresh-reviewer.json",
+        reviewer_id="fresh-reviewer", reviewed_commit=HEAD_SHA,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        notices: list[str] = []
+        ok = lwb_lanes.independent_reviews(9, "deadbeefcafe", HEAD_SHA, errors, notices)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert ok is True, errors
+    assert errors == []
+    assert any("STALE" in n for n in notices), notices
+
+
+# ---------------------------------------------------------------------------
+# Finding B (second round of independent review): commit_files reporting a
+# merge's real first-parent diff must not feed the LANE-OWNERSHIP check --
+# only the shared-path / review-freshness determination. A merge did not
+# personally author the files it brings in from its second parent; each of
+# those commits was already lane-checked individually when it landed.
+# ---------------------------------------------------------------------------
+
+
+def test_check_lanes_merge_with_out_of_lane_file_does_not_fail_lane_ownership(tmp_path):
+    """A merge that catches a claude branch up with a codex-lane file
+    already on main must NOT be flagged as the claude merger personally
+    touching a file outside their lane."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    def _commit_with_trailer(path: str, content: str, message: str, agent: str) -> str:
+        fp = repo / path
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_text(content, encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", f"{message}\n\nLWB-Agent: {agent}"],
+            cwd=repo,
+            check=True,
+        )
+        return _git(repo, "rev-parse", "HEAD")
+
+    _commit_with_trailer("seed.txt", "seed\n", "seed", "human")
+    base = _git(repo, "rev-parse", "HEAD")
+    main_branch = _branch_name(repo)
+
+    # A codex-lane commit lands on main -- already lane-checked as codex's
+    # own commit when IT landed.
+    _commit_with_trailer(
+        "plugins/codex/lwb/bin/lwb_hook.py", "code\n", "codex work", "codex"
+    )
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side", base], cwd=repo, check=True)
+    _commit_with_trailer(
+        "plugins/claude/lwb/bin/lwb_hook.py", "code\n", "claude work", "claude"
+    )
+
+    subprocess.run(["git", "checkout", "-q", "side"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git", "merge", "--no-ff", "-q",
+            "-m", f"merge main into side\n\nLWB-Agent: claude",
+            main_branch,
+        ],
+        cwd=repo,
+        check=True,
+    )
+    head = _git(repo, "rev-parse", "HEAD")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        merge_files = lwb_lanes.commit_files(head)
+        errors = lwb_lanes.check_lanes(f"{base}..{head}", 42)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    # The merge's first-parent diff really does carry the codex file (the
+    # thing that made the old, pre-fix behavior a latent bug) -- this
+    # assertion pins that the fix isn't accidentally hiding it from
+    # commit_files itself, only from lane-OWNERSHIP checking.
+    assert merge_files == ["plugins/codex/lwb/bin/lwb_hook.py"]
+    assert errors == [], errors
+
+
+def test_check_lanes_merge_still_rejects_a_directly_authored_out_of_lane_file(tmp_path):
+    """Must NOT regress: the merge exemption is for FILES THE MERGE BRINGS
+    IN, not a blanket amnesty. A non-merge commit by the claude agent that
+    directly touches a codex-lane file must still fail, exactly as
+    before."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    def _commit_with_trailer(path: str, content: str, message: str, agent: str) -> str:
+        fp = repo / path
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_text(content, encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", f"{message}\n\nLWB-Agent: {agent}"],
+            cwd=repo,
+            check=True,
+        )
+        return _git(repo, "rev-parse", "HEAD")
+
+    _commit_with_trailer("seed.txt", "seed\n", "seed", "human")
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit_with_trailer(
+        "plugins/codex/lwb/bin/lwb_hook.py", "code\n", "claude touching codex's lane", "claude"
+    )
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        errors = lwb_lanes.check_lanes(f"{base}..{head}", 42)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert any("outside the claude lane" in e for e in errors), errors

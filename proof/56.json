@@ -1,0 +1,252 @@
+{
+  "deliverable": "lwb-lanes-review-freshness-fixes",
+  "pr": 56,
+  "author": "claude-code-sonnet5-session-0131oyCU-2026-09-24",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "80cdb57aa3426e246b6955f8b59c2dc5293bfa5c",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        ".................................                                        [100%]",
+        "609 passed in 27.43s"
+      ],
+      "sha256": "6bb6abb4b152eeda7d01fd28d4d75e11b8082f46b2d63a81fd03110a00076292",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_state_claims.py",
+        "--repo",
+        "."
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "HANDOFF.md:46: UNVERIFIABLE: timestamp field, not checked: Generated: 2026-09-24 18:20 UTC",
+        "lwb-check-state-claims check passed"
+      ],
+      "sha256": "ad87e941281ed28b505c0f7989398dfdb32ecfce858137344e24e41f85b96dbc",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2960 bytes)"
+      ],
+      "sha256": "475224736a586a6814e73907bfa221659ef2dc494ae04fb493a3051c036f2df9",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "6afc545646faa9b241ffe60ee4c612f50e4437f8",
+      "resolved_head": "80cdb57aa3426e246b6955f8b59c2dc5293bfa5c"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "independent_reviews() no longer fails the lwb-lanes gate solely because a STALE review record exists in reviews/<pr>/, PROVIDED a different, fresh, valid AGREE record already satisfies REQUIRED_INDEPENDENT_REVIEWS on its own. Proven by test_independent_reviews_passes_with_one_stale_and_one_fresh_valid_record.",
+      "met": true
+    },
+    {
+      "criterion": "A record that does not count toward the requirement must still never COUNT, and when no OTHER valid record exists its rejection reason must still surface in the errors that fail the gate. Proven by test_independent_reviews_still_fails_on_a_lone_stale_record.",
+      "met": true
+    },
+    {
+      "criterion": "The stale-veto downgrade must be narrowed to STALE alone: a DISAGREE record, or a self-review identity collision, sitting next to a sufficient fresh AGREE must still fail the gate unconditionally, never silently outvoted. Proven by test_independent_reviews_disagree_still_fails_even_with_a_sufficient_fresh_agree, test_independent_reviews_self_review_collision_still_fails_with_a_sufficient_fresh_agree, and test_independent_reviews_stale_is_downgraded_but_disagree_is_not_in_the_same_directory (all three rejection kinds present in one directory at once: STALE demoted to a notice, DISAGREE kept in errors, gate still fails overall). This was a second, independently found defect in the first version of the stale-veto fix.",
+      "met": true
+    },
+    {
+      "criterion": "The ordinary REQUIRED_INDEPENDENT_REVIEWS = 1, single-fresh-valid-record case (no stale/other records at all) is unaffected. Proven by test_independent_reviews_ordinary_single_valid_record_still_passes.",
+      "met": true
+    },
+    {
+      "criterion": "_review_ok itself is untouched: same signature, same behavior, no weakening of the freshness check, the AGREE-verdict check, the reviewer_id != commit_author_id check, the segment-collision check, or the dispatched-boolean requirement. Proven by: (a) the diff never modifies _review_ok; (b) every pre-existing test that calls _review_ok directly, including test_reviewable_head_still_rejects_stale_review_before_a_later_substantive_commit, is unmodified and still passes.",
+      "met": true
+    },
+    {
+      "criterion": "commit_files() correctly reports a merge commit's changed files as its diff against its FIRST PARENT (not the empty result plain diff-tree gives a merge, and not the combined/-m diff, which pulls in the union against every parent). Proven by test_commit_files_uses_first_parent_diff_for_a_merge_commit, and directly re-verified against this repo's own live history: commit_files() on a real merge commit on main (07f82d1d45d9...) now returns exactly the two reviews/51/*.json files it actually changed, where before this fix it returned [].",
+      "met": true
+    },
+    {
+      "criterion": "resolve_reviewable_head() walks PAST a merge commit whose first-parent diff touches only reviews/ or proof/ files, exactly like it already skips an ordinary record-only commit -- the live staling bug this fix addresses. Proven by test_reviewable_head_skips_a_merge_that_only_brought_in_review_records.",
+      "met": true
+    },
+    {
+      "criterion": "A merge must never be able to smuggle real content past the review requirement by also carrying a reviews/ file alongside it -- resolve_reviewable_head() must NOT skip a merge whose first-parent diff touches real content too. Proven by test_reviewable_head_does_not_skip_a_merge_carrying_real_content_too.",
+      "met": true
+    },
+    {
+      "criterion": "A merge with a genuinely empty first-parent diff (e.g. an -s ours no-op merge) is treated as record-only/skippable, distinct from an ordinary empty (non-merge) commit which stays NOT record-only -- both behaviors proven and reasoned about explicitly in code comments. Proven by test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff and test_is_record_only_commit_still_false_for_an_ordinary_empty_commit.",
+      "met": true
+    },
+    {
+      "criterion": "commit_files() reporting a merge's real first-parent diff must not feed check_lanes' per-file lane-OWNERSHIP check (only the shared-path/review-freshness determination) -- a merge did not personally author files it brings in from its second parent. Proven by test_check_lanes_merge_with_out_of_lane_file_does_not_fail_lane_ownership (which also pins that commit_files itself still reports the file, so the fix hides it from ownership checking only) -- a second, independently found consequence of the merge-commit fix.",
+      "met": true
+    },
+    {
+      "criterion": "The merge lane-ownership exemption is not a blanket amnesty: a non-merge commit that directly touches a file outside the committing agent's lane still fails, unchanged. Proven by test_check_lanes_merge_still_rejects_a_directly_authored_out_of_lane_file.",
+      "met": true
+    },
+    {
+      "criterion": "No regression anywhere else in the suite: python -m pytest tests/ -q passes in full (606 passed).",
+      "met": true
+    },
+    {
+      "criterion": "Every commit on this branch carries the correct git identity (LEAPWare <leapware@outlook.com>), so lwb-commit-identity does not fail this PR the way it failed the abandoned #54 branch. Verified by `git log --format='%H %an <%ae>'` over this branch's own commits, all showing LEAPWare <leapware@outlook.com>.",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md's generated deliverable-proof-state block is not stale relative to this branch's own proof/55.json landing -- lwb-check-state-claims and lwb-handoff --check both pass clean.",
+      "met": true
+    },
+    {
+      "criterion": "No vendored copy of scripts/lwb_lanes.py needs updating (it is a scripts/-only file, never vendored from core/ or adapters/), confirmed by `find plugins -iname '*lwb_lanes*'` returning nothing and python scripts/lwb_build.py --check passing for both plugins/claude/lwb/vendor and plugins/codex/lwb/vendor.",
+      "met": true
+    },
+    {
+      "criterion": "The reviewer's real AGREE record for PR #55 (reviews/55/cloud-reviewer-clock-01PWEpYu.json, reviewing real content at c04be73) survives the recovery unchanged -- verified by byte-diffing it against origin/lwb-recut-54-bad-identity's poisoned tip before re-adding it here.",
+      "met": true
+    },
+    {
+      "criterion": "Every commit on this branch, from origin/main to this PR's tip, carries the correct git identity (LEAPWare <leapware@outlook.com>) -- verified by `python scripts/lwb_check_commit_identity.py --base origin/main --head HEAD` and by `git log --format='%H %an <%ae>'` over the whole range.",
+      "met": true
+    },
+    {
+      "criterion": "scripts/githooks/commit-msg additionally rejects a commit whose author is not ALLOWED_HUMAN (LEAPWare <leapware@outlook.com>, from scripts/lwb_check_commit_identity.py) and not a recognized GitHub-bot identity, mirroring that script's exact allowlist. Manually tested in a throwaway repo outside this one: the LEAPWare-HQ shape that poisoned PR #55's tip rejected; the Claude <noreply@anthropic.com> shape that poisoned PR #54's tip rejected; a correct identity missing the LWB-Agent trailer still rejected (existing check, unaffected); dependabot[bot] accepted; the correct identity with the trailer accepted. Transcript in the session report; not re-run inside this repo's own history since the hook is not installed by cloning.",
+      "met": true
+    },
+    {
+      "criterion": "The hook change does not alter scripts/lwb_lanes.py or any already-reviewed logic -- confirmed by the diff touching only scripts/githooks/commit-msg, and by the full suite still passing (606 passed, unchanged from PR #55's own count).",
+      "met": true
+    },
+    {
+      "criterion": "reviews/56/cloud-reviewer-b.json finding F1 is fixed: _review_ok's STALE-vs-other rejection classification is reported via a structured out-parameter (rejection_kind) set at the exact branch that rejects a record, never inferred afterward by substring-searching formatted error text. _is_stale_only_rejection (the old substring check) is deleted.",
+      "met": true
+    },
+    {
+      "criterion": "A genuine DISAGREE record filed at a path/filename containing the literal substring 'STALE', alongside a separate fresh valid AGREE record, still fails the gate (is not silently demoted to a notice). Proven by test_independent_reviews_disagree_at_a_stale_named_path_still_fails.",
+      "met": true
+    },
+    {
+      "criterion": "A genuine self-review identity collision (reviewer_id == commit_author_id) filed at a 'STALE'-containing path, alongside a separate fresh valid AGREE record, still fails the gate. Proven by test_independent_reviews_self_review_collision_at_a_stale_named_path_still_fails.",
+      "met": true
+    },
+    {
+      "criterion": "A genuinely STALE record (reviewed_commit does not match the reviewable head), even at a path that also happens to contain the substring 'STALE', is still correctly downgraded to a notice once a sufficient fresh AGREE record exists elsewhere -- no over-narrowing regression. Proven by test_independent_reviews_genuinely_stale_at_a_stale_named_path_is_still_downgraded.",
+      "met": true
+    },
+    {
+      "criterion": "Both new exploit-reproduction tests were confirmed meaningful: verified (in a throwaway scratch copy, not committed) that they FAIL against the prior substring-based _is_stale_only_rejection code and PASS against this fix, while the genuine-staleness test passes against both.",
+      "met": true
+    },
+    {
+      "criterion": "_review_ok's existing signature and all pre-existing direct-call tests are unaffected: rejection_kind is a new, optional, defaulted-to-None trailing parameter, so every existing call site (including ~30 direct _review_ok calls in tests/test_lwb_lanes.py) is unchanged. Proven by the full pre-existing test suite passing unmodified.",
+      "met": true
+    },
+    {
+      "criterion": "python -m pytest tests/ -q passes in full (609 passed: 606 pre-existing + 3 new), scripts/lwb_build.py --check, scripts/lwb_check_state_claims.py --repo ., scripts/lwb_handoff.py --check and scripts/lwb_check_commit_identity.py --base origin/main --head HEAD all pass at the new tip.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- this record was written mid-session without access to this session's own transcript file path/session id needed to compute message.usage totals per proof/schema.json's documented method; recorded as unknown rather than estimated or borrowed from another record, per proof/README.md."
+  },
+  "mutations": [
+    "scripts/lwb_lanes.py: independent_reviews() rewritten to collect each _review_ok() call's errors into a local per-record list, only escalating the STALE-only rejections into the caller's errors when the final count of distinct valid reviewer identities is still short of REQUIRED_INDEPENDENT_REVIEWS; every non-STALE rejection (DISAGREE, self-review collision, malformed record, wrong PR number, missing dispatched-boolean, ...) is appended to errors unconditionally via a new _is_stale_only_rejection helper. _review_ok() itself is unchanged.",
+    "scripts/lwb_lanes.py: new _commit_parents() helper (git rev-list --parents -n 1) used by both commit_files() and _is_record_only_commit().",
+    "scripts/lwb_lanes.py: commit_files() now diffs a merge commit (2+ parents) against its first parent specifically, instead of a plain --root diff-tree that prints nothing for a multi-parent commit. Non-merge commits, including the root-commit --root case, are unchanged.",
+    "scripts/lwb_lanes.py: _is_record_only_commit()'s empty-file-list guard split: an ordinary (non-merge) commit with zero files stays NOT record-only (unchanged); a merge whose first-parent diff is empty IS record-only (new), since commit_files proves it changed nothing relative to its first parent.",
+    "scripts/lwb_lanes.py: check_lanes() now skips the per-file lane-ownership check for a commit with 2+ parents (a merge), while still using its first-parent diff for the shared-path / review-freshness determination that follows.",
+    "tests/test_lwb_lanes.py: new tests for all of the above -- three new tests exercising independent_reviews() for the stale-veto fix; three new tests (plus two directly on commit_files/_is_record_only_commit) for the merge-commit fix using a real --no-ff / -s ours merge in a throwaway fixture repo; three new tests narrowing the stale-veto to STALE-only (DISAGREE, self-review collision, and a mixed-directory case); two new tests for the lane-ownership exemption on merges.",
+    "HANDOFF.md: generated deliverable-proof-state block regenerated via scripts/lwb_handoff.py --write (only the block between the lwb-handoff:begin/end markers changed; the hand-written 'In flight' prose is untouched).",
+    "proof/54.json renamed to proof/55.json, pr field updated from 54 to 55: this branch (lwb-recut-54-bad-identity) re-cuts #54's branch (lwb-fix-lanes-stale-review-veto) from its last good commit after #54's tip picked up a bad-identity commit from a different, concurrently-running session (Claude <noreply@anthropic.com> instead of the required LEAPWare <leapware@outlook.com>) that force-push cannot correct in place.",
+    "reviews/55/cloud-reviewer-clock-01PWEpYu.json: re-added as a new commit under the correct identity, byte-identical to the copy on the poisoned origin/lwb-recut-54-bad-identity branch (diffed to confirm) -- not re-reviewed, not re-run through pytest/build, per instruction: it is a record-only addition, same as the original poisoned commit was.",
+    "scripts/githooks/commit-msg: extended (not replaced) to also reject a commit whose author identity is not scripts/lwb_check_commit_identity.py's ALLOWED_HUMAN and not a recognized <name>[bot] <...@users.noreply.github.com> bot pattern, hand-mirroring that script's ALLOWED_HUMAN/BOT_NAME/BOT_EMAIL logic (documented in the hook's own header as needing to be kept in sync by hand, since this is POSIX shell and that script is Python). Reads the author via `git var GIT_AUTHOR_IDENT`, already resolved by commit-msg time. This closes the root cause behind five re-cuts of this same deliverable in one day (PR #55 and predecessors #54, #53, #52, #50, #39).",
+    "proof/55.json renamed to proof/56.json, pr field updated from 55 to 56, commit field updated to this branch's own tip (adf2001, the reviewable head -- the hook commit itself is not record-only, so it is not skipped): this PR re-cuts #55's branch (lwb-recut-54-bad-identity) from its last good commit (932046d5) after #55's tip picked up a bad-identity commit (e7827e58, LEAPWare-HQ <leapware@outlook.com> instead of the required LEAPWare <leapware@outlook.com>) from a different, concurrently-running session that force-push cannot correct in place.",
+    "scripts/lwb_lanes.py: _review_ok() gains an optional trailing `rejection_kind: Optional[list[str]] = None` out-parameter, appended to with exactly one tag (\"stale\" or \"other\") at each of its 11 `return None` branches, at the source, as a direct consequence of which branch ran. Signature is otherwise unchanged and every existing positional/keyword call site is unaffected.",
+    "scripts/lwb_lanes.py: _is_stale_only_rejection() deleted (it substring-searched _review_ok's formatted error TEXT for the marker \"STALE\", which a record's author-controlled filename or interpolated identity value could spoof -- reviews/56/cloud-reviewer-b.json finding F1).",
+    "scripts/lwb_lanes.py: independent_reviews() now passes a fresh per-record `record_kind` list into each _review_ok() call and classifies a rejection as routine staleness only when record_kind == [\"stale\"] -- the structured signal _review_ok itself set -- instead of re-reading record_errors' text.",
+    "tests/test_lwb_lanes.py: three new tests through independent_reviews() -- test_independent_reviews_disagree_at_a_stale_named_path_still_fails, test_independent_reviews_self_review_collision_at_a_stale_named_path_still_fails, test_independent_reviews_genuinely_stale_at_a_stale_named_path_is_still_downgraded."
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, per this repo's own convention -- inventing or borrowing one is the exact dishonesty this system exists to catch.",
+    "THE COMMANDS RAN ON LINUX ONLY (this container). CI runs the same gates on ubuntu, macos and windows across 3.10 and 3.12; the other five legs were not run here.",
+    "python scripts/lwb_check_proof.py --reexecute WAS NOT RUN as part of producing this record.",
+    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number 56 was run locally and (correctly) FAILS with '0 independent review(s) in reviews/56/, needs 1' for every shared-path-touching commit on this branch -- there is no review record for this PR yet, which is expected and is not this record's job to create (D20: I must not write my own review).",
+    "THE HOOK IS NOT INSTALLED BY CLONING (git config core.hooksPath scripts/githooks is opt-in), so it was manually tested in a throwaway repo OUTSIDE this repository rather than proven against this repo's own CI -- the transcript is in the session report, not captured as a proof/schema.json command, since it ran against a different repository entirely and this record's commands[] can only describe commands run against THIS repo.",
+    "THE HOOK'S ALLOWLIST IS A HAND-MIRROR of scripts/lwb_check_commit_identity.py's ALLOWED_HUMAN/BOT_NAME/BOT_EMAIL, kept in sync by hand rather than by import (POSIX shell cannot import a Python module) -- nothing mechanically enforces that the two stay identical if either is edited later; the hook's own header comment flags this.",
+    "THIS PR RE-CUTS lwb-recut-54-bad-identity (#55) FROM 932046d5 (that branch's last commit with correct git identity) because its next commit (e7827e58, produced by a different, concurrently-running session) carried the wrong author identity (LEAPWare-HQ instead of LEAPWare) and force-push is denied here. e7827e58's content (the reviewer's real AGREE record) was re-added byte-identical rather than re-derived, since it is a review record written by another party, not something this session could honestly regenerate. #55's branch is abandoned; #55 itself is left open, not closed, per instruction, with a comment pointing here. #54 already carries its own supersession comment pointing at #55 from the prior recovery, so no new comment was added there.",
+    "TWO PARTS ARE BUNDLED INTO ONE PR (the #55 recovery and the commit-identity hook) rather than split, per the owner's stated lean and this session's own judgement: both are scripts/-level shared-path changes needing the same independent-review gate, and the hook's only evidence is this very PR's own incident history, so splitting them would mean re-explaining that history in a second PR body.",
+    "THIS FOLLOW-UP FIX (F1) IS ALSO SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED -- checked_by remains UNCHECKED-pending-independent-review. reviews/56/cloud-reviewer-b.json's DISAGREE verdict was reviewing an earlier commit (adf2001) and has not been superseded by a fresh AGREE at this new tip; a new independent review of this fix is still required before reviews/56/ can satisfy independent_reviews() again. The branch's reviewable head moved TWICE more after this fix was first written (a review-note commit landed, requiring a rebase) -- this record's commit field and commands[] reflect the fix commit's post-rebase sha, re-verified fresh, not the pre-rebase one."
+  ]
+}

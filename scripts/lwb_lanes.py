@@ -268,11 +268,66 @@ def commit_agent(sha: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def commit_files(sha: str) -> list[str]:
-    # --root: a root commit (no parent, e.g. the first commit of a fresh
-    # test repo) otherwise shows no files at all under plain diff-tree.
+def _commit_parents(sha: str) -> list[str]:
+    """The parent shas of `sha`, in commit order. Empty for a root commit."""
     result = subprocess.run(
-        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha],
+        ["git", "rev-list", "--parents", "-n", "1", sha],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
+    tokens = result.stdout.split()
+    # tokens[0] is `sha` itself; everything after it is a parent.
+    return tokens[1:]
+
+
+def commit_files(sha: str) -> list[str]:
+    """The repo-relative paths `sha` changed.
+
+    For an ordinary (0- or 1-parent) commit this is unchanged from before:
+    a plain `--root` diff-tree (the `--root` flag matters only for a root
+    commit, which otherwise shows no files at all).
+
+    For a MERGE commit (2+ parents) this used to run that exact same plain
+    diff-tree call, and plain `diff-tree` with no `-m`/`-c`/`--cc` flag
+    prints NOTHING for a multi-parent commit -- not "this commit changed
+    nothing", but "diff-tree has nothing to say about a multi-parent
+    commit without being told how to collapse it to one tree first". That
+    silently starved every caller of a merge commit's real file list.
+    Confirmed live against this repo's own history: a `--no-ff` merge that
+    brought a reviewer's freshly-pushed record into a PR branch (a merge
+    whose first-parent diff touches only `reviews/<pr>/*.json`) showed a
+    plain diff-tree as empty, which `_is_record_only_commit` then read as
+    "no files changed" and (correctly, per its own vacuous-`all()` guard)
+    treated as NOT record-only -- so a merge that changed only review
+    records was judged as if it were a real content change, stopping
+    `resolve_reviewable_head`'s walk there and staling the very records
+    the merge had just brought in.
+    `-m` (the combined/multi-parent diff-tree mode) is not the fix either
+    -- it prints the union of the diff against EVERY parent, so for an
+    ordinary "merge origin/main into my branch" commit it pulls in the
+    entirety of main's own diff too, which is not what changed on the
+    branch being reviewed.
+    The correct comparison for a merge is against its FIRST parent only:
+    what this merge introduced, read the way `git log --first-parent`
+    reads history -- exactly the two-tree diff `git diff-tree
+    --no-commit-id --name-only -r <sha>^1 <sha>` (equivalently `git diff
+    --name-only <sha>^1 <sha>`) computes, with no special multi-parent
+    machinery involved at all.
+    """
+    parents = _commit_parents(sha)
+    if len(parents) >= 2:
+        argv = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", f"{sha}^1", sha]
+    else:
+        # --root: a root commit (no parent, e.g. the first commit of a
+        # fresh test repo) otherwise shows no files at all under plain
+        # diff-tree.
+        argv = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha]
+    result = subprocess.run(
+        argv,
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -322,15 +377,35 @@ def _is_record_only_commit(sha: str, pr_number: int) -> bool:
     never applies -- there is no PR whose records a commit could honestly
     be filing.
 
-    A commit with no files at all (e.g. an empty commit) is NOT record-only
-    — `all()` over an empty list is vacuously True, which would wrongly let
-    a no-op commit skip past the walk.
+    An empty file list (`commit_files(sha) == []`) can mean two genuinely
+    different things, and they must not share a return value:
+
+    - An ORDINARY (non-merge) commit with zero changed files is AMBIGUOUS.
+      Nothing here can tell a deliberate empty commit apart from anything
+      else an empty diff could represent, so this stays NOT record-only --
+      `all()` over an empty list is vacuously True, which would wrongly
+      let an unexplained no-op commit skip past the walk. This is the
+      original guard, unchanged for the non-merge case.
+
+    - A MERGE commit whose first-parent diff is empty is NOT ambiguous in
+      that way. `commit_files` (see its docstring) diffs a merge against
+      its first parent specifically, so an empty result here is a proven
+      claim: this merge's tree is byte-identical to its first parent's --
+      it changed literally nothing relative to the mainline it merged
+      into (a `-s ours` merge, or merging in a tree already identical to
+      the branch). Treating that as record-only (skippable) does NOT
+      carry the risk the non-merge guard exists to avoid: there is no
+      content to accidentally skip past, because there is none. Refusing
+      to skip it would instead reproduce the very staling bug this whole
+      mechanism exists to prevent -- it would stop the walk at a merge
+      that changed nothing and judge a review record for the real,
+      substantive commit underneath as stale against that merge's sha.
     """
     if not pr_number:
         return False
     files = commit_files(sha)
     if not files:
-        return False
+        return len(_commit_parents(sha)) >= 2
     reviews_prefix = f"reviews/{pr_number}/"
     proof_file = f"proof/{pr_number}.json"
     for f in files:
@@ -611,8 +686,35 @@ def _review_ok(
     pr_number: int,
     errors: list[str],
     notices: Optional[list[str]] = None,
+    rejection_kind: Optional[list[str]] = None,
 ) -> Optional[str]:
     """Validate one review record. Returns its reviewer_id, or None if invalid.
+
+    `rejection_kind`, when given, is a caller-owned empty list that this
+    function appends exactly one tag to -- "stale" or "other" -- at the
+    SPECIFIC CODE LOCATION of whichever rejection branch actually returns
+    `None`, as a direct consequence of which branch ran. It is a
+    structured signal the caller reads as data, never a message the
+    caller re-parses as text.
+
+    This replaces a prior design (`_is_stale_only_rejection`) that
+    inferred "was this rejection routine staleness" by substring-searching
+    the formatted `errors` text for the literal marker "STALE". That was
+    exploitable: every message this function builds is `f"{rel}: ..."`,
+    and `rel` is the review record's OWN FILENAME -- `reviews/README.md`
+    says explicitly that any filename is accepted (vendor-agnostic
+    reviewer identity), so the record's author fully controls it. A
+    record with a genuine DISAGREE verdict, or a genuine self-review
+    identity collision, filed at a path merely containing the substring
+    "STALE" (e.g. `reviews/56/whatever-STALE-whatever.json`) produced an
+    error message containing "STALE" for a reason that had nothing to do
+    with staleness, and the old substring check misclassified it as
+    routine churn -- silently demoting a live DISAGREE (or a detected
+    self-review collision) to a non-fatal notice. Found by independent
+    review of PR #56 (reviews/56/cloud-reviewer-b.json, finding F1).
+    Tagging the classification at its true source, at the exact branch
+    that produced it, removes author-controlled text from the decision
+    entirely.
 
     `pr_number` is the AUTHORITATIVE PR number -- the one `independent_reviews`
     globbed `reviews/<pr_number>/` for -- not something read out of the
@@ -648,13 +750,19 @@ def _review_ok(
         data = json.loads(review_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         errors.append(f"{rel}: invalid JSON: {exc}")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     if not isinstance(data, dict):
         errors.append(f"{rel}: not a JSON object")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     schema_errors_before = len(errors)
     _validate_against_schema(data, rel, errors)
     if len(errors) > schema_errors_before:
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
 
     # The record's own `pr` must agree with the directory it was found
@@ -672,21 +780,29 @@ def _review_ok(
             f"was found under (reviews/{pr_number}/) -- a review record must name the "
             "PR it actually belongs to"
         )
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
 
     if data.get("verdict") != "AGREE":
         errors.append(f"{rel}: verdict is {data.get('verdict')!r}, want 'AGREE'")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     reviewer_id = data.get("reviewer_id")
     author_id = data.get("commit_author_id")
     if not reviewer_id or not author_id:
         errors.append(f"{rel}: missing 'reviewer_id' or 'commit_author_id'")
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     if reviewer_id == author_id:
         errors.append(
             f"{rel}: reviewer_id equals commit_author_id ({reviewer_id!r}) — "
             "a reviewer may not be the commit's own author"
         )
+        if rejection_kind is not None:
+            rejection_kind.append("other")
         return None
     reviewed_commit = data.get("reviewed_commit")
     # isinstance guard, not just truthiness: a non-string reviewed_commit
@@ -708,6 +824,8 @@ def _review_ok(
             "under reviews/ and proof/ are excluded when computing this "
             "head); the change must be re-reviewed"
         )
+        if rejection_kind is not None:
+            rejection_kind.append("stale")
         return None
 
     # From REVIEWER_ID_FORMAT_CUTOFF_PR onward: both ids must be parseable,
@@ -725,6 +843,8 @@ def _review_ok(
         reviewer_parsed = _parse_identity(reviewer_id, "reviewer_id", rel, errors)
         author_parsed = _parse_identity(author_id, "commit_author_id", rel, errors)
         if reviewer_parsed is None or author_parsed is None:
+            if rejection_kind is not None:
+                rejection_kind.append("other")
             return None
         shared_segment = _shared_long_segment(reviewer_id, author_id)
         if shared_segment is not None:
@@ -735,6 +855,8 @@ def _review_ok(
                 "same session or dispatch reviewing its own work, not an independent "
                 "reviewer"
             )
+            if rejection_kind is not None:
+                rejection_kind.append("other")
             return None
         dispatched = data.get("reviewer_was_dispatched_by_author")
         if not isinstance(dispatched, bool):
@@ -744,6 +866,8 @@ def _review_ok(
                 "establish independence on its own and requires this record to declare "
                 "the relationship honestly instead of leaving it unstated"
             )
+            if rejection_kind is not None:
+                rejection_kind.append("other")
             return None
         if dispatched and notices is not None:
             notices.append(
@@ -756,6 +880,17 @@ def _review_ok(
     return str(reviewer_id)
 
 
+# `_is_stale_only_rejection` (a substring search for "STALE" over
+# `_review_ok`'s formatted error text) has been removed. It was
+# exploitable: `_review_ok`'s messages interpolate the review record's OWN
+# FILENAME (`rel`) and other author-controlled values, so a non-stale
+# rejection filed under a "STALE"-containing path was misclassified as
+# routine staleness and silently demoted -- see `_review_ok`'s
+# `rejection_kind` parameter, which now reports this classification
+# directly from the branch that produced it, as a structured tag rather
+# than text to be re-parsed.
+
+
 def independent_reviews(
     pr_number: int,
     commit_sha: str,
@@ -763,17 +898,96 @@ def independent_reviews(
     errors: list[str],
     notices: Optional[list[str]] = None,
 ) -> bool:
-    """True when this PR carries REQUIRED_INDEPENDENT_REVIEWS distinct reviewers."""
+    """True when this PR carries REQUIRED_INDEPENDENT_REVIEWS distinct reviewers.
+
+    A per-record failure and an overall gate failure are two different
+    properties, and this function used to conflate them. `_review_ok`
+    returning `None` for a given record (STALE, wrong verdict, a bad
+    identity, whatever the reason) must mean "this record does not COUNT
+    toward the requirement" -- that property is unchanged and is still
+    entirely `_review_ok`'s call, untouched here. It must NOT also mean
+    "the whole gate fails": a PR's `reviews/<pr>/` directory accumulates
+    records across review rounds, and a record from an earlier round going
+    STALE the moment new commits land is routine, expected churn, not a
+    sign anything is wrong.
+
+    The old code passed the SAME `errors` list into every `_review_ok`
+    call, so one leftover stale record from an earlier round permanently
+    vetoed the gate even after a brand-new, fresh, valid AGREE record
+    already satisfied REQUIRED_INDEPENDENT_REVIEWS on its own -- found by
+    independent review and reproduced live against this repo's own open
+    PRs, not merely theorised: a PR whose reviewable head moved (e.g.
+    after a merge-conflict resolution) picked up fresh AGREE records from
+    independent reviewers, but `lwb-lanes` kept failing hard on the
+    now-superseded records from the round before, without ever mentioning
+    that enough valid reviews already existed alongside them.
+
+    NARROWED, found by a second round of independent review of the first
+    version of this fix: that first version collected EVERY rejection
+    reason -- not just STALE -- into the same downgradable local list, so
+    once enough valid AGREE records existed, a genuine DISAGREE sitting
+    right next to them, a self-review segment collision, a malformed
+    record, or a wrong PR number were ALL silently downgraded to a mere
+    notice too. Only staleness is routine churn from ordinary review
+    rounds superseding each other; dissent and identity problems are not,
+    and must never be outvoted by an unrelated valid record. So each
+    record's errors are now judged on their own: a record whose rejection
+    is STALE and STALE alone -- per the structured `rejection_kind` tag
+    `_review_ok` itself sets at the STALE branch, never inferred here from
+    message text (see `_review_ok`'s `rejection_kind` docs; a prior,
+    text-substring-based version of this check, `_is_stale_only_rejection`,
+    was found exploitable and removed -- see reviews/56/cloud-reviewer-b.json
+    finding F1) -- goes into a separate, still-downgradable bucket; every
+    other rejection reason is
+    appended straight to the caller's `errors` UNCONDITIONALLY, exactly as
+    before this whole fix existed, and also forces this function's own
+    return value to False -- a directory holding a live objection or a
+    bad record is never honestly "independent review satisfied", however
+    many other valid records sit beside it.
+
+    The fix for the STALE case itself is unchanged: collect it into a
+    LOCAL list, never the caller's `errors` directly, and only escalate
+    it into `errors` -- the one `main()` checks to fail the build -- if
+    the final count of distinct valid reviewer identities is still short
+    of REQUIRED_INDEPENDENT_REVIEWS. A record that does not count still
+    never counts toward satisfying the requirement; a STALE one just
+    stops being able to veto a set of records that, on their own, are
+    already sufficient.
+    """
     review_dir = REPO_ROOT / "reviews" / str(pr_number)
     records = sorted(review_dir.glob("*.json")) if review_dir.is_dir() else []
 
     reviewer_ids = set()
+    stale_errors: list[str] = []
+    hard_error_found = False
     for record in records:
-        reviewer_id = _review_ok(record, head_sha, pr_number, errors, notices)
+        record_errors: list[str] = []
+        record_kind: list[str] = []
+        reviewer_id = _review_ok(
+            record, head_sha, pr_number, record_errors, notices, record_kind
+        )
         if reviewer_id is not None:
             reviewer_ids.add(reviewer_id)
+            continue
+        # `record_kind` is set by `_review_ok` itself, at the exact
+        # rejection branch that ran -- never inferred here by re-reading
+        # `record_errors`' formatted text (see `_review_ok`'s
+        # `rejection_kind` docs). Exactly one tag is appended per call, so
+        # this is the structured equivalent of the old
+        # "len(record_errors) == 1 and marker in text" check, without the
+        # text.
+        if record_kind == ["stale"]:
+            stale_errors.extend(record_errors)
+        else:
+            # DISAGREE, a bad/self-review identity, a malformed record, a
+            # wrong PR number, a missing dispatched-boolean, ... -- not
+            # routine churn. Always fails the gate, whatever else is true
+            # of this directory.
+            errors.extend(record_errors)
+            hard_error_found = True
 
     if len(reviewer_ids) < REQUIRED_INDEPENDENT_REVIEWS:
+        errors.extend(stale_errors)
         errors.append(
             f"{commit_sha[:12]}: touches a shared path and has "
             f"{len(reviewer_ids)} independent review(s) in reviews/{pr_number}/, "
@@ -782,6 +996,28 @@ def independent_reviews(
             "commit_author_id)"
         )
         return False
+
+    # Enough valid records already exist on their own. A STALE record is
+    # surfaced -- as a notice, not an error -- so it remains visible to a
+    # human reading CI output; it is just no longer fatal to the build
+    # once sufficient valid records exist alongside it. This runs whether
+    # or not a hard error was ALSO found elsewhere in the directory --
+    # the STALE record's own disposition does not depend on what some
+    # other, unrelated record in the same directory did.
+    if notices is not None:
+        for e in stale_errors:
+            notices.append(
+                f"not counted toward the {len(reviewer_ids)} valid review(s) above, "
+                f"but enough already exist: {e}"
+            )
+
+    if hard_error_found:
+        # At least one OTHER record in this same directory failed for a
+        # reason that is not routine churn. Its message is already in
+        # `errors` (added above, unconditionally) so the build still
+        # fails; this function reports False too, for the same reason.
+        return False
+
     return True
 
 
@@ -841,12 +1077,34 @@ def check_lanes(
             continue  # the owner's own commits are unrestricted
 
         files = commit_files(sha)
+        # A merge commit's `files` (see commit_files' own docstring) is its
+        # FIRST-PARENT diff -- what this merge brought in, from the
+        # mainline's point of view. That is the right input for deciding
+        # whether the merge touched a shared path (so a review is still
+        # required for whatever it brought in), but it is the WRONG input
+        # for lane-OWNERSHIP checking: those files were not necessarily
+        # authored by whoever performed the merge, they were carried in
+        # from wherever the merged-in side came from, and each of THOSE
+        # commits was already lane-checked individually when it landed.
+        # Before the merge fix, a merge commit's `files` was always `[]`
+        # (plain diff-tree has nothing to say about a multi-parent commit),
+        # so this loop was accidentally never reached for a merge at all --
+        # found by independent review as a latent consequence of that fix:
+        # once merges report real files, a merge that happens to carry in a
+        # file from a DIFFERENT lane (e.g. catching a feature branch up
+        # with a shared-path or other-lane change that already landed on
+        # the base branch) would be flagged as if the merging agent had
+        # personally written a file outside their own lane, in one commit
+        # they only merged. A merge is therefore exempt from the
+        # per-file OWNERSHIP check below, but not from the shared-path /
+        # review-freshness determination that follows it.
+        is_merge = len(_commit_parents(sha)) >= 2
         touches_shared = False
         for f in files:
             cls = classify_path(f)
             if cls == "shared":
                 touches_shared = True
-            elif cls != agent:
+            elif not is_merge and cls != agent:
                 errors.append(
                     f"{sha[:12]} (LWB-Agent: {agent}): touches '{f}', outside the "
                     f"{agent} lane and not a shared path"
