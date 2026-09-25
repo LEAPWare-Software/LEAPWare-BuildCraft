@@ -40,9 +40,14 @@ forward or not.
 
 What plain `git log <base>..<head> --reverse` (no `--first-parent`) gets
 wrong is different, and it is exactly what this repo's own
-`resolve_reviewable_head` in `scripts/lwb_lanes.py` already had to fix
-once (its own `--first-parent` correction, tracked as this repo's PR
-#63, superseding a gap PR #56 left open): a merge commit has TWO parents,
+`resolve_reviewable_head` in `scripts/lwb_lanes.py` already had to answer
+once (its own `--first-parent` correction, tracked as this repo's PR #63,
+superseding a gap PR #56 left open). As of this writing, PR #63 is still
+OPEN and unmerged -- `origin/main`'s copy of `resolve_reviewable_head`
+does not yet pass `--first-parent` to its `git log` walk, so the fix this
+paragraph reuses is PENDING there, not landed. It is reused here as a
+correct, already-reasoned-through design regardless of whether #63 has
+merged: a merge commit has TWO parents,
 and plain `git log` walks BOTH -- the mainline the merge landed on AND
 whatever was merged in -- in commit-DATE order, not branch-topology
 order. A genuine side branch created and merged WITHIN the deliverable
@@ -80,6 +85,21 @@ gets bypassed by force rather than by a reviewable exception. Each entry
 matches a PR number or a branch name (or both -- see below) and carries a
 non-empty `reason`; a match is reported `EXEMPT`, never `FAIL`, regardless
 of whether an issue is even linked. The file ships with zero entries.
+
+**What "or both" means, spelled out because it is easy to misread as a
+narrowing AND: it is a logical OR.** Setting both `pr` and `branch` on the
+same entry does not require both to match before it applies -- each
+condition is checked independently (see `_find_exemption` below), and
+either one matching is enough to report `EXEMPT`. `{"pr": 70, "branch":
+"scoping-spike"}` therefore exempts PR 70 on ANY branch AND ALSO exempts
+ANY PR built on a branch literally named `scoping-spike` -- a WIDER
+exemption than either field alone, not a narrower one. An author who
+writes both fields meaning to narrow the match to "PR 70, and only when
+it is on branch scoping-spike" gets something broader instead. This is
+the documented, tested behaviour, not a bug to fix here; the entry's
+`reason` and this repo's own review discipline (`CLAUDE.md`) are what
+keep a wide exemption honest, not the matching logic.
+
 Adding one is a shared-path change under this repo's own review discipline
 (`CLAUDE.md`) -- a visible, reviewable act, not a silent opt-out, which is
 the same design this repo already uses for `proof/exempt.json`.
@@ -182,7 +202,7 @@ Usage:
         [--base origin/main] [--head HEAD] [--branch <name>]
         [--repo-path .] [--gh-repo OWNER/REPO]
 
-Stdlib only. Prints one `OUTCOME: message` line and returns one of six
+Stdlib only. Prints one `OUTCOME: message` line and returns one of five
 exit codes -- see `ACCEPTANCE_EXIT_*` below -- never a plain boolean.
 """
 

@@ -317,6 +317,40 @@ def test_branch_in_exempt_file_is_exempt(tmp_path, monkeypatch):
     assert "incident fix" in result.message
 
 
+def test_exempt_entry_with_both_pr_and_branch_set_is_an_or_not_an_and(tmp_path, monkeypatch):
+    """Guards the module docstring's explicit resolution of "(or both --
+    see below)": an entry naming BOTH `pr` and `branch` exempts a match on
+    EITHER field independently (logical OR), not only when both match
+    (logical AND). This is deliberately the WIDER, more surprising
+    reading -- an author writing both fields to narrow an exemption to
+    "this PR, and only on this branch" instead gets an exemption that
+    fires for this PR on any branch, or any PR on this branch. Two
+    sub-cases below each match on only one of the two fields."""
+    repo = _init_repo(tmp_path)
+    _seed_base_and_work(repo)
+    _commit(repo, "feature.txt", "work\n")
+    _write_exempt(
+        repo, [{"pr": 70, "branch": "scoping-spike", "reason": "both fields set"}]
+    )
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("gh must not be called for an exempted deliverable")
+
+    monkeypatch.setattr(m, "_gh_api_json", _boom)
+
+    # PR matches, branch does not -- still EXEMPT (pr alone is sufficient).
+    result_pr_only = m.check_acceptance_criteria(
+        repo=repo, base="main", head="work", pr_number=70, branch="unrelated-branch", gh_repo="o/r"
+    )
+    assert result_pr_only.outcome == m.Outcome.EXEMPT, result_pr_only.render()
+
+    # Branch matches, PR does not -- still EXEMPT (branch alone is sufficient).
+    result_branch_only = m.check_acceptance_criteria(
+        repo=repo, base="main", head="work", pr_number=1, branch="scoping-spike", gh_repo="o/r"
+    )
+    assert result_branch_only.outcome == m.Outcome.EXEMPT, result_branch_only.render()
+
+
 def test_exempt_entry_does_not_match_an_unrelated_pr(tmp_path, monkeypatch):
     repo = _init_repo(tmp_path)
     _seed_base_and_work(repo)

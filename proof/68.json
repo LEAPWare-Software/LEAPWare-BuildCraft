@@ -35,6 +35,33 @@
     {
       "argv": [
         "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 22%]",
+        "........................................................................ [ 33%]",
+        "........................................................................ [ 45%]",
+        "........................................................................ [ 56%]",
+        "........................................................................ [ 67%]",
+        "........................................................................ [ 79%]",
+        "........................................................................ [ 90%]",
+        "............................................................             [100%]",
+        "636 passed in 31.78s"
+      ],
+      "sha256": "732c4aa502a156b3ece5c65a48b465f3b8b16d4e1cad5be209598a6cbea8dc11",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python",
         "scripts/lwb_check_prefix.py"
       ],
       "exit": 0,
@@ -207,7 +234,8 @@
     "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
     "checked_by is a placeholder pending independent review, per this repo's proof-record convention for an unreviewed PR (see e.g. proof/lwb-ship-proof-coverage-integrity.json).",
     "The mutation probes described in this PR's description (flipping the timestamp comparison operator; disabling the exemption match) were run interactively in this session and reverted before this record was written -- they are not themselves one of the commands[] entries above, since committing a script in a deliberately-broken state, even briefly, is not something this record captures as proof; the PR description states their exact before/after test counts instead.",
-    "This record originally marked `pytest tests/test_workflows_parse.py -q` verifiable: true, on the assumption that a 3-test run's output was stable enough. It is not: pytest's own summary line embeds a wall-clock duration (\"3 passed in 0.06s\"), the exact defect docs/maintainers/proof-of-completion-plan.md already names for the full `pytest tests/ -q` entry above. CI's own --reexecute step (report-only, so this did not fail the build) caught the mismatch on the real runner and this is corrected here -- classification only, per proof/README.md's rule for the one legitimate kind of post-hoc edit to a record: the captured argv/exit/tail/sha256 are left byte-for-byte as originally captured; only verifiable/verifiable_reason changed."
+    "This record originally marked `pytest tests/test_workflows_parse.py -q` verifiable: true, on the assumption that a 3-test run's output was stable enough. It is not: pytest's own summary line embeds a wall-clock duration (\"3 passed in 0.06s\"), the exact defect docs/maintainers/proof-of-completion-plan.md already names for the full `pytest tests/ -q` entry above. CI's own --reexecute step (report-only, so this did not fail the build) caught the mismatch on the real runner and this is corrected here -- classification only, per proof/README.md's rule for the one legitimate kind of post-hoc edit to a record: the captured argv/exit/tail/sha256 are left byte-for-byte as originally captured; only verifiable/verifiable_reason changed.",
+    "F4 correction (reviews/68/cloud-reviewer.json): the first `pytest tests/ -q` entry above (633 passed) was captured at commit 2b83009e, this record's original `commit` field, and is left byte-for-byte untouched per proof/README.md's rule that an existing record may only be corrected in its CLASSIFICATION, never its captured evidence. Three commits landed on this PR branch after that capture (8a577b0, f65fd7f6, and this fix commit), adding tests and fixing F1/F2/F3/F5; the true count moved. Rather than rewrite the original entry's tail/sha256 -- which proof/README.md and this record's own prior correction (the test_workflows_parse.py verifiable-flag fix above) both treat as illegitimate -- a second, freshly-captured `pytest tests/ -q` entry was generated through scripts/lwb_record.py (never hand-typed) and appended immediately after the original, showing the corrected, current count: 636 passed. This second entry is the authoritative count for this PR's completion claim; the PR body and this file's description of the count are updated to match it. A first attempt at re-running this command hit tests/test_lwb_lanes.py's pre-existing, already-tracked flake (test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff, root-caused and tracked by open PR #63 -- see reviews/68/cloud-reviewer-b.json's F3) and was discarded as noise, not recorded, since it is not a property of this PR's own code; the entry above is a clean re-run."
   ],
   "acceptance_criteria": [
     {
