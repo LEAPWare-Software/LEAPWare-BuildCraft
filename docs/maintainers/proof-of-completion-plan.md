@@ -479,17 +479,26 @@ Nothing in (d) or (e) is built while these stand.
    it is recorded so the option is not rediscovered as a novelty.
 
    **PARTIALLY NARROWED 2026-09-25 — the naming half only, not the whole
-   finding.** Checked directly against Anthropic's own documentation,
+   finding.** Checked directly against Anthropic's own documentation:
    `https://code.claude.com/docs/en/sub-agents.md`, via two independent
-   lookups: "In version 2.1.63, the Task tool was renamed to Agent.
-   Existing `Task(...)` references in settings and agent definitions
-   still work as aliases." The same page's own `PreToolUse` hook-matcher
-   example uses `"matcher": "Agent"` — the exact string this repo's
-   `hooks.json` already ships. So the specific fear stated above — that
-   `Agent` names no real tool and the matcher is dead on arrival,
-   independent of runtime behavior — does not hold: `Agent` is the
-   current, documented, canonical tool name. Full detail, including what
-   this does NOT establish, in
+   lookups, states "In version 2.1.63, the Task tool was renamed to
+   Agent. Existing `Task(...)` references in settings and agent
+   definitions still work as aliases." `https://code.claude.com/docs/en/hooks.md`,
+   its `PreToolUse` section, states: "Matches on any tool name except
+   `EndConversation`: built-in tools such as `Bash`, `PowerShell`,
+   `Edit`, `Write`, `Read`, `Glob`, `Grep`, `Agent`, `Workflow`,
+   `WebFetch`, `WebSearch`, `AskUserQuestion`, and `ExitPlanMode`" —
+   `Agent` is explicitly named as a matchable built-in tool, the exact
+   string this repo's `hooks.json` already ships. (An earlier version of
+   this annotation instead cited a `PreToolUse` hook-matcher JSON
+   example on `sub-agents.md`; independent reviewer B correctly caught
+   that no such example exists on that page — see the correction dated
+   2026-09-25 in `item-1.8-hook-matcher-name-2026-09-25.md`. The
+   citation above replaces it; nothing else in this annotation changes.)
+   So the specific fear stated above — that `Agent` names no real tool
+   and the matcher is dead on arrival, independent of runtime behavior —
+   does not hold: `Agent` is the current, documented, canonical tool
+   name. Full detail, including what this does NOT establish, in
    `docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md`. **This
    does not close the finding.** The empirical question the finding's
    title asks — does the hook actually fire in a real, running session —

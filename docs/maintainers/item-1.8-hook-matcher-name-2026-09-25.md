@@ -29,7 +29,7 @@ than a negative result).
 
 On 2026-09-25 the specific naming question — is `Agent` a real, current
 Claude Code tool name, or was the reviewer right that only `Task` exists —
-was checked directly against Anthropic's own documentation page,
+was checked directly against Anthropic's own documentation,
 `https://code.claude.com/docs/en/sub-agents.md`, via two independent
 lookups (a research subagent's fetch, and a separate direct fetch of the
 same URL from this session). Both returned the same text. The page's
@@ -39,9 +39,32 @@ section "Restrict which subagents can be spawned" states, verbatim:
 > `Task(...)` references in settings and agent definitions still work as
 > aliases.
 
-The same page's worked example of a `PreToolUse` hook matcher intercepting
-subagent dispatch uses exactly `"matcher": "Agent"` — the same string
-`plugins/claude/lwb/hooks/hooks.json` already ships.
+**Correction (2026-09-25, same day, independent reviewer B's DISAGREE on
+this PR's first head):** the version of this note first committed also
+claimed that `sub-agents.md` itself contains a worked `PreToolUse`
+hook-matcher example using `"matcher": "Agent"`. That claim was false —
+reviewer B reproduced it (`grep -c -F '"matcher": "Agent"' sub-agents.md`
+→ `0`, on two independently-fetched, identically-hashed copies of the
+page) and this session independently re-confirmed the same negative
+result before writing this correction. What sits next to the rename note
+on that page is a `tools:` frontmatter allowlist example
+(`tools: Agent(worker, researcher), Read, Bash`), not a hook matcher.
+
+The correct citation for `Agent` as a matchable `PreToolUse` tool name is
+`https://code.claude.com/docs/en/hooks.md`, its `PreToolUse` section,
+verbatim (confirmed directly against the raw page fetched in this
+session):
+
+> Runs after Claude creates tool parameters and before processing the
+> tool call. Matches on any tool name except `EndConversation`: built-in
+> tools such as `Bash`, `PowerShell`, `Edit`, `Write`, `Read`, `Glob`,
+> `Grep`, `Agent`, `Workflow`, `WebFetch`, `WebSearch`, `AskUserQuestion`,
+> and `ExitPlanMode`, and any MCP tool names.
+
+That page explicitly lists `Agent` as a built-in tool name `PreToolUse`
+can match on — the same string `plugins/claude/lwb/hooks/hooks.json`
+already ships. The rename-note citation stands unchanged; only the
+hook-matcher-example citation is replaced.
 
 ## What this narrows
 
@@ -49,11 +72,11 @@ The earlier reviewer's specific fear — that `Agent` names no real tool at
 all, so the hook's matcher is dead on arrival and the shipped hook "fires
 zero times" by construction, independent of any Claude Code runtime
 behavior — is resolved. `Agent` is the current, documented, canonical tool
-name for subagent dispatch as of Claude Code 2.1.63+, and it is the exact
-string the hooks reference itself uses in a `PreToolUse` subagent-matcher
-example. `Task` still works, per the same doc, only as a backward-
-compatible alias. The shipped `hooks.json` is not naming a nonexistent
-tool.
+name for subagent dispatch as of Claude Code 2.1.63+ (`sub-agents.md`),
+and the hooks reference (`hooks.md`) explicitly lists `Agent` among the
+built-in tool names its `PreToolUse` event matches on. `Task` still
+works, per `sub-agents.md`, only as a backward-compatible alias. The
+shipped `hooks.json` is not naming a nonexistent tool.
 
 ## What this does NOT resolve — still open
 
@@ -79,6 +102,10 @@ note is evidence toward that empirical question one way or the other:
   is unchanged by anything here.
 
 **Verdict: NARROWS the risk in finding 6 — the matcher names a real,
-current, documented tool, evidenced by two independent lookups against
-the official doc — but does NOT close item 1.8. The empirical
-firing-observation question stays open and is Phase 6's job to settle.**
+current, documented tool (`hooks.md`'s `PreToolUse` tool-name list), and
+the rename from `Task` is independently confirmed (`sub-agents.md`) —
+but does NOT close item 1.8. The empirical firing-observation question
+stays open and is Phase 6's job to settle. An earlier version of this
+note also cited a `PreToolUse` hook-matcher JSON example on `sub-agents.md`
+that does not exist there; that citation is corrected above, and the
+underlying conclusion (evidenced by `hooks.md` instead) is unchanged.**
