@@ -176,6 +176,86 @@ def test_pr_check_fails_when_no_record_names_the_pr(tmp_path):
     assert "PR #6" in errors[0]
 
 
+def test_pr_check_exempts_dependabot_author_with_no_record(tmp_path):
+    """The gap this PR closes: a bot PR can never write its own proof
+    record (same reasoning as lwb_lanes.py's BOT_AUTHOR_PATTERNS lane
+    exemption), so a recognized bot author is exempted -- but only with a
+    reported notice, never silently.
+    """
+    orig = (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR)
+    try:
+        lwb_check_proof.REPO_ROOT = tmp_path
+        lwb_check_proof.PROOF_DIR = tmp_path / "proof"
+        notices: list[str] = []
+        errors = lwb_check_proof.check_pr_has_record(
+            60, pr_author="dependabot[bot]", notices=notices
+        )
+    finally:
+        (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR) = orig
+
+    assert errors == []
+    assert len(notices) == 1
+    assert "60" in notices[0]
+    assert "dependabot[bot]" in notices[0]
+
+
+def test_pr_check_still_fails_for_a_human_author_with_no_record(tmp_path):
+    """Regression: a narrow carve-out, not a general bypass -- a real
+    (non-bot) PR author must still fail exactly as before.
+    """
+    orig = (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR)
+    try:
+        lwb_check_proof.REPO_ROOT = tmp_path
+        lwb_check_proof.PROOF_DIR = tmp_path / "proof"
+        notices: list[str] = []
+        errors = lwb_check_proof.check_pr_has_record(
+            6, pr_author="LEAPWare-HQ", notices=notices
+        )
+    finally:
+        (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR) = orig
+
+    assert len(errors) == 1
+    assert "PR #6" in errors[0]
+    assert notices == []
+
+
+def test_pr_check_still_fails_with_no_author_given(tmp_path):
+    """Regression: omitting --pr-author entirely (the pre-existing call
+    shape) must behave exactly as it did before this PR.
+    """
+    orig = (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR)
+    try:
+        lwb_check_proof.REPO_ROOT = tmp_path
+        lwb_check_proof.PROOF_DIR = tmp_path / "proof"
+        errors = lwb_check_proof.check_pr_has_record(6)
+    finally:
+        (lwb_check_proof.REPO_ROOT, lwb_check_proof.PROOF_DIR) = orig
+
+    assert len(errors) == 1
+    assert "PR #6" in errors[0]
+
+
+def test_is_bot_pr_author_matches_the_bot_suffix():
+    assert lwb_check_proof.is_bot_pr_author("dependabot[bot]") is True
+    assert lwb_check_proof.is_bot_pr_author("renovate[bot]") is True
+    assert lwb_check_proof.is_bot_pr_author("github-actions[bot]") is True
+
+
+def test_is_bot_pr_author_rejects_human_and_missing_logins():
+    assert lwb_check_proof.is_bot_pr_author("LEAPWare-HQ") is False
+    assert lwb_check_proof.is_bot_pr_author(None) is False
+    assert lwb_check_proof.is_bot_pr_author("") is False
+
+
+def test_is_bot_pr_author_rejects_a_login_that_merely_contains_bot():
+    """A login that mentions "bot" without GitHub's own bracketed `[bot]`
+    suffix is an ordinary human/org account name, not a recognized bot --
+    this must not become a general "contains bot" bypass.
+    """
+    assert lwb_check_proof.is_bot_pr_author("robot-wrangler") is False
+    assert lwb_check_proof.is_bot_pr_author("bot-enthusiast") is False
+
+
 def test_pr_check_passes_only_on_the_typed_pr_field(tmp_path):
     proof_dir = tmp_path / "proof_pr"
     proof_dir.mkdir()
