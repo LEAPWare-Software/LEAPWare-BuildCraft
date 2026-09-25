@@ -407,7 +407,7 @@ def resolve_reviewable_head(rev_range: str) -> Optional[str]:
         return None
 
     result = subprocess.run(
-        ["git", "log", "--format=%H", head_sha],
+        ["git", "log", "--first-parent", "--format=%H", head_sha],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
