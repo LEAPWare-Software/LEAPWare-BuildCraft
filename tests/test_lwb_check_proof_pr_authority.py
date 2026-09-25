@@ -238,6 +238,35 @@ def test_main_falls_back_to_default_range_without_explicit_base_head(tmp_path, m
     assert captured["rev_range"] == "origin/main..HEAD"
 
 
+def test_main_threads_pr_author_through_to_check_pr_has_record(tmp_path, monkeypatch):
+    """Regression for the gap two independent reviewers flagged on the
+    `--pr-author` exemption: `.github/workflows/ci.yml`'s `lwb-proof-pr`
+    step passes `--pr-author "${{ github.event.pull_request.user.login }}"`
+    to this script, but nothing previously proved `main()` actually threads
+    the parsed value into `check_pr_has_record` rather than, say, silently
+    reverting to a hardcoded `pr_author=None`. That single-line regression
+    would leave the full suite green while quietly disabling the bot
+    exemption for every dependabot/renovate PR.
+    """
+    repo = _init_repo(tmp_path)
+    captured = {}
+
+    def fake_check(pr_number, pr_author=None, notices=None):
+        captured["pr_number"] = pr_number
+        captured["pr_author"] = pr_author
+        return []
+
+    monkeypatch.setattr(lwb_check_proof, "check_pr_has_record", fake_check)
+    monkeypatch.setattr(
+        lwb_check_proof.sys,
+        "argv",
+        ["lwb_check_proof.py", "--pr", "60", "--pr-author", "dependabot[bot]"],
+    )
+    _with_repo_root(repo, lwb_check_proof.main)
+    assert captured["pr_number"] == 60
+    assert captured["pr_author"] == "dependabot[bot]"
+
+
 def test_deleted_proof_file_is_not_flagged(tmp_path):
     """A file deleted in this PR's diff is not on disk to read -- must be
     skipped, not crash or falsely flag."""
