@@ -164,7 +164,8 @@
       ],
       "sha256": "c2d64d41edcb4d9a0b7a81fcc964ceb8d2b7d73d7d92491bb17f24d0bbaea6d3",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
@@ -205,7 +206,8 @@
     "The new lwb-acceptance-criteria CI step was NOT run against a real GitHub Actions runner as part of this record -- only locally, against this repo's live PRs/issues via gh (which worked in this session's sandboxed environment) and against real tmp_path git repos in the unit tests. Whether `gh` behaves identically on a real GitHub-hosted runner with no GH_TOKEN configured (see the module docstring's 'known CI limitation' section) is unmeasured by this record.",
     "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
     "checked_by is a placeholder pending independent review, per this repo's proof-record convention for an unreviewed PR (see e.g. proof/lwb-ship-proof-coverage-integrity.json).",
-    "The mutation probes described in this PR's description (flipping the timestamp comparison operator; disabling the exemption match) were run interactively in this session and reverted before this record was written -- they are not themselves one of the commands[] entries above, since committing a script in a deliberately-broken state, even briefly, is not something this record captures as proof; the PR description states their exact before/after test counts instead."
+    "The mutation probes described in this PR's description (flipping the timestamp comparison operator; disabling the exemption match) were run interactively in this session and reverted before this record was written -- they are not themselves one of the commands[] entries above, since committing a script in a deliberately-broken state, even briefly, is not something this record captures as proof; the PR description states their exact before/after test counts instead.",
+    "This record originally marked `pytest tests/test_workflows_parse.py -q` verifiable: true, on the assumption that a 3-test run's output was stable enough. It is not: pytest's own summary line embeds a wall-clock duration (\"3 passed in 0.06s\"), the exact defect docs/maintainers/proof-of-completion-plan.md already names for the full `pytest tests/ -q` entry above. CI's own --reexecute step (report-only, so this did not fail the build) caught the mismatch on the real runner and this is corrected here -- classification only, per proof/README.md's rule for the one legitimate kind of post-hoc edit to a record: the captured argv/exit/tail/sha256 are left byte-for-byte as originally captured; only verifiable/verifiable_reason changed."
   ],
   "acceptance_criteria": [
     {

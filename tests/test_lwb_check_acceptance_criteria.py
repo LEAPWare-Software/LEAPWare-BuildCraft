@@ -150,6 +150,14 @@ def test_issue_created_after_first_commit_is_fail_naming_both_timestamps(tmp_pat
     repo = _init_repo(tmp_path)
     _seed_base_and_work(repo)
     first_sha = _commit(repo, "feature.txt", "work\n", author_date="2026-09-25T10:00:00+00:00")
+    # The exact ISO-8601 UTC-offset spelling `git log --format=%aI` emits
+    # for a zero offset is NOT pinned across git versions -- git 2.43
+    # prints "+00:00", git 2.55 prints "Z" for the identical commit. Read
+    # it back from git itself rather than assuming a spelling, so this
+    # test is not version-fragile (found the hard way: this exact
+    # assumption failed on a real CI runner's newer git while passing
+    # locally).
+    actual_first_author_date = m._commit_author_date(repo, first_sha)
 
     monkeypatch.setattr(
         m,
@@ -164,7 +172,7 @@ def test_issue_created_after_first_commit_is_fail_naming_both_timestamps(tmp_pat
     # Both timestamps must be named in the failure message, per this
     # script's brief.
     assert "2026-09-25T12:00:00Z" in result.message
-    assert "2026-09-25T10:00:00+00:00" in result.message
+    assert actual_first_author_date in result.message
     assert first_sha in result.message
     assert "#200" in result.message
 
@@ -399,7 +407,11 @@ def test_merge_forward_from_base_does_not_change_the_first_commit(tmp_path, monk
     assert resolved_sha == first_sha, (
         f"expected the deliverable's ORIGINAL first commit {first_sha}, got {resolved_sha}"
     )
-    assert author_date == "2026-09-25T09:00:00+00:00"
+    # Compare against what git itself reports for that commit, not a
+    # hardcoded ISO-8601 spelling -- see the note in
+    # test_issue_created_after_first_commit_is_fail_naming_both_timestamps
+    # about %aI's "+00:00" vs "Z" divergence across git versions.
+    assert author_date == m._commit_author_date(repo, first_sha)
 
 
 def test_check_acceptance_criteria_uses_the_original_first_commit_through_a_merge(
