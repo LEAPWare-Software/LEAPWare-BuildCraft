@@ -4,6 +4,7 @@ the bootstrap exception, and the review-record cross-check."""
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -366,12 +367,35 @@ def _init_repo(repo):
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
 
 
-def _commit(repo, path: str, content: str, message: str) -> str:
+def _commit(
+    repo, path: str, content: str, message: str, *, date: str | None = None
+) -> str:
+    """`date` (e.g. "2020-01-01T00:00:00") pins GIT_AUTHOR_DATE/
+    GIT_COMMITTER_DATE for this one commit, via `env=`, so a test can
+    control commit ordering deterministically instead of relying on
+    real-clock timing -- needed to force plain (non-first-parent)
+    `git log`'s date-based traversal into a specific, reproducible order."""
     fp = repo / path
     fp.parent.mkdir(parents=True, exist_ok=True)
     fp.write_text(content, encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-q", "-m", message], cwd=repo, check=True)
+    env = None
+    if date is not None:
+        env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
+    subprocess.run(["git", "commit", "-q", "-m", message], cwd=repo, check=True, env=env)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _merge_dated(repo, branch: str, message: str, *, strategy: str | None = None, date: str) -> str:
+    """`--no-ff` merge of `branch` into the current branch, at `date`
+    (see `_commit`), so the merge's own commit date is under the test's
+    control too, not just the ordinary commits'."""
+    args = ["merge", "--no-ff"]
+    if strategy is not None:
+        args += ["-s", strategy]
+    args += ["-m", message, branch]
+    env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
+    subprocess.run(["git", *args], cwd=repo, check=True, env=env)
     return _git(repo, "rev-parse", "HEAD")
 
 
@@ -1348,6 +1372,94 @@ def test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff(tmp
     assert files == []
     assert record_only is True
     assert got == substantive
+
+
+def test_reviewable_head_walks_first_parent_only_not_a_later_dated_side_commit(tmp_path):
+    r"""Deterministic version of the test above, pinned to explicit commit
+    dates instead of real-clock timing.
+
+    `test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff`
+    (above) reproduces the underlying defect, but only when the side
+    branch's own commit happens to sort ahead of `substantive` in plain
+    (non-`--first-parent`) `git log`'s date-based traversal -- which, with
+    real wall-clock timestamps taken milliseconds apart, is down to
+    whatever tie-break git's date-order comparator and the OS clock's
+    resolution happen to produce. That is exactly the flake this test
+    closes: pinning GIT_AUTHOR_DATE/GIT_COMMITTER_DATE (via `_commit`'s and
+    `_merge_dated`'s `date=`) makes `side content` deterministically NEWER
+    than `merge`, so plain `git log HEAD` is guaranteed, on every platform
+    and every run, to list it (`side content`) ahead of `substantive` --
+    reproducing the walk-order bug on demand rather than by luck.
+
+    Topology (dates strictly increasing left to right, `side content`
+    dated AFTER the merge that brings it in):
+        seed(d0) -- substantive(d1) -- merge(d2, -s ours, no-op) -- HEAD
+                                    \                             /
+                                     -- side content(d3) ---------
+
+    `merge` is a real 2-parent commit whose first-parent diff is empty
+    (an `-s ours` merge), so `_is_record_only_commit` -- correctly, per
+    its own docstring -- treats it as record-only and the walk must
+    continue past it. Plain `git log HEAD` then visits, in date order,
+    `side content` (d3) BEFORE `substantive` (d1), and `side content`
+    touches `unrelated.txt` -- a real, non-record-only file -- so the
+    pre-fix code (`git log` with no `--first-parent`) returns `side
+    content`'s sha: WRONG, since that commit is not even on the mainline
+    this branch's review is meant to cover. `--first-parent` restricts the
+    walk to `merge`'s first parent only (`substantive`, then `seed`),
+    skipping the side branch entirely and returning `substantive`: RIGHT.
+
+    verified: red before fix (returns the side-branch sha) / green after
+    (returns `substantive`) -- confirmed by temporarily reverting the
+    `--first-parent` addition in scripts/lwb_lanes.py and rerunning this
+    exact test, both by hand and via a 20x loop, before restoring it.
+    """
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed", date="2020-01-01T00:00:00+00:00")
+    main_branch = _branch_name(repo)
+    substantive = _commit(
+        repo, "core/thing.py", "code\n", "substantive change",
+        date="2020-01-02T00:00:00+00:00",
+    )
+
+    subprocess.run(["git", "checkout", "-q", "-b", "side"], cwd=repo, check=True)
+    side = _commit(
+        repo, "unrelated.txt", "on the side branch only\n", "side content",
+        date="2020-01-10T00:00:00+00:00",  # deliberately AFTER the merge below
+    )
+    assert side != substantive
+
+    subprocess.run(["git", "checkout", "-q", main_branch], cwd=repo, check=True)
+    merge_sha = _merge_dated(
+        repo, "side", "ours merge, keep main's tree",
+        strategy="ours", date="2020-01-03T00:00:00+00:00",
+    )
+
+    # Sanity check on the premise itself: plain `git log` really does put
+    # the side commit ahead of `substantive` here, so a failure below is
+    # the walk-order bug, not a mistaken setup.
+    plain_order = _git(repo, "log", "--format=%H", "HEAD").splitlines()
+    assert plain_order.index(side) < plain_order.index(substantive), plain_order
+    first_parent_order = _git(repo, "log", "--first-parent", "--format=%H", "HEAD").splitlines()
+    assert side not in first_parent_order, first_parent_order
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        record_only = lwb_lanes._is_record_only_commit(merge_sha)
+        got = lwb_lanes.resolve_reviewable_head("HEAD")
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert record_only is True  # the merge must still be treated as skippable
+    assert got == substantive, (
+        f"resolve_reviewable_head must walk mainline (first-parent) history "
+        f"only and land on 'substantive' ({substantive}), not the side "
+        f"branch's own commit ({side}) that plain, non-first-parent `git "
+        f"log` visits first purely because of its later commit date; got {got!r}"
+    )
+
 
 
 def test_is_record_only_commit_still_false_for_an_ordinary_empty_commit(tmp_path):
