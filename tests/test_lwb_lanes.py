@@ -388,7 +388,7 @@ def test_reviewable_head_skips_trailing_reviews_only_commit(tmp_path):
     original_root = lwb_lanes.REPO_ROOT
     try:
         lwb_lanes.REPO_ROOT = repo
-        got = lwb_lanes.resolve_reviewable_head("HEAD")
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
@@ -405,7 +405,7 @@ def test_reviewable_head_skips_trailing_proof_only_commit(tmp_path):
     original_root = lwb_lanes.REPO_ROOT
     try:
         lwb_lanes.REPO_ROOT = repo
-        got = lwb_lanes.resolve_reviewable_head("HEAD")
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
@@ -424,7 +424,7 @@ def test_reviewable_head_still_rejects_stale_review_before_a_later_substantive_c
     original_root = lwb_lanes.REPO_ROOT
     try:
         lwb_lanes.REPO_ROOT = repo
-        reviewable_head = lwb_lanes.resolve_reviewable_head("HEAD")
+        reviewable_head = lwb_lanes.resolve_reviewable_head("HEAD", 9)
         assert reviewable_head == newer_substantive
 
         _write_review(repo, "verifier.json", reviewed_commit=older_substantive)
@@ -449,11 +449,84 @@ def test_reviewable_head_falls_back_to_raw_head_when_every_commit_is_record_only
     original_root = lwb_lanes.REPO_ROOT
     try:
         lwb_lanes.REPO_ROOT = repo
-        got = lwb_lanes.resolve_reviewable_head("HEAD")
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
     assert got == head
+
+
+def test_is_record_only_commit_requires_matching_pr_number(tmp_path):
+    """B3: the record-only exemption is scoped to THIS PR's own records --
+    a commit under `reviews/9/` is record-only when checked against pr 9,
+    but not against a different pr, and not at all when pr_number is 0
+    ("no PR context")."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    sha = _commit(repo, "reviews/9/verifier.json", "{}\n", "review for pr 9")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        assert lwb_lanes._is_record_only_commit(sha, 9) is True
+        assert lwb_lanes._is_record_only_commit(sha, 10) is False
+        assert lwb_lanes._is_record_only_commit(sha, 0) is False
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+
+def test_is_record_only_commit_matches_proof_file_exactly_for_its_pr(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    sha = _commit(repo, "proof/9.json", "{}\n", "proof for pr 9")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        assert lwb_lanes._is_record_only_commit(sha, 9) is True
+        assert lwb_lanes._is_record_only_commit(sha, 10) is False
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+
+def test_is_record_only_commit_rejects_impostor_editing_a_different_prs_reviews_dir(tmp_path):
+    """The reproduction from adversarial review: a commit that only edits
+    `reviews/<some-other-pr>/` (e.g. guts of that PR's own review record)
+    must NOT be treated as record-only when checked against a DIFFERENT
+    pr_number -- it must go through ordinary identity/lane review like any
+    other content commit, not dodge review by "only touching reviews/"."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    sha = _commit(repo, "reviews/5/schema-like.json", '{"required": []}\n', "impostor edit")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        assert lwb_lanes._is_record_only_commit(sha, 9) is False
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+
+def test_reviewable_head_does_not_skip_record_only_commit_filed_for_a_different_pr(tmp_path):
+    """Same B3 narrowing, exercised through `resolve_reviewable_head`'s
+    freshness logic: a record-only-shaped commit under `reviews/9/` must
+    not be skipped when THIS check is running for a different PR."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _commit(repo, "seed.txt", "seed\n", "seed")
+    _commit(repo, "core/thing.py", "code\n", "substantive change")
+    record_only_for_pr_9 = _commit(repo, "reviews/9/verifier.json", "{}\n", "record the review")
+
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = repo
+        # Checked against PR 10, not PR 9: the reviews/9/ exemption must
+        # not apply, so the head itself (not skipped) is the reviewable head.
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 10)
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == record_only_for_pr_9
 
 
 def _write_review_pr(tmp_path, pr: int, name: str, **overrides):
@@ -959,6 +1032,90 @@ def test_shared_long_segment_ignores_short_coincidental_overlap():
     ) is None
 
 
+def test_id_segments_drops_ignored_product_name_segments():
+    """`IGNORED_ID_SEGMENTS` must be excluded from the segment SET itself,
+    not just checked at some call site, so every caller built on it is
+    automatically immune."""
+    assert lwb_lanes._id_segments("claude-cto-buildcraft-2026-09-19") == {
+        "claude",
+        "cto",
+    }
+    assert lwb_lanes._id_segments("human-reviewer-leapware-2026-09-19") == {
+        "human",
+        "reviewer",
+    }
+
+
+def test_shared_long_segment_ignores_product_name_only_collision():
+    """The false positive this PR exists to fix: two independently-authored
+    ids that share ONLY a product-name segment ("buildcraft", well past
+    MIN_SHARED_SEGMENT_LENGTH) must not be flagged as an accidental
+    self-review -- neither id names an actual shared session."""
+    assert lwb_lanes._shared_long_segment(
+        "claude-cto-buildcraft-2026-09-19",
+        "human-reviewer-buildcraft-2026-09-20",
+    ) is None
+    assert lwb_lanes._shared_long_segment(
+        "claude-cto-leapware-2026-09-19",
+        "human-reviewer-leapware-2026-09-20",
+    ) is None
+
+
+def test_shared_long_segment_still_flags_a_real_shared_token_alongside_product_name():
+    """The stoplist must not become a general amnesty: a REAL shared
+    session token must still collide even when both ids also happen to
+    mention the product name."""
+    shared = lwb_lanes._shared_long_segment(
+        "claude-cto-buildcraft-f8da3f9e-2026-09-19",
+        "human-reviewer-buildcraft-f8da3f9e-2026-09-20",
+    )
+    assert shared == "f8da3f9e"
+
+
+def test_shared_long_segment_ignores_product_name_regardless_of_case():
+    """The stoplist match is case-insensitive: an id author must not be
+    able to dodge it by capitalizing "BuildCraft" -- measured as a real
+    behaviour of the fix this test guards, not just documented intent."""
+    assert lwb_lanes._shared_long_segment(
+        "claude-cto-BuildCraft-2026-09-19",
+        "human-reviewer-buildcraft-2026-09-20",
+    ) is None
+    assert lwb_lanes._shared_long_segment(
+        "claude-cto-LeapWare-2026-09-19",
+        "human-reviewer-LEAPWARE-2026-09-20",
+    ) is None
+    # The un-lowered segment is still what's kept in the returned set, so
+    # this does not quietly make ALL segment comparisons case-insensitive.
+    assert lwb_lanes._id_segments("claude-cto-BuildCraft-2026-09-19") == {
+        "claude",
+        "cto",
+    }
+
+
+def test_review_ok_at_cutoff_accepts_ids_sharing_only_the_product_name(tmp_path):
+    """End-to-end: a review record pair that used to collide purely on
+    "buildcraft" must now pass `_review_ok` cleanly."""
+    _write_review_pr(
+        tmp_path, 19, "verifier.json",
+        reviewer_id="claude-cto-buildcraft-2026-09-19",
+        commit_author_id="human-reviewer-buildcraft-2026-09-19",
+        reviewer_was_dispatched_by_author=False,
+        reviewed_commit=HEAD_SHA,
+    )
+    original_root = lwb_lanes.REPO_ROOT
+    try:
+        lwb_lanes.REPO_ROOT = tmp_path
+        errors: list[str] = []
+        got = lwb_lanes._review_ok(
+            tmp_path / "reviews" / "19" / "verifier.json", HEAD_SHA, 19, errors
+        )
+    finally:
+        lwb_lanes.REPO_ROOT = original_root
+
+    assert got == "claude-cto-buildcraft-2026-09-19", errors
+    assert errors == []
+
+
 def test_review_ok_at_cutoff_rejects_the_padded_suffix_evasion(tmp_path):
     _write_review_pr(
         tmp_path, 19, "verifier.json",
@@ -1271,7 +1428,7 @@ def test_reviewable_head_skips_a_merge_that_only_brought_in_review_records(tmp_p
     original_root = lwb_lanes.REPO_ROOT
     try:
         lwb_lanes.REPO_ROOT = repo
-        got = lwb_lanes.resolve_reviewable_head("HEAD")
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
@@ -1301,7 +1458,7 @@ def test_reviewable_head_does_not_skip_a_merge_carrying_real_content_too(tmp_pat
     try:
         lwb_lanes.REPO_ROOT = repo
         files = lwb_lanes.commit_files(merge_sha)
-        got = lwb_lanes.resolve_reviewable_head("HEAD")
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
@@ -1340,8 +1497,8 @@ def test_is_record_only_commit_true_for_a_merge_with_empty_first_parent_diff(tmp
     try:
         lwb_lanes.REPO_ROOT = repo
         files = lwb_lanes.commit_files(merge_sha)
-        record_only = lwb_lanes._is_record_only_commit(merge_sha)
-        got = lwb_lanes.resolve_reviewable_head("HEAD")
+        record_only = lwb_lanes._is_record_only_commit(merge_sha, 9)
+        got = lwb_lanes.resolve_reviewable_head("HEAD", 9)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
@@ -1370,7 +1527,7 @@ def test_is_record_only_commit_still_false_for_an_ordinary_empty_commit(tmp_path
         lwb_lanes.REPO_ROOT = repo
         assert lwb_lanes.commit_files(empty_sha) == []
         assert len(lwb_lanes._commit_parents(empty_sha)) == 1
-        record_only = lwb_lanes._is_record_only_commit(empty_sha)
+        record_only = lwb_lanes._is_record_only_commit(empty_sha, 9)
     finally:
         lwb_lanes.REPO_ROOT = original_root
 
