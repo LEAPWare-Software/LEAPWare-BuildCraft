@@ -478,6 +478,25 @@ Nothing in (d) or (e) is built while these stand.
    owner rejected. It is not being acted on — the non-goal stands — but
    it is recorded so the option is not rediscovered as a novelty.
 
+   **PARTIALLY NARROWED 2026-09-25 — the naming half only, not the whole
+   finding.** Checked directly against Anthropic's own documentation,
+   `https://code.claude.com/docs/en/sub-agents.md`, via two independent
+   lookups: "In version 2.1.63, the Task tool was renamed to Agent.
+   Existing `Task(...)` references in settings and agent definitions
+   still work as aliases." The same page's own `PreToolUse` hook-matcher
+   example uses `"matcher": "Agent"` — the exact string this repo's
+   `hooks.json` already ships. So the specific fear stated above — that
+   `Agent` names no real tool and the matcher is dead on arrival,
+   independent of runtime behavior — does not hold: `Agent` is the
+   current, documented, canonical tool name. Full detail, including what
+   this does NOT establish, in
+   `docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md`. **This
+   does not close the finding.** The empirical question the finding's
+   title asks — does the hook actually fire in a real, running session —
+   is untouched: no new probe was run, the prior probe's negative result
+   is still uninformative for the reason given above, and Build Plan
+   Phase 6 remains the place that question gets settled.
+
 ## What this will still NOT cover
 
 Written plainly, because the owner was told this makes proof of completion
