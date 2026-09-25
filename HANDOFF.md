@@ -16,25 +16,25 @@ detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 **THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
 that no WORTHY AND VETTED tool already does it before building anything.
 
-1. **DONE: #7-#50.** Decisions: `docs/requirements/decisions.md` --
-   READ FIRST, do not re-decide. `main` tip #50 (6afc545), green.
-   Phase 1.1 (`lwb_proof_coverage`+`lwb_proof_integrity` at `warn`) DONE
-   via #50 (re-cut of #49's bad reviewer-B identity, not a
-   deliverable bug). Re-derive per `docs/handoff-protocol.md`.
+1. **DONE: #7-#39.** Decisions: `docs/requirements/decisions.md` --
+   READ FIRST, do not re-decide. `main`'s tip is #39 (e5f29bf), GREEN
+   (`gh api .../check-runs`, 2026-09-24). Re-derive per
+   `docs/handoff-protocol.md`.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
    every 2h; a separate reviewer routine writes the gating record
    hourly. D27's rule: separate cron entries, no trigger path
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT (track A), Phase 1 continuing:** #51 (1.2), #52/#53
-   (1.6, #53 re-cuts #52's bad identity). Also open #45,
-   #47/#48, #44, #40. **#46 (this D27 correction) is separate:** main drifted past
-   its base again; resolved via a real merge + HANDOFF regeneration,
-   moving the reviewable head past the three `reviews/46/` AGREEs --
-   stale by design (D20), needs a fresh independent review.
-4. **WHAT BLOCKS 1.0.0.** 0/13 stages, 4 rules on `main` (1.1 landed), 0 armed
-   to deny, 2/8 skills working.
+3. **IN FLIGHT (track A): Phase 1 item 1.1.** Ships
+   `lwb_proof_coverage` + `lwb_proof_integrity` as rules at `warn`.
+   Tests green, vendor rebuilt. #49 re-cut (branch
+   `lwb-recut-49-bad-reviewer-identity`): reviewer B's commit was
+   authored `Claude <noreply@anthropic.com>`, unlisted -- permanent
+   `lwb-commit-identity` failure, same shape as #38's bad commit (#39).
+   Not this PR's bug. New PR TBD. Cloud has #40, #44-48 open too.
+4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 2 rules on `main` today (4
+   once 1.1 lands), 0 armed to deny, 2 of 8 skills working.
 5. **DEFECT PATTERN:** "I could not check" must never share a
    representation with "I checked and found nothing". Live in Codex's
    lane. The hook has still never been seen to fire from `hooks.json`.
@@ -43,10 +43,10 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 17:58 UTC
+Generated: 2026-09-24 18:20 UTC
 main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
 CLI: claude
-Session: session_01EkvcWAEAV2sJYoN51CPrTF
+Session: claude-code-sonnet5-session-0131oyCU-2026-09-24
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
