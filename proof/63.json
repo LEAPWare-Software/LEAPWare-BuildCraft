@@ -25,9 +25,9 @@
         "........................................................................ [ 82%]",
         "........................................................................ [ 94%]",
         "..................................                                       [100%]",
-        "610 passed in 19.83s"
+        "610 passed in 19.69s"
       ],
-      "sha256": "fc5044ff2e6031515daa74610a1b9ef3fb7e8ac717c7b1dc7d8b077a0f21f2a0",
+      "sha256": "8176ea75dc2992dc443ac82198b184edf61020053e707c78eb339263f1f50056",
       "sanitiser_version": "1",
       "verifiable": false,
       "verifiable_reason": "nondeterministic-output"
@@ -46,11 +46,12 @@
       "expect_exit": 0,
       "tail": [
         "..                                                                       [100%]",
-        "2 passed, 79 deselected in 0.73s"
+        "2 passed, 79 deselected in 0.71s"
       ],
-      "sha256": "0c1501eb07aa460ff27500738a92c8b1ea0846614ab85b520851ee767a3d1292",
+      "sha256": "d1c313846a7a37dfd040198d22b829675ea605f34c20f9b0220af434cc448952",
       "sanitiser_version": "1",
-      "verifiable": true
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
     },
     {
       "argv": [
