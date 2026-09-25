@@ -322,3 +322,110 @@ def test_no_shipped_policy_file_arms_this_rule_to_deny():
             "not a control -- see docs/rules/lwb-proof-required.md. Make deny "
             "fail closed before shipping a policy that turns it on."
         )
+
+
+# --------------------------------------------------------------------
+# Build-plan item 1.2: DENY fails closed when it cannot verify; WARN/OFF
+# are unchanged. See docs/rules/lwb-proof-required.md, "DENY is advisory,
+# not a security control" / "Now fails closed".
+# --------------------------------------------------------------------
+
+
+def test_deny_with_no_repo_facts_fails_closed():
+    """`event.repo is None` under DENY now denies, with an honest reason --
+    this is the exact gap build-plan 1.2 names: "today it permits when it
+    cannot read git, advertising enforcement it cannot deliver."
+    """
+    finding = RULE.evaluate(_bash("git push", repo=None), DENY)
+    assert finding is not None
+    assert finding.mode is RuleMode.DENY
+    assert "could not verify" in finding.reason
+    # Must NOT reuse the false "checked and found nothing" framing that
+    # Attack C already burned this repo on once.
+    assert "record(s) found" not in finding.reason
+
+
+def test_warn_with_no_repo_facts_is_unchanged():
+    """Same event, WARN mode: still silent, exactly as before 1.2. Also
+    covered by test_no_repo_facts_means_no_opinion above; restated here,
+    named for the plan item, so the two directions sit next to each
+    other."""
+    assert RULE.evaluate(_bash("git push", repo=None), WARN) is None
+
+
+def test_deny_with_incomplete_facts_fails_closed():
+    """`event.repo.facts_incomplete` under DENY now denies too -- the
+    independent reviewer's Attack C closed the FALSE-deny version of this
+    (a wrong "0 records found" claim); build-plan 1.2 adds the HONEST
+    version: a real deny that says it could not verify, not that it
+    checked and found nothing."""
+    repo = RepoFacts(
+        branch="feature-x",
+        proof_ids=(),
+        facts_incomplete=True,
+        facts_incomplete_reason="could not read proof/: PermissionError",
+    )
+    finding = RULE.evaluate(_bash("git push", repo), DENY)
+    assert finding is not None
+    assert finding.mode is RuleMode.DENY
+    assert "could not verify" in finding.reason
+    assert "could not read proof/" in finding.reason
+    assert "record(s) found" not in finding.reason
+
+
+def test_warn_with_incomplete_facts_stays_silent():
+    """Same event, WARN mode: unchanged by 1.2. This is the direction that
+    protects Attack C's original fix -- `facts_incomplete` must still not
+    be treated as "checked, found nothing" in WARN, exactly as before."""
+    repo = RepoFacts(
+        branch="feature-x",
+        proof_ids=(),
+        facts_incomplete=True,
+        facts_incomplete_reason="could not read proof/: PermissionError",
+    )
+    assert RULE.evaluate(_bash("git push", repo), WARN) is None
+
+
+def test_deny_fail_closed_reason_names_the_pr_when_one_was_typed():
+    """The claim identifier is available from the command line even when
+    repo facts are missing entirely -- the honest reason should still
+    name it when it can."""
+    finding = RULE.evaluate(_bash("gh pr merge 24 --squash", repo=None), DENY)
+    assert finding is not None
+    assert "'24'" in finding.reason
+
+
+def test_deny_still_denies_normally_once_facts_are_complete_and_real():
+    """Control: a fully-gathered, genuinely empty repo (facts_incomplete is
+    False) must keep denying with the ORIGINAL "record(s) found" wording --
+    this fix must not have blunted the rule's ordinary, already-shipped
+    deny behavior."""
+    repo = RepoFacts(branch="main", proof_ids=())
+    finding = RULE.evaluate(_bash("git push origin main", repo), DENY)
+    assert finding is not None
+    assert "record(s) found" in finding.reason
+
+
+def test_detached_head_with_no_pr_number_is_silent_even_under_deny():
+    """Deliberately OUT OF SCOPE for build-plan item 1.2, in every mode
+    including deny: `repo.branch is None` here means the adapter read git
+    just fine (`facts_incomplete` is False) -- there is simply no
+    identifier for the claim being made. This is a different gap from
+    "cannot read git", and closing it is left to a later, separate
+    decision. See docs/rules/lwb-proof-required.md, "Confirmed bypasses
+    that remain"."""
+    repo = RepoFacts(branch=None, proof_ids=("24",))
+    assert RULE.evaluate(_bash("git push origin HEAD", repo), DENY) is None
+
+
+def test_through_the_engine_deny_fails_closed_on_missing_repo_facts():
+    """Same proof at the engine level, not just the rule level directly --
+    confirms `Decision.permit` actually flips for a policy-armed deny."""
+    event = _bash("git push", repo=None)
+    decision = evaluate(event, Policy(rules={"lwb_proof_required": DENY}))
+    assert decision.permit is False
+    assert "could not verify" in (decision.deny_reason or "")
+
+    warn_decision = evaluate(event, Policy(rules={"lwb_proof_required": WARN}))
+    assert warn_decision.permit is True
+    assert warn_decision.warnings == []

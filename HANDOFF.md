@@ -16,25 +16,24 @@ detail: `docs/maintainers/session-handoff-2026-09-19.md`. Gate traps:
 **THE CONDITION ON EVERY PHASE:** absolutely, positively double-check
 that no WORTHY AND VETTED tool already does it before building anything.
 
-1. **DONE: #7-#39.** Decisions: `docs/requirements/decisions.md` --
-   READ FIRST, do not re-decide. `main`'s tip is #39 (e5f29bf), GREEN
-   (`gh api .../check-runs`, 2026-09-24). Re-derive per
-   `docs/handoff-protocol.md`.
+1. **DONE: #7-#39, #50.** Decisions: `docs/requirements/decisions.md`
+   -- READ FIRST, do not re-decide. Re-derive branch/PR state per
+   `docs/handoff-protocol.md`; it drifts fast here.
 2. **THE CLOUD LOOP IS LIVE (D27).** A conductor routine picks work
    every 2h; a separate reviewer routine writes the gating record
    hourly. D27's rule: separate cron entries, no trigger path
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT (track A): Phase 1 item 1.1.** Ships
-   `lwb_proof_coverage` + `lwb_proof_integrity` as rules at `warn`.
-   Tests green, vendor rebuilt. #49 re-cut (branch
-   `lwb-recut-49-bad-reviewer-identity`): reviewer B's commit was
-   authored `Claude <noreply@anthropic.com>`, unlisted -- permanent
-   `lwb-commit-identity` failure, same shape as #38's bad commit (#39).
-   Not this PR's bug. New PR TBD. Cloud has #40, #44-48 open too.
-4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 2 rules on `main` today (4
-   once 1.1 lands), 0 armed to deny, 2 of 8 skills working.
+3. **IN FLIGHT:** #51 (item 1.2, `deny` fails closed on unreadable
+   git). #56 landed (lwb_lanes stale-veto + merge-first-parent fix +
+   identity hook) -- it changes `resolve_reviewable_head`, so merging
+   main into #51 stales its AGREE records; a fresh review is expected
+   next, not a defect. Re-derive dead/live PR state per
+   `docs/handoff-protocol.md`; it drifts fast here.
+4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages enforced, 4 rules shipped,
+   0 armed to deny, 2 of 8 skills working. **A consuming repo installs
+   `lwb` and gets a no-op.** Phase 1 is `lwbpoce`.
 5. **DEFECT PATTERN:** "I could not check" must never share a
    representation with "I checked and found nothing". Live in Codex's
    lane. The hook has still never been seen to fire from `hooks.json`.
@@ -43,16 +42,16 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 18:20 UTC
-main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
+Generated: 2026-09-25 03:13 UTC
+main SHA: 0d1be714ac028d9b2204bf997d49296c32378ff1
 CLI: claude
-Session: claude-code-sonnet5-session-0131oyCU-2026-09-24
+Session: 01oyCUXLqcRyXy8deLZYtH
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
 
 Deliverable proof state (from proof/):
-23/23 proven
+24/24 proven
 (all proven; none outstanding)
 
 <!-- lwb-handoff:end -->

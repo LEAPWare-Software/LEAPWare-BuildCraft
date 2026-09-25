@@ -24,9 +24,17 @@ out)`; it is fully exercised by constructing `Event`s in a test, with no
 repository, no subprocess and no tmpdir needed.
 
 `event.repo is None` means the adapter gathered nothing -- NOT that
-nothing was found. This rule stays silent in that case. An adapter that
-has not been taught to collect repo facts (today: the Codex adapter) must
-not cause a warning on every push.
+nothing was found. In WARN (and OFF) this rule stays silent in that case,
+same as always -- an adapter that has not been taught to collect repo
+facts (today: the Codex adapter) must not cause a warning on every push.
+
+Build-plan item 1.2: in DENY mode ONLY, `event.repo is None` and
+`event.repo.facts_incomplete` no longer mean silence -- they mean the rule
+cannot verify a matching proof record exists, so it fails CLOSED with an
+honest reason instead of silently permitting. See `_fail_closed_reason`
+and `evaluate`'s own docstring below, and
+docs/rules/lwb-proof-required.md, "DENY is advisory, not a security
+control".
 
 ## Mode
 
@@ -61,7 +69,7 @@ from __future__ import annotations
 import re
 from typing import List, Optional, Tuple
 
-from ..config import RuleConfig
+from ..config import RuleConfig, RuleMode
 from ..events import Event, RepoFacts
 
 rule_id = "lwb_proof_required"
@@ -288,15 +296,57 @@ def _matching_record(repo: RepoFacts, pr_numbers: List[str]) -> Optional[str]:
     return None
 
 
+def _fail_closed_reason(why: str, claim: Optional[str]) -> str:
+    """Build the honest DENY reason for the two build-plan-1.2 cases.
+
+    Deliberately does NOT say "N record(s) found ... none matching" -- that
+    exact phrase asserts a count this rule never actually obtained, which is
+    the false framing "Attack C" (independent review of PR #26) already
+    burned this repo on once: `facts_incomplete` used to be reported the
+    same way a genuine "checked, found nothing" is reported. This is the
+    honest third outcome build-plan item 1.2 adds: "could not verify,
+    failing closed" is its own distinct sentence, not a variant of the old
+    one, so a reader (or a later reviewer grepping for the old false
+    framing) cannot mistake one for the other.
+    """
+    target = f" for '{claim}'" if claim else ""
+    return (
+        f"publishing command seen but lwb_proof_required could not verify "
+        f"whether a matching proof record exists{target}: {why}. Failing "
+        f"CLOSED under 'deny' rather than permitting a publish it could not "
+        f"check. See docs/rules/lwb-proof-required.md"
+    )
+
+
 def evaluate(event: Event, config: RuleConfig):
     """Warn (or deny) on a publishing command with no proof record behind it.
 
     Returns None -- silently, with no opinion -- for every event that is not
-    a Bash publish, and for every publish this rule cannot honestly judge.
+    a Bash publish, and for every publish this rule cannot honestly judge in
+    WARN mode.
 
     `config.mode` is already guaranteed non-OFF by the engine, and is used
     verbatim as the finding's severity: this rule is armable by policy,
     unlike `lwb_version`.
+
+    Build-plan item 1.2: in DENY mode ONLY, a publish this rule cannot see
+    enough to judge -- `event.repo is None`, or `event.repo.facts_incomplete`
+    -- now produces a DENY finding with an honest "could not verify" reason,
+    instead of silence. WARN (and OFF) are UNCHANGED for both cases: a
+    fail-closed WARN would warn on every Bash call in every repository with
+    no `.git` or an unreadable one, which build-plan 1.2 explicitly does not
+    ask for. See docs/rules/lwb-proof-required.md, "What would have to
+    change before `deny` could be called a control".
+
+    A THIRD case -- `repo.branch is None and not pr_numbers` (detached HEAD,
+    no PR number named) -- is deliberately left OUT of scope for this
+    change, in every mode including deny. That is not a "cannot read git"
+    situation: the adapter read git just fine and `facts_incomplete` is
+    False. It is "read git fine, there is no identifier for the claim being
+    made", which is a different, already-documented, accepted bypass of
+    `deny` ("detaching HEAD in one call and pushing in the next defeats
+    `deny` entirely" -- see the same doc section). Closing that is a
+    separate, later decision, not folded into 1.2.
     """
     from ..engine import Finding  # local import: engine imports this module.
 
@@ -313,10 +363,30 @@ def evaluate(event: Event, config: RuleConfig):
         # must be untouched by this rule.
         return None
 
+    claim_hint = pr_numbers[0] if pr_numbers else None
+
     repo = event.repo
     if repo is None:
-        # The adapter gathered no repo facts. Absence of evidence, not
-        # evidence of absence -- say nothing.
+        # The adapter gathered no repo facts at all -- no `.git` found, an
+        # adapter that has not been taught to collect facts (Codex today),
+        # or a collector crash upstream. Absence of evidence is still not
+        # evidence of absence, so WARN/OFF stay exactly as quiet as before
+        # this change. But under DENY this is precisely the gap build-plan
+        # 1.2 names: "today it permits when it cannot read git, advertising
+        # enforcement it cannot deliver." A policy author who armed `deny`
+        # asked for a block, not a report; failing OPEN here silently
+        # downgrades that promise to advisory. So DENY now fails CLOSED.
+        if config.mode is RuleMode.DENY:
+            return Finding(
+                rule_id=rule_id,
+                mode=config.mode,
+                reason=_fail_closed_reason(
+                    "no repository facts were gathered for this event (no "
+                    "readable .git here, or the adapter does not collect "
+                    "repo facts)",
+                    claim_hint,
+                ),
+            )
         return None
 
     if repo.facts_incomplete:
@@ -324,20 +394,42 @@ def evaluate(event: Event, config: RuleConfig):
         # proof directory or .git/HEAD existed but was not READABLE) --
         # "could not check", not "checked, found nothing". An independent
         # reviewer's Attack C (`chmod 000 proof/` with a matching record
-        # still on disk, deny mode) turned this rule into a FALSE DENY:
-        # it reported "0 record(s) found ... none matching" when it had
-        # in fact been unable to count anything. Staying silent here
-        # keeps this rule's own documented UNDER-match posture -- a
-        # missed warning is preferred to a deny built on facts this rule
-        # does not actually have. See `RepoFacts.facts_incomplete` and
-        # `bin/lwb_hook.py`'s `repo.facts_incomplete` warning, which is
-        # what makes "could not check" visible instead of merely quiet.
+        # still on disk, deny mode) turned this rule into a FALSE DENY: it
+        # reported "0 record(s) found ... none matching" when it had in
+        # fact been unable to count anything. WARN/OFF still stay silent
+        # here, unchanged -- a missed warning is still preferred to a WARN
+        # built on facts this rule does not actually have, exactly as
+        # before. DENY is different: silence there is not "quieter", it is
+        # "permits when it cannot read git" restated (Attack C's gap plus
+        # this one are two instances of the same defect, at two different
+        # severities). So DENY now returns an HONEST deny -- "could not
+        # verify", explicitly NOT "0 record(s) found ... none matching",
+        # which is the exact false framing Attack C burned this repo on.
+        # See `RepoFacts.facts_incomplete` and `bin/lwb_hook.py`'s
+        # `repo.facts_incomplete` warning, which independently makes "could
+        # not check" visible in the transcript alongside this deny.
+        if config.mode is RuleMode.DENY:
+            why = "repository facts could not be fully read"
+            if repo.facts_incomplete_reason:
+                why = f"{why} ({repo.facts_incomplete_reason})"
+            return Finding(
+                rule_id=rule_id,
+                mode=config.mode,
+                reason=_fail_closed_reason(why, claim_hint or repo.branch),
+            )
         return None
 
     if repo.branch is None and not pr_numbers:
-        # Detached HEAD (or an unreadable HEAD) and no PR number on the
-        # command line: there is no identifier for the claim being made,
-        # so there is nothing this rule could sensibly ask for.
+        # Detached HEAD (or a HEAD read as legitimately not a branch ref)
+        # and no PR number on the command line: the adapter read git just
+        # fine -- `facts_incomplete` is False -- there is simply no
+        # identifier for the claim being made. OUT OF SCOPE for build-plan
+        # 1.2 in every mode, including deny: this is a "no claim to check"
+        # gap, not a "cannot read git" gap, and the rule's own docs already
+        # list it as a separate, accepted bypass of `deny`
+        # ("detaching HEAD in one call and pushing in the next defeats
+        # `deny` entirely") rather than as part of "cannot read git". See
+        # docs/rules/lwb-proof-required.md, "DENY is advisory".
         return None
 
     if _matching_record(repo, pr_numbers) is not None:

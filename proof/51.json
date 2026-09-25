@@ -1,0 +1,205 @@
+{
+  "deliverable": "lwb-proof-required-deny-fail-closed",
+  "pr": 51,
+  "author": "claude-lwb-proof-required-fail-closed-01oyCUXLqcRyXy8deLZYtH-2026-09-24",
+  "checked_by": "UNCHECKED-pending-independent-review",
+  "commit": "3a59eaaf39605f1f5fa2797044ef5a5093c60ce1",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 13%]",
+        "........................................................................ [ 27%]",
+        "........................................................................ [ 40%]",
+        "........................................................................ [ 54%]",
+        "........................................................................ [ 67%]",
+        "........................................................................ [ 81%]",
+        "........................................................................ [ 94%]",
+        "............................                                             [100%]",
+        "532 passed in 24.61s"
+      ],
+      "sha256": "0aef033d567b3280a594e77bc458b9e1578f8df918e1f9e1879c382f2f566c77",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "needs-build-step"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_validate_claude_plugin.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "Claude plugin validation passed"
+      ],
+      "sha256": "619ada789ca468110703bf240cbe66ae005fcda31587c5b2854057af0facf306",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_validate_codex_plugin.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "Codex plugin validation passed"
+      ],
+      "sha256": "fc1fae45a0bf8b84d7e98a6c52c4c66a909177983709aa16659b60b518eb837f",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "e5f29bfaccec90199f983b778c1d7689b8c24d33",
+      "resolved_head": "3a59eaaf39605f1f5fa2797044ef5a5093c60ce1"
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "In RuleMode.DENY, a publishing command whose repo facts are entirely missing (event.repo is None) now produces a DENY Finding instead of a silent allow -- the exact gap build-plan item 1.2 names ('today it permits when it cannot read git, advertising enforcement it cannot deliver').",
+      "met": true
+    },
+    {
+      "criterion": "In RuleMode.DENY, a publishing command whose repo facts are incomplete (event.repo.facts_incomplete) now also produces a DENY Finding instead of a silent allow.",
+      "met": true
+    },
+    {
+      "criterion": "The new DENY reason is honestly worded ('could not verify ... failing closed') and never reuses the old 'N record(s) found ... none matching' framing that the Attack C fix (PR #26) exists to prevent -- locked by tests/core/test_lwb_proof_required.py::test_deny_with_no_repo_facts_fails_closed and test_deny_with_incomplete_facts_fails_closed.",
+      "met": true
+    },
+    {
+      "criterion": "RuleMode.WARN (and OFF) are UNCHANGED for both cases -- still silent, exactly as before this fix -- locked by test_warn_with_no_repo_facts_is_unchanged and test_warn_with_incomplete_facts_stays_silent in tests/core/test_lwb_proof_required.py, plus test_incomplete_facts_still_silent_under_warn and test_shipped_hook_a_genuine_no_repo_case_stays_a_silent_allow_under_warn in tests/adapters/test_claude_repo_facts_incomplete.py.",
+      "met": true
+    },
+    {
+      "criterion": "The detached-HEAD-with-no-PR-number case (repo.branch is None and not pr_numbers) is explicitly decided OUT OF SCOPE for build-plan item 1.2, in every mode including deny, because it is a 'no claim to check' gap rather than a 'cannot read git' gap -- locked by test_detached_head_with_no_pr_number_is_silent_even_under_deny, and stated in docs/rules/lwb-proof-required.md's 'Confirmed bypasses that remain' section and in this PR's description.",
+      "met": true
+    },
+    {
+      "criterion": "core/lwb_core/engine.py's rule-crash fail-open (`except Exception as exc`) is explicitly decided to stay unchanged, as a materially different concern (a bug in a rule, not a git-read failure) -- not touched by this deliverable, and the reasoning is stated in the PR description rather than silently assumed.",
+      "met": true
+    },
+    {
+      "criterion": "core/policy/default.json and both vendored policy copies still ship lwb_proof_required at 'warn' -- unchanged by this PR. test_no_shipped_policy_file_arms_this_rule_to_deny and test_the_shipped_default_is_warn_not_deny (both pre-existing, not edited) still pass.",
+      "met": true
+    },
+    {
+      "criterion": "docs/rules/lwb-proof-required.md is updated to match: the 'When it says nothing' section states which cases are still silent per mode, 'DENY is advisory, not a security control' is split into 'Now fails closed (build-plan item 1.2)' and 'Confirmed bypasses that remain', and the former proposal paragraph is rewritten as a statement of what changed and what did not.",
+      "met": true
+    },
+    {
+      "criterion": "`python -m pytest tests/ -q` is green with coverage added, not reduced: 532 passed (0 skipped once PyYAML was installed locally for tests/test_workflows_parse.py's mandatory-in-CI checks; 529 passed/3 skipped with the environment as found), up from a 522-test baseline on origin/main -- +8 new test functions in tests/core/test_lwb_proof_required.py (26 -> 34) and +2 net new in tests/adapters/test_claude_repo_facts_incomplete.py (13 -> 15, one test replaced by two, one test replaced by two). No test was weakened, skipped, or deleted to make this pass.",
+      "met": true
+    },
+    {
+      "criterion": "core/lwb_core stays I/O-free: the only new import in lwb_proof_required.py is RuleMode from the already-local ..config module; no filesystem, subprocess, or environment access was added. The existing purity probe test_the_rule_reads_nothing_but_its_arguments is unchanged and still passes.",
+      "met": true
+    },
+    {
+      "criterion": "`python scripts/lwb_build.py` regenerates plugins/{claude,codex}/lwb/vendor/ from the changed core source, and `python scripts/lwb_build.py --check` then passes clean for both vendored copies.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- this record was written by a delegated subagent session that cannot see its own transcript's message.usage blocks (no access to ~/.claude/projects/<slug>/<session-id>.jsonl from inside this execution context). Recorded as unknown rather than estimated or borrowed from another record, per D25 and required-work item 3 in docs/requirements/decisions.md -- an unmeasured field recorded as a number, or copied from an unrelated deliverable, is exactly how an efficiency claim gets manufactured."
+  },
+  "mutations": [
+    "core/lwb_core/rules/lwb_proof_required.py: evaluate() now fails closed under RuleMode.DENY when event.repo is None or event.repo.facts_incomplete, via a new _fail_closed_reason() helper; WARN/OFF and the detached-HEAD-no-PR-number case are unchanged; module and function docstrings updated to match",
+    "docs/rules/lwb-proof-required.md: follow-up polish after the initial commands[] run -- fixed a heading that had wrapped across two lines (broken Markdown ATX heading), and added a 'Known gap: Codex' consequence note: arming deny now denies every publish on Codex unconditionally, since event.repo is None on every Codex event and deny fails closed on that. Documentation only; no command's captured output depends on this file's text, so commands[] was not re-run.",
+    "docs/rules/lwb-proof-required.md: 'When it says nothing' rewritten per-mode; 'DENY is advisory, not a security control' split into 'Now fails closed (build-plan item 1.2)' and 'Confirmed bypasses that remain'; the former proposal paragraph rewritten as a statement of fact; Modes table's deny row updated",
+    "plugins/claude/lwb/vendor/lwb_core/rules/lwb_proof_required.py: regenerated by scripts/lwb_build.py from the core source change",
+    "plugins/codex/lwb/vendor/lwb_core/rules/lwb_proof_required.py: regenerated by scripts/lwb_build.py from the core source change",
+    "tests/core/test_lwb_proof_required.py: 8 new tests covering both directions (deny fails closed / warn unchanged) for both new cases, plus the out-of-scope detached-HEAD case and an engine-level check",
+    "tests/adapters/test_claude_repo_facts_incomplete.py: test_incomplete_facts_do_not_produce_a_false_deny replaced with test_incomplete_facts_deny_honestly_not_falsely_under_deny (now asserts the new honest deny) plus new test_incomplete_facts_still_silent_under_warn; test_shipped_hook_surfaces_an_unreadable_head_as_incomplete_not_silent updated to expect deny through the real shipped hook; test_shipped_hook_a_genuine_clean_pass_carries_no_incompleteness_marker replaced with test_shipped_hook_a_genuine_no_repo_case_also_now_fails_closed_under_deny and test_shipped_hook_a_genuine_no_repo_case_stays_a_silent_allow_under_warn",
+    "proof/51.json: this record"
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. `checked_by` is deliberately the literal string UNCHECKED-pending-independent-review rather than a reviewer identity, because inventing or borrowing one is the exact dishonesty this system exists to catch. A fresh independent review record under reviews/51/ is what makes this record complete; I did not write and must not write that record myself (D20).",
+    "scripts/lwb_check_env_leak.py was NOT run as proof: it reports UNCONFIGURED in this environment because LWB_PRIVATE_NEEDLES (a repo secret) is unset locally, and a clean UNCONFIGURED result proves nothing. It runs for real only in CI.",
+    "scripts/lwb_lanes.py was checked locally with `--base origin/main --head HEAD` and reported no violating paths, but was NOT run with `--pr-number 51` (the real enforcement mode, which also checks reviews/51/ for independent-review records) since this PR number did not exist yet when most of the verification commands ran; CI runs the real check.",
+    "All commands were run on Linux only, in this one container. CI runs the same suite across ubuntu/macos/windows and Python 3.10/3.12; that six-way matrix was not independently reproduced here.",
+    "The two 'decide and document' design choices (leaving the detached-HEAD-no-PR-number case and engine.py's rule-crash fail-open out of scope) are judgement calls, not something a command can prove correct. The tests above prove the CURRENT behavior matches what was decided; they do not prove the decision itself is the right one -- that is exactly what independent review under reviews/51/ is for, and the reasoning is stated in full in this PR's own description for a reviewer to attack.",
+    "`scripts/lwb_check_proof.py --reexecute` was NOT run against this record as part of writing it (a record cannot contain proof of its own existence or its own re-execution, per proof/README.md) and was not separately run against the wider proof/ corpus in this session either.",
+    "python scripts/lwb_check_commit_identity.py was run with explicit --base/--head flags scoped to this branch's own single commit; it was NOT run with no arguments (its default, which CI's own workflow step actually invokes and which scans up to the last 500 commits reachable from HEAD). That default run already fails on origin/main today -- squash-merge commits carry GitHub's own merge-actor identity (LEAPWare <300127941+LEAPWare-HQ@users.noreply.github.com>), not the literal LEAPWare <leapware@outlook.com> the script's ALLOWED_HUMAN constant requires -- which is a pre-existing, unrelated defect this PR does not introduce and does not fix."
+  ]
+}
