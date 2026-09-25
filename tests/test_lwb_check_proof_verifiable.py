@@ -138,6 +138,71 @@ def test_true_verifiable_needs_no_reason():
     assert errors == []
 
 
+def test_handoff_check_marked_verifiable_true_is_rejected():
+    """proof/20.json AND, independently, proof/39.json both once marked
+    'python3 scripts/lwb_handoff.py --check' verifiable: true -- the
+    identical mistake, made twice, because that command's output is the
+    byte count of HANDOFF.md's GENERATED block, which moves with live
+    repo state (main SHA, open-PR listing, proof-state summary) on every
+    subsequent merge, independent of any change to tracked content. This
+    is the structural guard build-plan item 1.4 added so a third record
+    cannot make the same mistake undetected."""
+    record = _pr20_base(
+        commands=[_cmd(argv=["python3", "scripts/lwb_handoff.py", "--check"], verifiable=True)]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("derived from repo STATE" in e for e in errors), errors
+
+
+def test_handoff_check_module_form_marked_verifiable_true_is_also_rejected():
+    """Same needle-based, case-insensitive substring match _command_resolves_to_self
+    uses -- catches the -m module spelling and an uppercase filename too,
+    not just the one exact spelling this repo's records happen to use."""
+    record = _pr20_base(
+        commands=[_cmd(argv=["python3", "-m", "LWB_HANDOFF", "--check"], verifiable=True)]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("derived from repo STATE" in e for e in errors), errors
+
+
+def test_check_state_claims_marked_verifiable_true_is_rejected():
+    """lwb_check_state_claims.py has the identical property for the
+    identical reason -- it scans every tracked .md file for volatile
+    git/PR state, so its own output changes with repo state that has
+    nothing to do with any tracked file's content."""
+    record = _pr20_base(
+        commands=[_cmd(argv=["python3", "scripts/lwb_check_state_claims.py", "--repo", "."], verifiable=True)]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert any("derived from repo STATE" in e for e in errors), errors
+
+
+def test_handoff_check_marked_verifiable_false_with_reason_still_passes():
+    """The correct classification -- verifiable: false, reason
+    nondeterministic-output, exactly as proof/20.json's and proof/39.json's
+    own corrections use -- must not be flagged by the new guard."""
+    record = _pr20_base(
+        commands=[
+            _cmd(
+                argv=["python3", "scripts/lwb_handoff.py", "--check"],
+                verifiable=False,
+                verifiable_reason="nondeterministic-output",
+            )
+        ]
+    )
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert errors == []
+
+
+def test_unrelated_command_marked_verifiable_true_is_unaffected():
+    """The guard is name-specific, not a general 'state-dependent output'
+    detector this validator cannot build -- an ordinary command is
+    untouched."""
+    record = _pr20_base(commands=[_cmd(argv=["python3", "scripts/lwb_check_prefix.py"], verifiable=True)])
+    errors = lwb_check_proof._validate_record(Path("r.json"), record)
+    assert errors == []
+
+
 def test_range_command_missing_resolved_shas_is_rejected():
     record = _pr20_base(
         commands=[

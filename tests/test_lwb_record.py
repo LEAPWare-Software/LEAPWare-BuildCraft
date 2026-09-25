@@ -115,6 +115,43 @@ def test_run_command_accepts_valid_reason_when_not_verifiable():
     assert entry["verifiable_reason"] == "nondeterministic-output"
 
 
+def test_run_command_rejects_verifiable_true_for_lwb_handoff_check():
+    """proof/20.json AND, independently, proof/39.json both once recorded
+    'lwb_handoff.py --check' as verifiable: true -- the identical mistake,
+    made twice, because that command's output is HANDOFF.md's GENERATED
+    block byte count, which moves with live repo state on every
+    subsequent merge. This is where that mistake is actually made, so
+    this is where it is now refused outright, before the command is even
+    launched (never reaches subprocess.run)."""
+    import pytest
+    with pytest.raises(ValueError, match="derived from repo STATE"):
+        lwb_record.run_command(
+            ["python3", "scripts/lwb_handoff.py", "--check"], expect_exit=0, verifiable=True
+        )
+
+
+def test_run_command_rejects_verifiable_true_for_lwb_check_state_claims():
+    import pytest
+    with pytest.raises(ValueError, match="derived from repo STATE"):
+        lwb_record.run_command(
+            ["python3", "scripts/lwb_check_state_claims.py", "--repo", "."],
+            expect_exit=0,
+            verifiable=True,
+        )
+
+
+def test_run_command_accepts_verifiable_false_for_lwb_handoff_check():
+    """The correct classification is unaffected by the new guard."""
+    entry = lwb_record.run_command(
+        [sys.executable, "-c", "print('lwb_handoff.py --check')"],
+        expect_exit=0,
+        verifiable=False,
+        verifiable_reason="nondeterministic-output",
+    )
+    assert entry["verifiable"] is False
+    assert entry["verifiable_reason"] == "nondeterministic-output"
+
+
 def test_run_command_accepts_resolved_base_and_head():
     entry = lwb_record.run_command(
         [sys.executable, "-c", "print('x')"],

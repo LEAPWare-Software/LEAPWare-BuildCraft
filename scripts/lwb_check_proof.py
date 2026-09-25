@@ -271,6 +271,63 @@ ALLOWED_VERIFIABLE_REASONS = (
     "needs-build-step",
 )
 
+# Structural guard for a mistake this repo has now made TWICE with the
+# identical root cause. proof/20.json originally marked `lwb_handoff.py
+# --check` `verifiable: true`; independent review found it wrong (the
+# command prints the byte count of HANDOFF.md's GENERATED block -- main
+# SHA, open-PR list, proof-state summary -- which changes with live repo
+# state on every subsequent merge, independent of any change to the
+# tracked file itself) and it was corrected to `verifiable: false`,
+# `verifiable_reason: "nondeterministic-output"` -- see proof/README.md's
+# "Re-execution" section for the full writeup and the precedent this
+# mirrors. build-plan item 1.4 (making --reexecute blocking) found
+# proof/39.json had made the EXACT same mistake again, on the EXACT same
+# command, undetected because nothing outside a human's memory of
+# proof/20.json's history stopped it recurring. `lwb_check_state_claims.py`
+# has the identical property for the identical reason (it scans every
+# tracked .md file for volatile git/PR state, so its own output changes
+# with repo state that has nothing to do with any tracked file's
+# CONTENT) -- every real record already gets this one right, but that is
+# a fact about today's records, not a guarantee about the next one someone
+# hand-writes.
+#
+# This does not try to detect the general class described in
+# proof/README.md ("if a machine re-executing it, at any commit, on any
+# machine, could ever print something different from what was recorded...
+# because the output embeds a byte count, a file count, a timestamp, a
+# live gh/network result, a generated-block value, or anything else
+# derived from repo STATE rather than repo CONTENT") -- that judgement is
+# inherently about what a command's OUTPUT depends on, and no script can
+# read a command's implementation to answer it in general (the same
+# honesty-gap limit that applies to `verifiable_reason` generally; see
+# ALLOWED_VERIFIABLE_REASONS above and docs/maintainers/proof-of-completion-
+# plan.md). It closes the ONE specific, already-repeated case by name, the
+# same way `_command_resolves_to_self` closes a specific recursion risk by
+# name rather than attempting general self-reference detection.
+STATE_DEPENDENT_COMMAND_NEEDLES = (
+    "lwb_handoff",
+    "lwb_check_state_claims",
+)
+
+
+def _command_reads_mutable_generated_state(argv) -> bool:
+    """True if `argv` names one of the commands this repo has already
+    recorded `verifiable: true` in error, because their output is derived
+    from repo STATE that changes with later history rather than from any
+    tracked file's CONTENT -- see STATE_DEPENDENT_COMMAND_NEEDLES above.
+
+    Same technique as `_command_resolves_to_self`: a case-insensitive
+    substring match against every string `argv` token, deliberately
+    over-inclusive (a command that merely MENTIONS one of these names,
+    e.g. a `pytest` invocation of its test file, also matches). The
+    caller only uses a match to forbid `verifiable: true`; it never turns
+    a match into a skip or a pass on its own.
+    """
+    if not isinstance(argv, list):
+        return False
+    tokens = [a.lower() for a in argv if isinstance(a, str)]
+    return any(needle in token for needle in STATE_DEPENDENT_COMMAND_NEEDLES for token in tokens)
+
 
 def _argv_has_git_range(argv: list) -> bool:
     """True if `argv` names a git revision range, by any spelling seen (or
@@ -355,6 +412,20 @@ def _validate_verifiability(rel, commands: list) -> list[str]:
                     f"{prefix}: 'verifiable' is false but 'verifiable_reason' "
                     f"{reason!r} is not one of {ALLOWED_VERIFIABLE_REASONS!r}"
                 )
+        elif verifiable is True and _command_reads_mutable_generated_state(argv):
+            # See STATE_DEPENDENT_COMMAND_NEEDLES / proof/README.md's
+            # "Re-execution" section -- proof/20.json and proof/39.json both
+            # made this exact mistake on this exact command, independently.
+            errors.append(
+                f"{prefix}: 'verifiable' is true, but this command's expected "
+                "output is derived from repo STATE that changes with later "
+                "history (e.g. HANDOFF.md's generated block, rewritten by "
+                "every subsequent merge, or a scan over every tracked .md "
+                "file's volatile git/PR claims) rather than from tracked "
+                "file CONTENT -- mark 'verifiable: false' with "
+                "'verifiable_reason': 'nondeterministic-output' instead "
+                "(see proof/20.json's own correction and proof/README.md)"
+            )
 
         if _argv_has_git_range(argv):
             resolved_base = cmd.get("resolved_base")
