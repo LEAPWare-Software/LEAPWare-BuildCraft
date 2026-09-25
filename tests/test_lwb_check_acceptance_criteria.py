@@ -37,16 +37,29 @@ def _init_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _commit(repo: Path, name: str, text: str, *, author_date: str | None = None) -> str:
+def _commit(
+    repo: Path,
+    name: str,
+    text: str,
+    *,
+    author_date: str | None = None,
+    committer_date: str | None = None,
+) -> str:
     path = repo / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     subprocess.run(["git", "add", name], cwd=repo, check=True)
     env = None
-    if author_date is not None:
+    if author_date is not None or committer_date is not None:
         env = dict(os.environ)
-        env["GIT_AUTHOR_DATE"] = author_date
-        env["GIT_COMMITTER_DATE"] = author_date
+        if author_date is not None:
+            env["GIT_AUTHOR_DATE"] = author_date
+        if committer_date is not None:
+            env["GIT_COMMITTER_DATE"] = committer_date
+        elif author_date is not None:
+            # Preserve existing tests' behaviour: passing only author_date
+            # sets both dates identically.
+            env["GIT_COMMITTER_DATE"] = author_date
     subprocess.run(
         ["git", "commit", "-q", "-m", f"add {name}"],
         cwd=repo,
@@ -144,6 +157,50 @@ def test_issue_created_exactly_at_first_commit_is_pass(tmp_path, monkeypatch):
         repo=repo, base="main", head="work", pr_number=1, branch=None, gh_repo="o/r"
     )
     assert result.outcome == m.Outcome.PASS, result.render()
+
+
+def test_check_acceptance_criteria_reads_author_date_not_committer_date(tmp_path, monkeypatch):
+    """Guards the module docstring's specific rebase-safety reason for
+    `%aI` (author date) over `%cI` (committer date): 'not commit date,
+    which a rebase can change without the author's knowledge'. Construct a
+    commit whose author date and committer date genuinely differ (`GIT_
+    AUTHOR_DATE` vs `GIT_COMMITTER_DATE` at commit time), placed so the two
+    dates give OPPOSITE PASS/FAIL answers against the same issue timestamp:
+    author date (15:00) is AFTER the issue (12:00), so the issue predates
+    the commit -> PASS if author date is used; committer date (09:00) is
+    BEFORE the issue (12:00), so the issue would postdate the commit ->
+    FAIL if committer date were used instead. A script reading %cI would
+    fail this test."""
+    repo = _init_repo(tmp_path)
+    _seed_base_and_work(repo)
+    first_sha = _commit(
+        repo,
+        "feature.txt",
+        "work\n",
+        author_date="2026-09-25T15:00:00+00:00",
+        committer_date="2026-09-25T09:00:00+00:00",
+    )
+    # Sanity-check the fixture itself, independent of the function under
+    # test: query git directly for both dates, not via m._commit_author_date
+    # (which is the very function this test is checking), so this guard
+    # stays meaningful even if that function is the thing that regresses.
+    raw_author = m._run_git(["log", "-1", "--format=%aI", first_sha], repo).stdout.strip()
+    raw_committer = m._run_git(["log", "-1", "--format=%cI", first_sha], repo).stdout.strip()
+    assert raw_author != raw_committer, "test fixture did not actually diverge author/committer dates"
+
+    monkeypatch.setattr(
+        m,
+        "_gh_api_json",
+        _fake_gh(pr_body="Closes #101", issue_created_at="2026-09-25T12:00:00Z"),
+    )
+    result = m.check_acceptance_criteria(
+        repo=repo, base="main", head="work", pr_number=1, branch=None, gh_repo="o/r"
+    )
+    assert result.outcome == m.Outcome.PASS, (
+        "expected PASS using the commit's AUTHOR date (15:00, after the 12:00 "
+        f"issue) -- got {result.render()}; a script wrongly reading committer "
+        "date (09:00, before the issue) would report FAIL here"
+    )
 
 
 def test_issue_created_after_first_commit_is_fail_naming_both_timestamps(tmp_path, monkeypatch):
@@ -448,6 +505,57 @@ def test_check_acceptance_criteria_uses_the_original_first_commit_through_a_merg
         repo=repo, base="main", head="work", pr_number=1, branch=None, gh_repo="o/r"
     )
     assert result.outcome == m.Outcome.FAIL, result.render()
+
+
+def test_side_branch_merged_within_the_deliverable_does_not_override_its_own_first_commit(
+    tmp_path,
+):
+    """A genuine SIDE BRANCH merged WITHIN the deliverable (not `origin/main`
+    forward-merged in, but a feature branch the deliverable itself merges) is
+    the case `--first-parent` exists for, per `resolve_first_commit`'s own
+    docstring reasoning (borrowed from `scripts/lwb_lanes.py`'s
+    `resolve_reviewable_head`). The side branch's own commit is given an
+    EARLIER author/commit date than the deliverable's real first commit --
+    entirely possible, since dates are whatever the machine that made them
+    says -- so plain date-ordered traversal (no `--first-parent`) would
+    present the side commit as "first" under `--reverse`. This is a
+    DIFFERENT case from `test_merge_forward_from_base_does_not_change_the_
+    first_commit` above, which merges the BASE forward; here the side branch
+    forks from base independently and is merged INTO the deliverable branch
+    via a real two-parent merge."""
+    repo = _init_repo(tmp_path)
+    _seed_base_and_work(repo)  # main: seed. work: branched off main.
+
+    # A side branch, also forked from base, whose own commit is dated
+    # EARLIER than the deliverable's real first commit below.
+    subprocess.run(["git", "checkout", "-b", "side", "main"], cwd=repo, check=True)
+    _commit(repo, "side.txt", "side\n", author_date="2026-09-25T08:00:00+00:00")
+
+    # The deliverable's own real first commit, dated LATER than the side
+    # commit above.
+    subprocess.run(["git", "checkout", "work"], cwd=repo, check=True)
+    first_sha = _commit(repo, "feature1.txt", "one\n", author_date="2026-09-25T09:00:00+00:00")
+
+    # A real two-parent merge of the side branch INTO the deliverable
+    # branch -- not a base-merge-forward.
+    env = dict(os.environ)
+    env["GIT_AUTHOR_DATE"] = "2026-09-25T10:00:00+00:00"
+    env["GIT_COMMITTER_DATE"] = "2026-09-25T10:00:00+00:00"
+    subprocess.run(
+        ["git", "merge", "side", "--no-ff", "-m", "merge side into work"],
+        cwd=repo,
+        check=True,
+        env=env,
+    )
+
+    resolved_sha, author_date, range_result = m.resolve_first_commit(repo, "main", "work")
+    assert range_result is None, range_result
+    assert resolved_sha == first_sha, (
+        f"expected the deliverable's own real first commit {first_sha}, got "
+        f"{resolved_sha} -- without --first-parent, plain date-ordered "
+        "traversal would surface the earlier-dated side-branch commit instead"
+    )
+    assert author_date == m._commit_author_date(repo, first_sha)
 
 
 # ---------------------------------------------------------------------------

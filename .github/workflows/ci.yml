@@ -187,12 +187,14 @@ jobs:
         # PR was not asked to add.
         if: always() && github.event_name == 'pull_request'
         continue-on-error: true
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: >-
           python scripts/lwb_check_acceptance_criteria.py
           --pr ${{ github.event.pull_request.number }}
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
-          --branch ${{ github.event.pull_request.head.ref }}
+          --branch "$PR_HEAD_REF"
 
       - name: lwb-proof-coverage (every landed deliverable HAS a record)
         # Post-merge, on main: `before..sha` contains the squash commit that
