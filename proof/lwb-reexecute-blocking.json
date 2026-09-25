@@ -1,0 +1,164 @@
+{
+  "deliverable": "lwb-reexecute-blocking-1.4",
+  "pr": 62,
+  "author": "claude-code-lwb-reexecute-blocking-2026-09-25",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "a954af217d0c9e7c44577634e032281ab3eca307",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 12%]",
+        "........................................................................ [ 24%]",
+        "........................................................................ [ 36%]",
+        "........................................................................ [ 48%]",
+        "........................................................................ [ 60%]",
+        "........................................................................ [ 72%]",
+        "........................................................................ [ 84%]",
+        "........................................................................ [ 96%]",
+        "........................                                                 [100%]",
+        "600 passed in 23.50s"
+      ],
+      "sha256": "1132260952a43e083263792dadfded98af4aff85eaa4af34d6fbac1ab28f04e8",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "...                                                                      [100%]",
+        "3 passed in 0.06s"
+      ],
+      "sha256": "c2d64d41edcb4d9a0b7a81fcc964ceb8d2b7d73d7d92491bb17f24d0bbaea6d3",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_proof.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "NOTICE: pr-authority: no --pr given -- every record's 'pr' field in this run is SELF-DECLARED and UNVERIFIED against any number external to the record itself (only _authoritative_pr_from_filename's filename cross-check ran)",
+        "lwb-proof check passed (22 record(s))"
+      ],
+      "sha256": "bba9b28c8981416ced186c309ec37561ab51ce48fa1456970df1a5bd74d1af27",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "build-plan item 1.4 is implemented: .github/workflows/ci.yml's lwb-proof-reexecute step is continue-on-error: false (explicit, not relying on the implicit default), timeout-minutes: 15 is unchanged, and the stale 'unmeasured cross-platform reproduction' comment is replaced with the actual current state.",
+      "met": true
+    },
+    {
+      "criterion": "Verified myself, not assumed from the task prompt, that flipping the gate on would break CI: ran `python scripts/lwb_check_proof.py --reexecute` on a clean checkout of origin/main before making any change, and reproduced exactly one mismatch -- 'TOTAL: 31 of 157 commands re-executed, 0 uncomparable, 18 skipped-self, across 22 records -- MISMATCH: 1 command(s) did not match', FAIL on proof/39.json's `python3 scripts/lwb_handoff.py --check` entry.",
+      "met": true
+    },
+    {
+      "criterion": "Confirmed no OTHER currently-verifiable: true command across proof/*.json newly fails once blocking. After the fix, `python scripts/lwb_check_proof.py --reexecute` reports 'TOTAL: 30 of 157 commands re-executed, 0 uncomparable, 18 skipped-self, across 22 records -- ALL RE-EXECUTED COMMANDS MATCHED' (exit 0). The fixed record's one command drops out of the re-executed count (30 vs. the prior 31) rather than moving to UNCOMPARABLE or SKIPPED-SELF, because it is no longer verifiable: true at all.",
+      "met": true
+    },
+    {
+      "criterion": "The fix is honest about what it does NOT close: it does not lie about closing the verifiable_reason honesty gap (docs/maintainers/proof-of-completion-plan.md's open blocker 2). This is stated explicitly in the commit message and PR body: the enum still only constrains wording, not truth, and an author can still opt every command out and get a green gate. REEXECUTE_EXIT_NOTHING_REEXECUTED and the TOTAL line's wording make that visible, not prevented; this PR narrows the ONE already-repeated concrete case (lwb_handoff.py --check / lwb_check_state_claims.py), it does not claim to close the general hole.",
+      "met": true
+    },
+    {
+      "criterion": "proof/39.json's classification-only correction mirrors proof/20.json's own precedent exactly (proof/README.md's 'Re-execution' section): verifiable: true -> verifiable: false, verifiable_reason: 'nondeterministic-output', with argv, exit, expect_exit, tail, sha256 and sanitiser_version left byte-for-byte untouched. Checked every other pr>=20 record in proof/*.json (proof/20.json, proof/22.json, proof/24.json, proof/lwb-ship-proof-coverage-integrity.json): every one already classifies lwb_handoff.py --check and lwb_check_state_claims.py this way, so no new enum value was needed.",
+      "met": true
+    },
+    {
+      "criterion": "Structural fix added so this cannot recur silently a third time: scripts/lwb_check_proof.py's schema validation (STATE_DEPENDENT_COMMAND_NEEDLES / _command_reads_mutable_generated_state) and scripts/lwb_record.py's recorder (STATE_DEPENDENT_COMMAND_NEEDLES / _reads_mutable_generated_state) both now refuse verifiable: true by name for lwb_handoff.py --check and lwb_check_state_claims.py. 8 new regression tests added and passing.",
+      "met": true
+    },
+    {
+      "criterion": "python -m pytest tests/ -q is green after every change (600 passed, up from 592 on origin/main, reflecting the 8 new tests) and python -m pytest tests/test_workflows_parse.py -q passes (3 passed) after touching .github/workflows/ci.yml.",
+      "met": true
+    },
+    {
+      "criterion": "Did not touch plugins/codex/, adapters/codex/, .claude/, .codex/, core/, or adapters/ -- confirmed by `git status --short` showing only .github/workflows/ci.yml, proof/39.json, scripts/lwb_check_proof.py, scripts/lwb_record.py, tests/test_lwb_check_proof_verifiable.py and tests/test_lwb_record.py changed. lwb_build.py --check was not re-run for a vendor rebuild because core/ and adapters/ are untouched -- not applicable, not skipped.",
+      "met": true
+    },
+    {
+      "criterion": "Did not write anything under reviews/ and did not dispatch any review of this work myself (D20/D27) -- the separate, clock-dispatched reviewer routine handles that after this PR is pushed.",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown -- this record was written mid-session and no per-PR token accounting was taken. Recorded as unknown rather than copied from an earlier record or estimated, because a borrowed number is a manufactured one."
+  },
+  "mutations": [
+    ".github/workflows/ci.yml: lwb-proof-reexecute step flipped from continue-on-error: true to continue-on-error: false (explicit); the stale comment citing 'unmeasured cross-platform reproduction' replaced with the current, accurate state and a pointer to what was fixed to make blocking safe; timeout-minutes: 15 unchanged.",
+    "proof/39.json: commands[] entry for `python3 scripts/lwb_handoff.py --check` corrected from verifiable: true to verifiable: false, verifiable_reason: 'nondeterministic-output' (classification-only, mirroring proof/20.json's own precedent -- captured evidence untouched); one note appended to unproven[] documenting the correction. pr field (39) left unchanged, as required for a MODIFIED-not-added record.",
+    "scripts/lwb_check_proof.py: added STATE_DEPENDENT_COMMAND_NEEDLES and _command_reads_mutable_generated_state, and hooked them into _validate_verifiability so `lwb_handoff.py --check` / `lwb_check_state_claims.py` can never be recorded verifiable: true again.",
+    "scripts/lwb_record.py: added the identical STATE_DEPENDENT_COMMAND_NEEDLES / _reads_mutable_generated_state guard in run_command itself (refuses before the command is even launched), and corrected its own docstring, which previously claimed 'nothing in lwb_check_proof.py catches this' -- no longer fully true for these two commands.",
+    "tests/test_lwb_check_proof_verifiable.py: 5 new tests for the validator-side guard (both rejected forms, the module-spelling bypass, the correctly-classified case passing, and an unrelated command being unaffected).",
+    "tests/test_lwb_record.py: 3 new tests for the recorder-side guard (both rejected commands, and the correctly-classified case still working)."
+  ],
+  "unproven": [
+    "THE COMMANDS RAN ON LINUX ONLY (this container). CI runs the same gates on ubuntu, macos and windows across 3.10 and 3.12; I did not run the other five legs myself. This is exactly why build-plan item 1.4 depended on PR #21's prior cross-platform measurement (docs/maintainers/proof-of-completion-plan.md) rather than a fresh one here -- this PR changes the CI gate's severity, not the sanitiser or the re-execution mechanism's cross-platform behaviour, which PR #21 already measured on all six legs.",
+    "THE GENERAL verifiable_reason HONESTY GAP IS NOT CLOSED, as stated explicitly in the commit message and PR body -- this record does not claim otherwise. This PR closes one specific, already-repeated concrete case (lwb_handoff.py --check / lwb_check_state_claims.py verifiable: true), never the general judgement of whether a stated reason is true.",
+    "lwb-lanes (shared-path independent review) could not be exercised locally -- it needs live PR/GitHub context (github.event_name == 'pull_request') this container does not have. `python scripts/lwb_lanes.py --base origin/main --head HEAD` printed 'lwb-lanes check skipped (not running under a PR)' locally; the real check runs in CI once this PR is open. I did not write, and must not write, a reviews/ record for this PR myself (D20) -- the separate reviewer routine does that.",
+    "lwb-env-leak could not be exercised locally in its configured form -- LWB_PRIVATE_NEEDLES is a CI repository secret, unset in this container ('FAIL: lwb-env-leak UNCONFIGURED' is expected and unrelated to this change). CI runs it for real with the secret present.",
+    "lwb_build.py --check was NOT re-run as a vendor-rebuild step -- this PR touches no file under core/ or adapters/, so plugins/*/lwb/vendor/ cannot have drifted from source; running --check anyway (locally, informationally) still passed, confirming no incidental drift, but this is not the same claim as 'a vendor rebuild was needed and performed'.",
+    "`python3 scripts/lwb_check_proof.py --reexecute` itself does NOT appear in commands[] above, even though its 'TOTAL: 30 of 157 ... ALL RE-EXECUTED COMMANDS MATCHED' output is the central verification this deliverable rests on and is quoted in the commit message and PR body verbatim. It cannot appear here: `--reexecute` is pinned by tests/test_lwb_check_proof_reexecute.py::test_reexecute_flag_never_appears_in_any_recorded_argv to never occur in ANY recorded argv across proof/*.json, because a re-executed command that itself carried --reexecute could recurse into a nested --reexecute invocation. I ran it directly, read its output myself, and it is not a fabricated number -- it is simply not a commands[] entry, by the same rule that keeps `lwb_check_proof.py --pr <N>` for a record's own PR out of commands[] too (proof/README.md, 'Captured output must be sanitized')."
+  ]
+}

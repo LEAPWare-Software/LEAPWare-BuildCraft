@@ -72,6 +72,30 @@ ALLOWED_VERIFIABLE_REASONS = (
     "needs-build-step",
 )
 
+# Kept identical to scripts/lwb_check_proof.py::STATE_DEPENDENT_COMMAND_NEEDLES,
+# duplicated for the same reason ALLOWED_VERIFIABLE_REASONS is above -- this
+# module does not import the CI validator. `lwb_handoff.py --check` and
+# `lwb_check_state_claims.py` print output derived from live repo STATE
+# (HANDOFF.md's generated block; a scan of every tracked .md file's
+# volatile git/PR claims) that changes with later history rather than from
+# any tracked file's CONTENT. proof/20.json and, independently, proof/39.json
+# both recorded `lwb_handoff.py --check` as `verifiable: true` by mistake --
+# the identical mistake, made twice. This is the point where that mistake
+# is actually made, so this is where it is now refused outright, not just
+# caught later by scripts/lwb_check_proof.py's schema validation (which
+# also refuses it -- see that module's STATE_DEPENDENT_COMMAND_NEEDLES --
+# as a second, independent line of defence for any record built without
+# going through this recorder at all).
+STATE_DEPENDENT_COMMAND_NEEDLES = (
+    "lwb_handoff",
+    "lwb_check_state_claims",
+)
+
+
+def _reads_mutable_generated_state(argv: list[str]) -> bool:
+    tokens = [a.lower() for a in argv if isinstance(a, str)]
+    return any(needle in token for needle in STATE_DEPENDENT_COMMAND_NEEDLES for token in tokens)
+
 
 def run_command(
     argv: list[str],
@@ -120,8 +144,15 @@ def run_command(
     the tracked file does not change, so its digest reproduces only by
     coincidence. Found by independent review, corrected in the record
     itself (see `proof/README.md`'s "The rule for marking a command
-    verifiable: true"). Nothing in `lwb_check_proof.py` catches this --
-    it is a judgement call for whoever writes the record, every time.
+    verifiable: true"). `proof/39.json` made the identical mistake again,
+    independently, and was corrected the same way when build-plan item 1.4
+    made `--reexecute` blocking. For the general class this is still a
+    judgement call `lwb_check_proof.py` cannot make for you, every time --
+    but for these two specific, twice-repeated commands it is no longer
+    only a judgement call: see `STATE_DEPENDENT_COMMAND_NEEDLES` below,
+    which this function now enforces directly, and which
+    `lwb_check_proof.py`'s own schema validation enforces independently as
+    a second line of defence for a record built without this recorder.
     """
     if verifiable is False:
         if verifiable_reason not in ALLOWED_VERIFIABLE_REASONS:
@@ -131,6 +162,14 @@ def run_command(
             )
     elif verifiable_reason is not None:
         raise ValueError("verifiable_reason is only meaningful when verifiable=False")
+    if verifiable is True and _reads_mutable_generated_state(argv):
+        raise ValueError(
+            f"verifiable=True is not allowed for {argv!r} -- this command's "
+            "output is derived from repo STATE that changes with later "
+            "history (see STATE_DEPENDENT_COMMAND_NEEDLES); mark "
+            "verifiable=False, verifiable_reason='nondeterministic-output' "
+            "instead"
+        )
 
     proc = subprocess.run(
         argv,

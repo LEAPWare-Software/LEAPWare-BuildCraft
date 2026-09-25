@@ -127,39 +127,46 @@ jobs:
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}
 
-      - name: "lwb-proof-reexecute (report-only: re-run verifiable commands, compare digests)"
+      - name: "lwb-proof-reexecute (blocking: re-run verifiable commands, compare digests)"
         if: always()
-        # REPORT-ONLY, deliberately: this step can never fail the job
-        # (continue-on-error: true, plus if: always() above like every
-        # other gate in this job). The sanitiser's cross-platform
-        # determinism (scripts/lwb_sanitise.py) has been verified on
-        # Windows only, and a GitHub-hosted runner has a different
-        # absolute repo root, a different home directory, and a different
-        # checkout layout than any machine that has recorded a digest so
-        # far. If a locally-recorded digest does not reproduce here, a
-        # BLOCKING gate would fail every PR -- including the one that
-        # fixes the sanitiser -- and force-push to fix a bad merge is
-        # denied in this repo (session-protocol.md: that has already cost
-        # two PRs). The first real runner output is the experiment; making
-        # this blocking is a separate PR, filed only after digests are
-        # observed reproducing here. See
-        # docs/maintainers/proof-of-completion-plan.md, blocker 2.
-        continue-on-error: true
-        # REPORT-ONLY DOES NOT BOUND TIME, which the independent reviewer
-        # of this PR pushed back on and which is right: continue-on-error
-        # stops a FAILURE from failing the job, it does not stop a HANG.
-        # This workflow had no timeout-minutes anywhere, so GitHub's
-        # 360-minute default was the only cap. The per-command
-        # REEXECUTE_TIMEOUT_SECONDS = 300 in scripts/lwb_check_proof.py is
-        # not sufficient alone: on Windows a command that TIMES OUT and is
-        # KILLED, while a child process it spawned keeps the pipes open,
-        # makes subprocess.run wait for that child anyway -- the reviewer
-        # measured a 2-second limit taking 20 seconds. (An earlier version
-        # of this comment said "a command that exits but leaves a child
-        # process"; that is not what was measured, and the reviewer
-        # corrected it.) This step-level cap is the outer bound that
-        # holds regardless. 15 minutes is many times the whole job's
-        # current runtime, so it can only fire on a genuine hang.
+        # BLOCKING as of build-plan item 1.4. It was report-only while two
+        # things were unmeasured; both are now measured, not assumed:
+        #
+        # 1. Cross-platform reproduction. PR #21's CI run (all six
+        #    ubuntu/macos/windows x 3.10/3.12 legs) reproduced identical
+        #    digests for every command marked verifiable: true at that
+        #    commit -- see docs/maintainers/proof-of-completion-plan.md,
+        #    "Cross-platform digest evidence -- MEASURED 2026-09-19".
+        # 2. The re-execution mechanism's own defects. Three independent-
+        #    review rounds after that measurement found and fixed real
+        #    bugs in this exact code path (_command_resolves_to_self
+        #    missing bypass forms, total_uncomparable/total_skipped_self
+        #    not tracked, a malformed-argv crash, a stale --help, vacuous
+        #    regression tests) -- see the "CLOSED 2026-09-19" sections in
+        #    that same document, immediately above the "What still stands"
+        #    note this PR closes.
+        #
+        # What this does NOT claim: the verifiable_reason enum constrains
+        # the WORDING a record gives for opting a command out of
+        # re-execution; it cannot and does not check whether that stated
+        # reason is actually TRUE of the command it labels. A record can
+        # still mark every command verifiable: false with a plausible
+        # reason and get a green gate having re-executed nothing --
+        # REEXECUTE_EXIT_NOTHING_REEXECUTED and the TOTAL line's wording
+        # make that visible, never a false pass, but visibility is not
+        # prevention. That judgement stays with review, not this script.
+        # See proof/README.md's Re-execution section and
+        # docs/maintainers/proof-of-completion-plan.md, open blocker 2.
+        continue-on-error: false
+        # A HANG must still fail closed rather than run forever.
+        # continue-on-error: false now stops a genuine FAILURE from
+        # passing the job; timeout-minutes is the separate, still-needed
+        # cap on a HANG (Windows measured a per-command
+        # REEXECUTE_TIMEOUT_SECONDS = 300 actually taking longer when a
+        # timed-out child keeps its pipes open, and there was no job- or
+        # step-level ceiling at all before this). 15 minutes is many times
+        # the whole job's current runtime, so it can only fire on a
+        # genuine hang.
         timeout-minutes: 15
         run: python scripts/lwb_check_proof.py --reexecute
 
