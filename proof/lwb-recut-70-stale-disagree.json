@@ -1,0 +1,170 @@
+{
+  "deliverable": "lwb-recut-70-stale-disagree",
+  "author": "claude-code-conductor-track-a-session_01YD5hpzfpL5it8uZroanCLn",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "ffc4bbe03c97aec3e67a13ebb84cad2610181658",
+  "commands": [
+    {
+      "argv": [
+        "/root/.local/bin/pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        "..............................sss                                        [100%]",
+        "606 passed, 3 skipped in 29.14s"
+      ],
+      "sha256": "f574886fda3646aa671a19f36b0b25da4a063ca42e81881df8d1a7366e48c7dd",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "/root/.local/bin/pytest",
+        "tests/test_workflows_parse.py",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "sss                                                                      [100%]",
+        "3 skipped in 0.01s"
+      ],
+      "sha256": "f93af03063f5ed70c0106507190b617cd9b8fe5104e1bd308f47e80c062d7bf2",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "e4a14ceeb47d7d0d5f4114beae89c89ef87b8353"
+    }
+  ],
+  "mutations": [
+    "docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md: new dated maintainers note quoting finding 6 verbatim, quoting the official Anthropic doc rename note verbatim with URL, and stating what is narrowed vs what stays open.",
+    "docs/maintainers/proof-of-completion-plan.md: appended an annotation under finding 6 (~line 443) pointing at the new note and stating the naming risk is resolved with citation, while explicitly stating the firing-observation question stays open. The original finding text is unchanged, per this file's own convention of appending corrections rather than rewriting.",
+    "proof/lwb-item-1.8-hook-matcher-name.json: this record.",
+    "CORRECTION (follow-up commit, same PR): independent reviewer B's DISAGREE at head 5fa8e75 correctly found that the original claim -- 'sub-agents.md's own worked PreToolUse hook-matcher example uses \"matcher\": \"Agent\"' -- is false; no such example exists on that page (reviewer B's grep reproduction, independently re-confirmed in this session against a fresh fetch of the raw page). The Task-renamed-to-Agent rename quote from sub-agents.md was and remains verbatim-correct and unaffected. The false sub-example claim is replaced in docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md and docs/maintainers/proof-of-completion-plan.md with a citation to hooks.md's PreToolUse section, which explicitly lists `Agent` among the built-in tool names PreToolUse matches on -- verbatim-verified against a fresh fetch of that raw page in this session. The underlying conclusion (Agent is a real, current, matchable tool name) is unchanged; only the supporting citation for the hook-matcher half of that conclusion changed.",
+    "RE-CUT (supersedes #70): #70's reviews/70/cloud-reviewer-b.json carries a DISAGREE at the superseded commit 5fa8e75 -- a real, since-fixed finding (a false doc citation). scripts/lwb_lanes.py's _review_ok checks verdict != 'AGREE' before staleness, so that DISAGREE keeps blocking lwb-lanes even after a fresh AGREE landed on #70 at 9700513 naming the fix. Per this repo's precedent (#46, #53, #66), an unclearable stale DISAGREE is cleared by re-cutting onto a fresh branch/PR, never by editing or deleting another reviewer's dissent. This branch starts clean from origin/main and carries only the corrected final content of docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md and docs/maintainers/proof-of-completion-plan.md's finding-6 annotation (one commit, ffc4bbe) plus this proof record (renamed from proof/lwb-item-1.8-hook-matcher-name.json and reset for the new PR, per this repo's own record/head circularity convention) -- it never contains the false citation #70's first two commits carried, so there is nothing here for a fresh review to disagree with on that ground. #70 is closed with a comment pointing here rather than left open alongside this branch."
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string pending-independent-reviewer-routine, not a reviewer identity -- per D20/D27 and this repo's CLAUDE.md, writing or dispatching that record is a separate clock-dispatched reviewer routine's job, and this session must not do either.",
+    "The doc citation (Anthropic's sub-agents.md rename note) was checked via two independent lookups in this session (a research subagent's fetch and a separate direct fetch of the same URL) and both returned the same text -- but this record does not re-fetch the URL itself as a command, so the citation's exact current text is not re-verified by anything in commands[] above; it is asserted from what was read earlier in this session.",
+    "The empirical hook-firing question -- does plugins/claude/lwb/hooks/hooks.json actually fire inside a real running Claude Code session -- remains genuinely open and is explicitly NOT claimed resolved by this record or by the note it adds. No probe was run in this session. That is Build Plan Phase 6's job.",
+    "reviews/ has no record for this PR yet, which is the expected, correct state before the separate reviewer routine runs -- not a defect in this record. lwb_lanes.py was not run against this branch for that reason.",
+    "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
+    "This environment's python3 has no pytest module installed (python3 -m pytest fails with No module named pytest); the pytest binary at /root/.local/bin/pytest was used directly instead, an equivalent invocation, recorded honestly as the argv actually run rather than the python3 -m pytest form the task instructions suggested.",
+    "tests/test_workflows_parse.py's 3 tests were SKIPPED, not passed: PyYAML is not installed in this local environment, and the tests themselves say this check is mandatory in CI. That is an honest environment fact, not a claim that workflow parsing was verified locally.",
+    "lwb-env-leak / lwb-env-leak-history were not run locally: LWB_PRIVATE_NEEDLES is a CI-only repository secret, unset here. This deliverable adds no needle-shaped strings and touches only docs/ and proof/; CI's real run with the secret configured is the only authoritative check.",
+    "The commands above ran on Linux only, in this container. CI's other matrix legs (macOS, Windows, the second Python version) were not run here."
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "A new dated maintainers note exists at docs/maintainers/item-1.8-hook-matcher-name-2026-09-25.md that quotes finding 6's stated risk verbatim and quotes the official Anthropic doc's exact Task-renamed-to-Agent note verbatim, with the doc URL cited",
+      "met": true
+    },
+    {
+      "criterion": "The note explicitly states it was checked via two independent lookups against the same URL, and states clearly what is narrowed (the dead-matcher-name risk) versus what remains open (empirical hook-firing observation, reserved for Build Plan Phase 6)",
+      "met": true
+    },
+    {
+      "criterion": "The note contains no claim that item 1.8 is closed, and no claim that the hook has been observed to fire",
+      "met": true
+    },
+    {
+      "criterion": "docs/maintainers/proof-of-completion-plan.md's finding 6 is annotated with a pointer to the new note, not silently rewritten -- the original finding text is unchanged and the annotation is clearly appended",
+      "met": true
+    },
+    {
+      "criterion": "No core/, adapters/, plugins/*/lwb/vendor/, or plugins/claude/lwb/hooks/hooks.json path is touched by this deliverable",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (tests/ -q) green with no test changes needed, since this is docs-only",
+      "met": true
+    },
+    {
+      "criterion": "Commit author/committer identity (LEAPWare <leapware@outlook.com>) passes scripts/lwb_check_commit_identity.py --base origin/main --head HEAD",
+      "met": true
+    },
+    {
+      "criterion": "The commit message carries the LWB-Agent: claude trailer required by scripts/githooks/commit-msg",
+      "met": true
+    },
+    {
+      "criterion": "No reviews/ record written or dispatched by this session -- that is the separate clock-dispatched routine's job per D20/D27",
+      "met": true
+    },
+    {
+      "criterion": "This branch's history never contains the false sub-agents.md hook-matcher-example citation #70's first two commits carried -- confirmed by diffing this branch's single content commit against #70's final (corrected) content, not by re-deriving the fix from scratch",
+      "met": true
+    }
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
