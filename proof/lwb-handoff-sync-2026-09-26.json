@@ -1,0 +1,128 @@
+{
+  "deliverable": "lwb-handoff-sync-2026-09-26",
+  "author": "claude-code-sonnet5-session-01Wgm1qF-2026-09-26",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "c15cf12f2540b08f501f06ddf750a7a7512a5424",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        ".................................                                        [100%]",
+        "609 passed in 21.80s"
+      ],
+      "sha256": "d744e3b0da97183688165c756a8404656505c9b831aec9a4cd13e338c5fa1c7c",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2924 bytes)"
+      ],
+      "sha256": "4ce33d87ab30d53827db815cf1efb8a91cb610d430399db86e179159a2ec8f16",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "c15cf12f2540b08f501f06ddf750a7a7512a5424"
+    }
+  ],
+  "mutations": [
+    "HANDOFF.md"
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "HANDOFF.md's hand-written 'In flight' prose no longer describes build-plan item 1.1 as pending a re-cut ('New PR TBD'); it states 1.1 is DONE and merged to main, citing commit 6afc545 and PR #50.",
+      "met": true
+    },
+    {
+      "criterion": "The prose lists, for build-plan items 1.2, 1.4, 1.5, 1.6, 1.7 and 1.8, that each already has an open, green, independently reviewed PR (numbers #51, #62, #68, #53, #66, #71 respectively) waiting only on the Auto-queue workflow, and notes that stall was already flagged to the owner on PR #45 as a structural serialization hazard outside any single PR's diff, not to be re-litigated here.",
+      "met": true
+    },
+    {
+      "criterion": "The prose states item 1.3 remains locked until 1.2 lands on main.",
+      "met": true
+    },
+    {
+      "criterion": "Only the hand-written prose changed; the generated block between the lwb-handoff:begin/end markers was produced solely by `scripts/lwb_handoff.py --write`, and the file's other structure (headings, 'Where to look') is untouched.",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md stays at or under the 3000-byte hard cap: `scripts/lwb_handoff.py --check` passes (2924 bytes).",
+      "met": true
+    },
+    {
+      "criterion": "No other file was touched by this deliverable's content commit; `git show --stat` on the content commit lists only HANDOFF.md.",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (`python -m pytest tests/ -q`) passes with no regressions (609 passed, unchanged from main's own count).",
+      "met": true
+    },
+    {
+      "criterion": "This commit's author identity is LEAPWare <leapware@outlook.com> (this repo's ALLOWED_HUMAN), verified by `python scripts/lwb_check_commit_identity.py --base origin/main --head HEAD`, and the commit message carries the required `LWB-Agent: claude` trailer.",
+      "met": true
+    }
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string pending-independent-reviewer-routine rather than a reviewer identity, per this repo's convention -- I must not write my own review (D20/D27).",
+    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number <this PR's number, unknown at record-writing time> WILL fail with '0 independent review(s) in reviews/<pr>/, needs 1' until a separate reviewer routine files an AGREE record -- this is the same, expected, not-yet-reviewed state every other open PR in this build-plan phase (#51, #53, #62, #66, #68, #71) is already in, not a defect in this change. Run locally against a placeholder PR number (9999) and confirmed it flags ONLY the missing-review finding, nothing else about this specific commit (no trailer/lane-ownership problem).",
+    "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
+    "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
+    "This record's own 'pr' field is intentionally omitted: no PR exists yet at the point this record was written (this branch's proof-record-before-PR convention, matching e.g. proof/lwb-recut-70-stale-disagree.json's history). A follow-up commit on this same branch adds `\"pr\": <n>` once the PR is opened, per proof/schema.json's own note that 'pr' is the only field the directive-7 gates key on.",
+    "The Auto-queue workflow stall this deliverable's prose describes (manual-dispatch-only trigger, no run in >24h) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed."
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
