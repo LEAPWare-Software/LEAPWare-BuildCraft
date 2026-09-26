@@ -108,10 +108,10 @@
   ],
   "unproven": [
     "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string pending-independent-reviewer-routine rather than a reviewer identity, per this repo's convention -- I must not write my own review (D20/D27).",
-    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number <this PR's number, unknown at record-writing time> WILL fail with '0 independent review(s) in reviews/<pr>/, needs 1' until a separate reviewer routine files an AGREE record -- this is the same, expected, not-yet-reviewed state every other open PR in this build-plan phase (#51, #53, #62, #66, #68, #71) is already in, not a defect in this change. Run locally against a placeholder PR number (9999) and confirmed it flags ONLY the missing-review finding, nothing else about this specific commit (no trailer/lane-ownership problem).",
+    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number 72 WILL fail with '0 independent review(s) in reviews/72/, needs 1' until a separate reviewer routine files an AGREE record -- this is the same, expected, not-yet-reviewed state every other open PR in this build-plan phase (#51, #53, #62, #66, #68, #71) is already in, not a defect in this change. Run locally (first against a placeholder PR number 9999, then against the real #72 once it existed) and confirmed it flags ONLY the missing-review finding, nothing else about this specific commit (no trailer/lane-ownership problem).",
     "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
     "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
-    "This record's own 'pr' field is intentionally omitted: no PR exists yet at the point this record was written (this branch's proof-record-before-PR convention, matching e.g. proof/lwb-recut-70-stale-disagree.json's history). A follow-up commit on this same branch adds `\"pr\": <n>` once the PR is opened, per proof/schema.json's own note that 'pr' is the only field the directive-7 gates key on.",
+    "This record's 'pr' field (72) was added in a follow-up commit on this same branch, after PR #72 was opened via the GitHub REST API (this branch's proof-record-before-PR convention, matching e.g. proof/lwb-recut-70-stale-disagree.json's history) -- the record's 'commit' field still names the earlier content commit (c15cf12), not this record-only follow-up commit.",
     "The Auto-queue workflow stall this deliverable's prose describes (manual-dispatch-only trigger, no run in >24h) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed."
   ],
   "tokens": {
@@ -124,5 +124,6 @@
     "tool_overhead": "unknown",
     "wall_time_seconds": "unknown",
     "source": "unknown: not measured from a session transcript in this run"
-  }
+  },
+  "pr": 72
 }
