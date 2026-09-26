@@ -1,0 +1,161 @@
+{
+  "deliverable": "lwb-recut-72-stale-disagree",
+  "author": "claude-code-sonnet5-session-01Wgm1qF-2026-09-26",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "0df30c071c621e9de2e0008c8b54cff7f40a4509",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        ".................................                                        [100%]",
+        "609 passed in 22.72s"
+      ],
+      "sha256": "6cb2fa7c358a07b3aa20101675c6ac5423012bcb9284eab1bc588dd8fede64d8",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2938 bytes)"
+      ],
+      "sha256": "2b4c54a976348937e3675b5b3b6a7b71873ab105a90ad8f833d1e252536bb33b",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "0df30c071c621e9de2e0008c8b54cff7f40a4509"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "mutations": [
+    "HANDOFF.md"
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "HANDOFF.md's content is byte-for-byte identical to #72's final, corrected state at commit 3b0808f (both reviewer B's original findings and the fix are represented; verified by diffing this commit's HANDOFF.md against `git show 3b0808f3272e464758931cd6e825cd112331154c:HANDOFF.md` -- identical aside from the regenerated block's timestamp).",
+      "met": true
+    },
+    {
+      "criterion": "No reviews/ record is carried over from #72; this deliverable starts its own clean reviews/<pr>/ directory once its PR number is known, so the unclearable stale DISAGREE from #72 (reviews/72/cloud-reviewer-b.json) cannot poison this PR's lwb-lanes evaluation.",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (`python -m pytest tests/ -q`) passes with no regressions (609 passed).",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md stays at or under the 3000-byte hard cap: `scripts/lwb_handoff.py --check` passes (2938 bytes).",
+      "met": true
+    },
+    {
+      "criterion": "This commit's author identity is LEAPWare <leapware@outlook.com> (this repo's ALLOWED_HUMAN), verified by `python scripts/lwb_check_commit_identity.py --base origin/main --head HEAD`, and the commit message carries the required `LWB-Agent: claude` trailer.",
+      "met": true
+    }
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string pending-independent-reviewer-routine rather than a reviewer identity, per this repo's convention -- I must not write my own review (D20/D27).",
+    "This is a re-cut of #72, made necessary by a genuine structural defect in scripts/lwb_lanes.py's _review_ok: it checks verdict != 'AGREE' before the staleness (reviewed_commit vs current head) check, so a DISAGREE record is classified 'other' rather than 'stale' even once the commit it reviewed is superseded and its own findings fixed -- an 'other' rejection is never outvoted by a later valid AGREE, by design (see the extensive comments above independent_reviews() in scripts/lwb_lanes.py). Reviewer B's reviews/72/cloud-reviewer-b.json became genuinely obsolete once #72's fix commit (3b0808f) landed and a second reviewer confirmed it with a fresh AGREE, but remained structurally unclearable on #72 itself. This is the same failure mode #46, #53, #66 and #71 hit before; per that precedent the fix is a re-cut, and this branch/PR is that re-cut. The underlying _review_ok ordering defect is NOT fixed here -- deliberately out of scope, since it is a shared-path change to the core enforcement logic that deserves its own scoped, independently reviewed PR rather than being bundled into a docs-only re-cut.",
+    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number <unknown until PR opens> WILL fail with '0 independent review(s)' until a separate reviewer routine files a fresh AGREE under this PR's own reviews/<pr>/ directory -- expected, not a defect in this change, and not mine to fix (D20/D27, and this repo's own conductor rule 5a).",
+    "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
+    "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
+    "This record's 'pr' field is intentionally omitted: no PR exists yet at the point this record was written. A follow-up commit on this same branch adds `\"pr\": <n>` once the PR is opened, matching this branch's own predecessor's convention (proof/lwb-recut-70-stale-disagree.json).",
+    "The Auto-queue workflow stall (and its actual root cause, GitHub's check_suite recursion guard, fixed by open PR #64) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed."
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  }
+}
