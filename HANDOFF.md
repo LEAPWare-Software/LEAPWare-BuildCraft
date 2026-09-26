@@ -26,15 +26,15 @@ that no WORTHY AND VETTED tool already does it before building anything.
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **IN FLIGHT (track A): Phase 1 item 1.1.** Ships
-   `lwb_proof_coverage` + `lwb_proof_integrity` as rules at `warn`.
-   Tests green, vendor rebuilt. #49 re-cut (branch
-   `lwb-recut-49-bad-reviewer-identity`): reviewer B's commit was
-   authored `Claude <noreply@anthropic.com>`, unlisted -- permanent
-   `lwb-commit-identity` failure, same shape as #38's bad commit (#39).
-   Not this PR's bug. New PR TBD. Cloud has #40, #44-48 open too.
-4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 2 rules on `main` today (4
-   once 1.1 lands), 0 armed to deny, 2 of 8 skills working.
+3. **Phase 1 status (track A).** 1.1 DONE, merged (#50). 1.2 #51,
+   1.4 #62, 1.5 #68, 1.6 #53, 1.7 #66, 1.8 #71: OPEN/GREEN/reviewed,
+   waiting on Auto-queue -- declares `check_suite`+`workflow_dispatch`
+   but hasn't fired in >24h (recursion guard: `check_suite` never
+   fires for a suite Actions itself created). PR #64 fixes it;
+   flagged to owner on #45. None blocked; don't re-litigate. 1.3
+   LOCKED until 1.2 lands.
+4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 4 rules on `main` today
+   (1.1 landed), 0 armed to deny, 2 of 8 skills working.
 5. **DEFECT PATTERN:** "I could not check" must never share a
    representation with "I checked and found nothing". Live in Codex's
    lane. The hook has still never been seen to fire from `hooks.json`.
@@ -43,10 +43,10 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-24 18:20 UTC
-main SHA: 6afc545646faa9b241ffe60ee4c612f50e4437f8
+Generated: 2026-09-26 06:07 UTC
+main SHA: 0d1be714ac028d9b2204bf997d49296c32378ff1
 CLI: claude
-Session: claude-code-sonnet5-session-0131oyCU-2026-09-24
+Session: claude-code-sonnet5-session-01Wgm1qF-2026-09-26
 
 Open PRs:
 (unavailable: no `gh` auth in this environment, or no open PRs)
