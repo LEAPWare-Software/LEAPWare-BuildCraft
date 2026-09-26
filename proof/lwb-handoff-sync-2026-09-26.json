@@ -2,7 +2,7 @@
   "deliverable": "lwb-handoff-sync-2026-09-26",
   "author": "claude-code-sonnet5-session-01Wgm1qF-2026-09-26",
   "checked_by": "pending-independent-reviewer-routine",
-  "commit": "c15cf12f2540b08f501f06ddf750a7a7512a5424",
+  "commit": "3b0808f3272e464758931cd6e825cd112331154c",
   "commands": [
     {
       "argv": [
@@ -67,6 +67,70 @@
       "verifiable_reason": "git-range-not-reproducible",
       "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
       "resolved_head": "c15cf12f2540b08f501f06ddf750a7a7512a5424"
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        ".................................                                        [100%]",
+        "609 passed in 22.40s"
+      ],
+      "sha256": "df1b58f8bb9b148a1e317cdd782efc015c878a76650f28f35da9c7d978c8a814",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_handoff.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/HANDOFF.md passes all checks (2938 bytes)"
+      ],
+      "sha256": "2b4c54a976348937e3675b5b3b6a7b71873ab105a90ad8f833d1e252536bb33b",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_commit_identity.py",
+        "--base",
+        "origin/main",
+        "--head",
+        "HEAD"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-commit-identity check passed"
+      ],
+      "sha256": "7c782a8f5e792cfef1b091bafe109b06604a35f5ee47ed17b2c84895f4d68033",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "git-range-not-reproducible",
+      "resolved_base": "0d1be714ac028d9b2204bf997d49296c32378ff1",
+      "resolved_head": "3b0808f3272e464758931cd6e825cd112331154c"
     }
   ],
   "mutations": [
@@ -104,6 +168,14 @@
     {
       "criterion": "This commit's author identity is LEAPWare <leapware@outlook.com> (this repo's ALLOWED_HUMAN), verified by `python scripts/lwb_check_commit_identity.py --base origin/main --head HEAD`, and the commit message carries the required `LWB-Agent: claude` trailer.",
       "met": true
+    },
+    {
+      "criterion": "Item 4's rule count matches item 3's own claim that 1.1 landed: HANDOFF.md now states '4 rules on `main` today (1.1 landed)', not the pre-1.1 count of 2, verified against `git ls-tree --name-only origin/main core/lwb_core/rules/` (4 modules: lwb_proof_coverage, lwb_proof_integrity, lwb_proof_required, lwb_version).",
+      "met": true
+    },
+    {
+      "criterion": "Item 3 no longer claims Auto-queue is workflow_dispatch-only; it states the workflow declares both check_suite and workflow_dispatch, names the actual defect (GitHub's recursion guard on check_suite), and names open PR #64 as the fix, verified against `git show origin/main:.github/workflows/auto-queue.yml` and `gh api .../pulls/64`.",
+      "met": true
     }
   ],
   "unproven": [
@@ -112,7 +184,8 @@
     "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
     "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
     "This record's 'pr' field (72) was added in a follow-up commit on this same branch, after PR #72 was opened via the GitHub REST API (this branch's proof-record-before-PR convention, matching e.g. proof/lwb-recut-70-stale-disagree.json's history) -- the record's 'commit' field still names the earlier content commit (c15cf12), not this record-only follow-up commit.",
-    "The Auto-queue workflow stall this deliverable's prose describes (manual-dispatch-only trigger, no run in >24h) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed."
+    "The Auto-queue workflow stall this deliverable's prose describes (manual-dispatch-only trigger, no run in >24h) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed.",
+    "Reviewer B filed reviews/72/cloud-reviewer-b.json as DISAGREE against this deliverable's original content commit (c15cf12), naming these same two prose defects. This record's `commit` field now points to the fix commit (3b0808f) that corrects them; the DISAGREE record still names the pre-fix head and is expected to read as stale/superseded once a fresh independent review runs against the new reviewable head -- I did not touch reviews/72/ myself (D20/D27: must not review my own PR)."
   ],
   "tokens": {
     "total_input": "unknown",
