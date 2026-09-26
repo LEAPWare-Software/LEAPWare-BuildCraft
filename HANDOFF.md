@@ -26,14 +26,15 @@ that no WORTHY AND VETTED tool already does it before building anything.
    conductor->reviewer -- PROCEDURAL, not mechanical: #27's own
    reviewer was manually fired by its author's session
    (`reviews/27/dispatch-correction.md`); no gate caught it.
-3. **Phase 1 status (track A).** 1.1 DONE, merged (commit 6afc545, #50).
-   1.2 #51, 1.4 #62, 1.5 #68, 1.6 #53, 1.7 #66, 1.8 #71: each OPEN,
-   GREEN, independently reviewed, waiting only on Auto-queue
-   (`workflow_dispatch`-only, no run in >24h -- flagged to owner on #45
-   as a structural hazard outside any PR's diff, already escalated).
-   None blocked; don't re-litigate. 1.3 LOCKED until 1.2 lands.
-4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 2 rules on `main` today (4
-   once 1.1 lands), 0 armed to deny, 2 of 8 skills working.
+3. **Phase 1 status (track A).** 1.1 DONE, merged (#50). 1.2 #51,
+   1.4 #62, 1.5 #68, 1.6 #53, 1.7 #66, 1.8 #71: OPEN/GREEN/reviewed,
+   waiting on Auto-queue -- declares `check_suite`+`workflow_dispatch`
+   but hasn't fired in >24h (recursion guard: `check_suite` never
+   fires for a suite Actions itself created). PR #64 fixes it;
+   flagged to owner on #45. None blocked; don't re-litigate. 1.3
+   LOCKED until 1.2 lands.
+4. **WHAT BLOCKS 1.0.0.** 0 of 13 stages, 4 rules on `main` today
+   (1.1 landed), 0 armed to deny, 2 of 8 skills working.
 5. **DEFECT PATTERN:** "I could not check" must never share a
    representation with "I checked and found nothing". Live in Codex's
    lane. The hook has still never been seen to fire from `hooks.json`.
@@ -42,7 +43,7 @@ that no WORTHY AND VETTED tool already does it before building anything.
 
 <!-- lwb-handoff:begin -->
 
-Generated: 2026-09-26 04:28 UTC
+Generated: 2026-09-26 05:06 UTC
 main SHA: 0d1be714ac028d9b2204bf997d49296c32378ff1
 CLI: claude
 Session: claude-code-sonnet5-session-01Wgm1qF-2026-09-26
