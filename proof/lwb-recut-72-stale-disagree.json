@@ -144,8 +144,8 @@
     "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number <unknown until PR opens> WILL fail with '0 independent review(s)' until a separate reviewer routine files a fresh AGREE under this PR's own reviews/<pr>/ directory -- expected, not a defect in this change, and not mine to fix (D20/D27, and this repo's own conductor rule 5a).",
     "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
     "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
-    "This record's 'pr' field is intentionally omitted: no PR exists yet at the point this record was written. A follow-up commit on this same branch adds `\"pr\": <n>` once the PR is opened, matching this branch's own predecessor's convention (proof/lwb-recut-70-stale-disagree.json).",
-    "The Auto-queue workflow stall (and its actual root cause, GitHub's check_suite recursion guard, fixed by open PR #64) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed."
+    "The Auto-queue workflow stall (and its actual root cause, GitHub's check_suite recursion guard, fixed by open PR #64) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed.",
+    "This record's 'pr' field (73) was added in a follow-up commit on this same branch, after PR #73 was opened via the GitHub REST API -- the record's 'commit' field still names the earlier content+proof commits, not this record-only follow-up commit."
   ],
   "tokens": {
     "total_input": "unknown",
@@ -157,5 +157,6 @@
     "tool_overhead": "unknown",
     "wall_time_seconds": "unknown",
     "source": "unknown: not measured from a session transcript in this run"
-  }
+  },
+  "pr": 73
 }
