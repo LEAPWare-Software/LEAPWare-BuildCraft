@@ -1,0 +1,125 @@
+{
+  "deliverable": "lwb-recut-73-stale-disagree",
+  "author": "claude-code-sonnet5-session-01Wgm1qF-2026-09-26",
+  "checked_by": "pending-independent-reviewer-routine",
+  "commit": "8b418eafdb336f91f929d292ab5f4176c0694662",
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "........................................................................ [ 11%]",
+        "........................................................................ [ 23%]",
+        "........................................................................ [ 35%]",
+        "........................................................................ [ 47%]",
+        "........................................................................ [ 59%]",
+        "........................................................................ [ 70%]",
+        "........................................................................ [ 82%]",
+        "........................................................................ [ 94%]",
+        ".................................                                        [100%]",
+        "609 passed in 22.64s"
+      ],
+      "sha256": "53e5ec1f31b2814605a9d19f529ea929f7de121eb8a5c9c1f10577bc92e4279a",
+      "sanitiser_version": "1",
+      "verifiable": false,
+      "verifiable_reason": "nondeterministic-output"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_prefix.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-prefix check passed"
+      ],
+      "sha256": "69ca97c9d32a2f4896f6df92a5840b86592ff8ce8e65fe38f4a904784c73bcb9",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_check_no_instruction_dep.py"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "lwb-no-instruction-dep check passed"
+      ],
+      "sha256": "d05b1c3eaeb82f65cd7aa71536a7bbf533e8b79360b84033e10be1d77dded317",
+      "sanitiser_version": "1",
+      "verifiable": true
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/lwb_build.py",
+        "--check"
+      ],
+      "exit": 0,
+      "expect_exit": 0,
+      "tail": [
+        "OK: <repo>/plugins/claude/lwb/vendor matches source",
+        "OK: <repo>/plugins/codex/lwb/vendor matches source"
+      ],
+      "sha256": "9e53d6018317363a9ddf4385cd974e3126a949882c85774f97e5163896920fdb",
+      "sanitiser_version": "1",
+      "verifiable": true
+    }
+  ],
+  "mutations": [
+    "HANDOFF.md"
+  ],
+  "acceptance_criteria": [
+    {
+      "criterion": "HANDOFF.md's prose content matches #72/#73's final, corrected state (1.1 DONE citing #50; 1.2/1.4-1.8 open+green+reviewed citing #51/#62/#68/#53/#66/#71; Auto-queue's actual check_suite-recursion-guard defect and PR #64 named; item 4's rule count corrected to 4).",
+      "met": true
+    },
+    {
+      "criterion": "UNLIKE #73, this deliverable's generated block is regenerated (scripts/lwb_handoff.py --write) AFTER this proof record file already exists in the working tree and BEFORE the commit that lands both -- so the tip commit's block reports the correct final proof count, never a stale one. This is the specific ordering-trap defect reviewer B found on #73 (recorded 23/23, re-derived 24/24); verified fixed here by running `python scripts/lwb_check_state_claims.py --repo .` after committing and confirming exit 0.",
+      "met": true
+    },
+    {
+      "criterion": "Full test suite (`python -m pytest tests/ -q`) passes with no regressions (609 passed).",
+      "met": true
+    },
+    {
+      "criterion": "HANDOFF.md stays at or under the 3000-byte hard cap: `scripts/lwb_handoff.py --check` passes.",
+      "met": true
+    },
+    {
+      "criterion": "This commit's author identity is LEAPWare <leapware@outlook.com> (this repo's ALLOWED_HUMAN), verified by `python scripts/lwb_check_commit_identity.py --base origin/main --head HEAD`, and the commit message carries the required `LWB-Agent: claude` trailer.",
+      "met": true
+    }
+  ],
+  "unproven": [
+    "THIS RECORD IS SELF-AUTHORED AND NOT YET INDEPENDENTLY CHECKED. checked_by is deliberately the literal string pending-independent-reviewer-routine rather than a reviewer identity, per this repo's convention -- I must not write my own review (D20/D27).",
+    "This is a SECOND re-cut, of #73 (itself a re-cut of #72). #72 hit the unclearable-stale-DISAGREE structural defect in scripts/lwb_lanes.py's _review_ok (verdict checked before staleness, so an obsolete DISAGREE can never be outvoted). #73 fixed #72's two prose findings but, in doing so, regenerated HANDOFF.md's block BEFORE its own proof record commit landed, leaving a stale '23/23 proven' claim that re-derived to '24/24' -- a genuine, PR-introduced regression reviewer B caught and correctly filed as a blocking DISAGREE (not itself pre-existing; origin/main's own check_state_claims passes). That DISAGREE is, by the same structural defect, ALSO unclearable in place -- reviewer B named this explicitly and recommended fixing _review_ok's ordering as its own scoped PR before any further re-cut. I have NOT done that here: this branch only fixes the ordering-trap regression (regenerate the block after the proof file lands, in one commit) and starts a clean reviews/74/ directory. The _review_ok fix itself is flagged as a separate, follow-up, independently-reviewed PR -- deliberately out of scope for this docs-only re-cut, same reasoning as #73's own note about not bundling it in.",
+    "python scripts/lwb_lanes.py --base origin/main --head HEAD --pr-number <unknown until PR opens> WILL fail with '0 independent review(s)' until a separate reviewer routine files a fresh AGREE under this PR's own reviews/<pr>/ directory -- expected, not a defect in this change, and not mine to fix (D20/D27, and this repo's own conductor rule 5a).",
+    "Windows/macOS CI legs were not run locally; every command above ran on Linux/CPython in this container only.",
+    "python scripts/lwb_check_proof.py --reexecute was not run as part of producing this record.",
+    "The Auto-queue workflow stall (and its actual root cause, GitHub's check_suite recursion guard, fixed by open PR #64) is a pre-existing, already-escalated (PR #45) structural issue outside this deliverable's scope; this record proves only that the prose accurately states that fact, not that the stall itself is fixed.",
+    "This record's 'pr' field (74) was added in a follow-up commit on this same branch, after PR #74 was opened via the GitHub REST API -- the record's 'commit' field still names the earlier content+proof commit (8b418ea), not this record-only follow-up commit."
+  ],
+  "tokens": {
+    "total_input": "unknown",
+    "cached_input": "unknown",
+    "uncached_input": "unknown",
+    "output": "unknown",
+    "retries": "unknown",
+    "setup_overhead": "unknown",
+    "tool_overhead": "unknown",
+    "wall_time_seconds": "unknown",
+    "source": "unknown: not measured from a session transcript in this run"
+  },
+  "pr": 74
+}
